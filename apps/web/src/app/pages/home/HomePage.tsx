@@ -1,3 +1,4 @@
+// apps/web/src/app/pages/home/HomePage.tsx
 import { useCallback, useState } from 'react';
 
 import { useBuildRunsData } from '../../../features/builds/hooks';
@@ -32,8 +33,8 @@ export default function HomePage() {
     <div className="page page--home">
       <HomeIntroBand />
 
-      <div className="home-grid">
-        <div className="home-grid__left">
+      <div className="home-layout">
+        <div className="home-layout__form">
           <BuildFormPanel
             datasets={datasets}
             universes={universes}
@@ -43,7 +44,7 @@ export default function HomePage() {
           />
         </div>
 
-        <div className="home-grid__center">
+        <div className="home-layout__main">
           <BuildRunsPanel
             buildRuns={buildRuns}
             loading={buildRunsLoading}
@@ -54,7 +55,7 @@ export default function HomePage() {
           />
         </div>
 
-        <div className="home-grid__right">
+        <div className="home-layout__reference">
           <CatalogSidebar
             datasets={datasets}
             universes={universes}

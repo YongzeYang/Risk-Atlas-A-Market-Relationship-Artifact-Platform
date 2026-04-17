@@ -1,3 +1,4 @@
+// apps/web/src/app/pages/home/sections/BuildFormPanel.tsx
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -37,7 +38,6 @@ export default function BuildFormPanel({
   const [universeId, setUniverseId] = useState('');
   const [asOfDate, setAsOfDate] = useState('');
   const [windowDays, setWindowDays] = useState<BuildRunWindowDays>(252);
-  const [scoreMethod, setScoreMethod] = useState<BuildRunScoreMethod>(SCORE_METHOD);
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -74,7 +74,7 @@ export default function BuildFormPanel({
       universeId,
       asOfDate,
       windowDays,
-      scoreMethod
+      scoreMethod: SCORE_METHOD
     };
 
     setSubmitting(true);
@@ -85,21 +85,22 @@ export default function BuildFormPanel({
       setCreatedBuild(created);
       onBuildCreated(created);
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Failed to create build run.');
+      setSubmitError(err instanceof Error ? err.message : 'Failed to start build.');
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <Panel className="build-form-panel" >
+    <Panel variant="primary" className="build-form-panel">
       <div id="create-build" />
+
       <SectionHeader
-        title="Create Build"
-        subtitle="Queue one correlation artifact build from the selected dataset and universe."
+        title="New build"
+        subtitle="Choose a dataset, a universe, and a date."
       />
 
-      {loading ? <div className="state-note">Loading dataset and universe catalog…</div> : null}
+      {loading ? <div className="state-note">Loading available data…</div> : null}
       {error ? <div className="state-note state-note--error">{error}</div> : null}
 
       {createdBuild ? (
@@ -108,12 +109,13 @@ export default function BuildFormPanel({
             <StatusBadge status={createdBuild.status} />
             <span className="mono">{createdBuild.id}</span>
           </div>
+
           <div className="inline-callout__body">
-            Build queued successfully. You can open its detail page immediately while status is
-            still updating.
+            Build started. You can open it now while it runs.
           </div>
+
           <Link to={`/builds/${createdBuild.id}`} className="button button--secondary button--sm">
-            Open Build
+            Open build
           </Link>
         </div>
       ) : null}
@@ -133,6 +135,7 @@ export default function BuildFormPanel({
               </option>
             ))}
           </select>
+
           <span className="field__hint">
             {selectedDataset
               ? `${selectedDataset.name} · ${formatDateOnly(selectedDataset.minTradeDate)} → ${formatDateOnly(
@@ -156,6 +159,7 @@ export default function BuildFormPanel({
               </option>
             ))}
           </select>
+
           <span className="field__hint">
             {universes.find((item) => item.id === universeId)?.name ?? 'Select one universe.'}
           </span>
@@ -170,7 +174,8 @@ export default function BuildFormPanel({
             onChange={(event) => setAsOfDate(event.target.value)}
             disabled={loading || submitting}
           />
-          <span className="field__hint">Uses log returns ending on this trading date.</span>
+
+          <span className="field__hint">Uses daily log returns ending on this trading date.</span>
         </label>
 
         <div className="form-grid__inline">
@@ -184,29 +189,20 @@ export default function BuildFormPanel({
             >
               {WINDOW_OPTIONS.map((days) => (
                 <option key={days} value={days}>
-                  {days}d
+                  {days} days
                 </option>
               ))}
             </select>
           </label>
 
-          <label className="field">
-            <span className="field__label">Score method</span>
-            <select
-              className="field__control mono"
-              value={scoreMethod}
-              onChange={(event) =>
-                setScoreMethod(event.target.value as BuildRunScoreMethod)
-              }
-              disabled
-            >
-              <option value="pearson_corr">pearson_corr</option>
-            </select>
-          </label>
-        </div>
+          <div className="field">
+            <span className="field__label">Method</span>
 
-        <div className="field__hint">
-          V1 computes Pearson correlation over aligned daily log returns for the selected universe.
+            <div className="field__static">
+              <div className="field__static-title">Pearson correlation</div>
+              <div className="field__static-copy">Fixed in V1</div>
+            </div>
+          </div>
         </div>
 
         {submitError ? <div className="state-note state-note--error">{submitError}</div> : null}
@@ -217,7 +213,7 @@ export default function BuildFormPanel({
             className="button button--primary"
             disabled={loading || submitting || !datasetId || !universeId || !asOfDate}
           >
-            {submitting ? 'Queueing build…' : 'Queue Build'}
+            {submitting ? 'Starting build…' : 'Start build'}
           </button>
         </div>
       </form>

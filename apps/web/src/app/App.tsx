@@ -1,3 +1,4 @@
+// apps/web/src/app/App.tsx
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
 import BuildDetailPage from './pages/build-detail/BuildDetailPage';

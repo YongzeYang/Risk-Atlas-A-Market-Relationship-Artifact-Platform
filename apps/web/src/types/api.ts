@@ -1,3 +1,4 @@
+// apps/web/src/types/api.ts
 export type BuildRunStatus = 'pending' | 'running' | 'succeeded' | 'failed';
 export type BuildRunScoreMethod = 'pearson_corr';
 export type BuildRunWindowDays = 60 | 120 | 252;

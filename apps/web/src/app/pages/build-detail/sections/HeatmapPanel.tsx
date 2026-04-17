@@ -1,3 +1,4 @@
+// apps/web/src/app/pages/build-detail/sections/HeatmapPanel.tsx
 import { useEffect, useMemo, useState } from 'react';
 
 import HeatmapGrid from '../../../../components/data-display/HeatmapGrid';
@@ -10,7 +11,6 @@ type HeatmapPanelProps = {
   buildRunId: string;
   symbolOrder: string[];
   topPairs: TopPairItem[];
-  disabled: boolean;
 };
 
 const DESIRED_DEFAULT_SYMBOLS = 8;
@@ -49,12 +49,12 @@ function buildDefaultSelection(symbolOrder: string[], topPairs: TopPairItem[]): 
 export default function HeatmapPanel({
   buildRunId,
   symbolOrder,
-  topPairs,
-  disabled
+  topPairs
 }: HeatmapPanelProps) {
   const [selectedSymbols, setSelectedSymbols] = useState<string[]>([]);
   const [subset, setSubset] = useState<HeatmapSubsetResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [initialized, setInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const defaultSelection = useMemo(
@@ -62,14 +62,38 @@ export default function HeatmapPanel({
     [symbolOrder, topPairs]
   );
 
+  const selectedSet = useMemo(() => new Set(selectedSymbols), [selectedSymbols]);
+
+  const availableSymbols = useMemo(
+    () => symbolOrder.filter((symbol) => !selectedSet.has(symbol)),
+    [selectedSet, symbolOrder]
+  );
+
   useEffect(() => {
-    if (disabled || defaultSelection.length < 2) {
+    if (symbolOrder.length < 2 || defaultSelection.length < 2) {
       setSelectedSymbols([]);
       setSubset(null);
+      setInitialized(false);
+      setError(null);
+      setLoading(false);
       return;
     }
 
     setSelectedSymbols(defaultSelection);
+    setSubset(null);
+    setInitialized(false);
+    setError(null);
+    setLoading(false);
+  }, [buildRunId, defaultSelection, symbolOrder.length]);
+
+  useEffect(() => {
+    if (initialized) {
+      return;
+    }
+
+    if (defaultSelection.length < 2) {
+      return;
+    }
 
     let active = true;
 
@@ -79,14 +103,21 @@ export default function HeatmapPanel({
 
       try {
         const next = await getHeatmapSubset(buildRunId, defaultSelection);
-        if (active) {
-          setSubset(next);
+
+        if (!active) {
+          return;
         }
+
+        setSubset(next);
+        setInitialized(true);
       } catch (err) {
-        if (active) {
-          setError(err instanceof Error ? err.message : 'Failed to load default heatmap subset.');
-          setSubset(null);
+        if (!active) {
+          return;
         }
+
+        setError(err instanceof Error ? err.message : 'Failed to load matrix.');
+        setSubset(null);
+        setInitialized(true);
       } finally {
         if (active) {
           setLoading(false);
@@ -99,7 +130,7 @@ export default function HeatmapPanel({
     return () => {
       active = false;
     };
-  }, [buildRunId, defaultSelection, disabled]);
+  }, [buildRunId, defaultSelection, initialized]);
 
   function toggleSymbol(symbol: string) {
     setSelectedSymbols((current) => {
@@ -117,7 +148,7 @@ export default function HeatmapPanel({
 
   async function applySubset() {
     if (selectedSymbols.length < 2) {
-      setError('Select at least two symbols to render a heatmap subset.');
+      setError('Select at least two symbols.');
       return;
     }
 
@@ -128,7 +159,7 @@ export default function HeatmapPanel({
       const next = await getHeatmapSubset(buildRunId, selectedSymbols);
       setSubset(next);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load heatmap subset.');
+      setError(err instanceof Error ? err.message : 'Failed to load matrix.');
       setSubset(null);
     } finally {
       setLoading(false);
@@ -136,57 +167,105 @@ export default function HeatmapPanel({
   }
 
   function resetPreset() {
+    setError(null);
     setSelectedSymbols(defaultSelection);
   }
 
+  if (symbolOrder.length < 2) {
+    return (
+      <Panel variant="primary">
+        <SectionHeader title="Matrix view" subtitle="Inspect a selected symbol set." />
+        <div className="state-note">Not enough symbols are available for a matrix view.</div>
+      </Panel>
+    );
+  }
+
   return (
-    <Panel>
+    <Panel variant="primary">
       <SectionHeader
-        title="Heatmap Subset"
-        subtitle="Select a small symbol subset and render a preview-backed correlation matrix."
+        title="Matrix view"
+        subtitle="Inspect a selected symbol set."
         action={
           <div className="toolbar-inline">
             <button type="button" className="button button--ghost button--sm" onClick={resetPreset}>
-              Reset Preset
+              Reset
             </button>
+
             <button
               type="button"
               className="button button--secondary button--sm"
               onClick={() => {
                 void applySubset();
               }}
-              disabled={disabled || selectedSymbols.length < 2 || loading}
+              disabled={selectedSymbols.length < 2 || loading}
             >
-              {loading ? 'Applying…' : 'Apply Subset'}
+              {loading ? 'Applying…' : 'Apply'}
             </button>
           </div>
         }
       />
 
-      {disabled ? (
-        <div className="state-note">Heatmap subset becomes available after build success.</div>
-      ) : (
-        <>
-          <div className="heatmap-toolbar">
-            <div className="heatmap-toolbar__meta">
-              <span className="heatmap-toolbar__count">
-                Selected {selectedSymbols.length} / {MAX_SELECTABLE_SYMBOLS}
-              </span>
-              <span className="heatmap-toolbar__hint">
-                Request order is preserved in the rendered matrix.
-              </span>
-            </div>
+      <div className="selection-summary">
+        <div>
+          <div className="selection-summary__count">
+            Selected {selectedSymbols.length} of {MAX_SELECTABLE_SYMBOLS}
+          </div>
 
+          <div className="selection-summary__hint">
+            Default selection uses symbols from the strongest pairs.
+          </div>
+        </div>
+
+        <div className="selection-summary__meta">Selection order is preserved.</div>
+      </div>
+
+      <div className="selection-groups">
+        <section className="selection-group">
+          <div className="selection-group__header">
+            <h3 className="selection-group__title">Selected symbols</h3>
+            <span className="selection-group__count">{selectedSymbols.length}</span>
+          </div>
+
+          <div className="selection-group__body">
+            {selectedSymbols.length > 0 ? (
+              <div className="chip-list">
+                {selectedSymbols.map((symbol) => (
+                  <button
+                    key={symbol}
+                    type="button"
+                    className="symbol-chip symbol-chip--active"
+                    onClick={() => toggleSymbol(symbol)}
+                    title="Remove symbol"
+                  >
+                    <span className="mono">{symbol}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="state-note">Select at least two symbols.</div>
+            )}
+          </div>
+        </section>
+
+        <section className="selection-group selection-group--available">
+          <div className="selection-group__header">
+            <h3 className="selection-group__title">Available symbols</h3>
+            <span className="selection-group__count">{availableSymbols.length}</span>
+          </div>
+
+          <div className="selection-group__body">
             <div className="chip-list">
-              {symbolOrder.map((symbol) => {
-                const active = selectedSymbols.includes(symbol);
+              {availableSymbols.map((symbol) => {
+                const disabled = selectedSymbols.length >= MAX_SELECTABLE_SYMBOLS;
 
                 return (
                   <button
                     key={symbol}
                     type="button"
-                    className={`symbol-chip${active ? ' symbol-chip--active' : ''}`}
+                    className={`symbol-chip${disabled ? ' symbol-chip--disabled' : ''}`}
                     onClick={() => toggleSymbol(symbol)}
+                    disabled={disabled}
+                    title={disabled ? 'Selection limit reached' : 'Add symbol'}
                   >
                     <span className="mono">{symbol}</span>
                   </button>
@@ -194,16 +273,17 @@ export default function HeatmapPanel({
               })}
             </div>
           </div>
+        </section>
+      </div>
 
-          {error ? <div className="state-note state-note--error">{error}</div> : null}
+      {error ? <div className="state-note state-note--error">{error}</div> : null}
+      {loading && !subset ? <div className="state-note">Loading matrix…</div> : null}
 
-          {subset ? (
-            <HeatmapGrid symbols={subset.symbolOrder} scores={subset.scores} />
-          ) : !loading ? (
-            <div className="state-note">No heatmap subset loaded yet.</div>
-          ) : null}
-        </>
-      )}
+      {subset ? (
+        <HeatmapGrid symbols={subset.symbolOrder} scores={subset.scores} />
+      ) : !loading ? (
+        <div className="state-note">Select at least two symbols.</div>
+      ) : null}
     </Panel>
   );
 }

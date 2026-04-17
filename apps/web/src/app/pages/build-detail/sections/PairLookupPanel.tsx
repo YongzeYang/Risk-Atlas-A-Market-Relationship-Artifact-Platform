@@ -1,3 +1,4 @@
+// apps/web/src/app/pages/build-detail/sections/PairLookupPanel.tsx
 import { useEffect, useState } from 'react';
 
 import ScorePill from '../../../../components/data-display/ScorePill';
@@ -9,19 +10,19 @@ import type { PairScoreResponse } from '../../../../types/api';
 type PairLookupPanelProps = {
   buildRunId: string;
   symbols: string[];
-  disabled: boolean;
 };
 
 export default function PairLookupPanel({
   buildRunId,
-  symbols,
-  disabled
+  symbols
 }: PairLookupPanelProps) {
   const [left, setLeft] = useState('');
   const [right, setRight] = useState('');
   const [result, setResult] = useState<PairScoreResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const symbolsKey = symbols.join('|');
 
   useEffect(() => {
     if (symbols.length === 0) {
@@ -35,7 +36,12 @@ export default function PairLookupPanel({
     setRight(symbols[1] ?? symbols[0] ?? '');
     setResult(null);
     setError(null);
-  }, [symbols]);
+  }, [symbolsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    setResult(null);
+    setError(null);
+  }, [left, right]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -51,7 +57,7 @@ export default function PairLookupPanel({
       const next = await getPairScore(buildRunId, { left, right });
       setResult(next);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to query pair score.');
+      setError(err instanceof Error ? err.message : 'Failed to check pair.');
       setResult(null);
     } finally {
       setLoading(false);
@@ -59,14 +65,11 @@ export default function PairLookupPanel({
   }
 
   return (
-    <Panel>
-      <SectionHeader
-        title="Pair Lookup"
-        subtitle="Query one ordered symbol pair through the preview-backed API."
-      />
+    <Panel variant="utility">
+      <SectionHeader title="Check a pair" />
 
-      {disabled ? (
-        <div className="state-note">Build queries become available after success.</div>
+      {symbols.length === 0 ? (
+        <div className="state-note">No symbols are available for this build.</div>
       ) : (
         <>
           <form className="query-form" onSubmit={handleSubmit}>
@@ -101,7 +104,7 @@ export default function PairLookupPanel({
             </label>
 
             <button type="submit" className="button button--secondary">
-              {loading ? 'Querying…' : 'Query Pair'}
+              {loading ? 'Checking…' : 'Check pair'}
             </button>
           </form>
 
@@ -112,17 +115,19 @@ export default function PairLookupPanel({
               <div className="query-result__title mono">
                 {result.left} ↔ {result.right}
               </div>
+
               <div className="query-result__row">
                 <span className="query-result__label">Correlation score</span>
-                <ScorePill score={result.score} />
+                <ScorePill score={result.score} digits={4} />
               </div>
+
               <div className="query-result__hint">
-                Pearson correlation over the selected build window.
+                Ordered input is preserved in the result.
               </div>
             </div>
-          ) : (
-            <div className="state-note">Choose a pair and query the built artifact preview.</div>
-          )}
+          ) : !error ? (
+            <div className="state-note">Choose two symbols and check one score.</div>
+          ) : null}
         </>
       )}
     </Panel>

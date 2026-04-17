@@ -1,11 +1,17 @@
+// apps/web/src/components/ui/StatusBadge.tsx
 import type { BuildRunStatus } from '../../types/api';
 
 type StatusBadgeProps = {
   status: BuildRunStatus;
 };
 
-export default function StatusBadge({ status }: StatusBadgeProps) {
-  const label = status.charAt(0).toUpperCase() + status.slice(1);
+const STATUS_LABELS: Record<BuildRunStatus, string> = {
+  pending: 'Queued',
+  running: 'Running',
+  succeeded: 'Ready',
+  failed: 'Failed'
+};
 
-  return <span className={`status-badge status-badge--${status}`}>{label}</span>;
+export default function StatusBadge({ status }: StatusBadgeProps) {
+  return <span className={`status-badge status-badge--${status}`}>{STATUS_LABELS[status]}</span>;
 }

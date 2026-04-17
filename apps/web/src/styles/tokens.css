@@ -1,3 +1,4 @@
+/* apps/web/src/styles/tokens.css */
 :root {
   color-scheme: dark;
 
@@ -6,32 +7,38 @@
   --font-mono: "IBM Plex Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
     Consolas, "Liberation Mono", monospace;
 
-  --bg-root: #0b1220;
-  --bg-surface: #111827;
-  --bg-raised: #172033;
-  --bg-soft: #0f1728;
-  --bg-overlay: rgba(11, 18, 32, 0.84);
+  --bg-root: #0f1217;
+  --bg-surface: #151922;
+  --bg-surface-strong: #191f29;
+  --bg-utility: #12171d;
+  --bg-soft: #10141a;
 
-  --border-strong: #24324a;
-  --border-soft: rgba(36, 50, 74, 0.68);
+  --border-subtle: rgba(148, 163, 184, 0.14);
+  --border-strong: rgba(148, 163, 184, 0.24);
 
-  --text-primary: #e6edf7;
-  --text-secondary: #a5b4c7;
-  --text-muted: #6b7a90;
+  --text-primary: #edf2f7;
+  --text-secondary: #b9c2cf;
+  --text-muted: #8d97a8;
+  --text-faint: #6e7787;
 
-  --accent: #38bdf8;
-  --accent-strong: #0ea5e9;
+  --accent: #8fa4c1;
+  --accent-strong: #b4c3d8;
+  --accent-surface: rgba(143, 164, 193, 0.12);
 
-  --success: #22c55e;
-  --warning: #f59e0b;
-  --danger: #ef4444;
-  --running: #60a5fa;
+  --success: #79a88d;
+  --warning: #b69a62;
+  --danger: #b97a7a;
+  --running: #7d95b8;
 
-  --shadow-soft: 0 12px 30px rgba(0, 0, 0, 0.18);
+  --data-positive: #6f8eab;
+  --data-negative: #8e6b60;
+  --data-neutral: #444c59;
 
-  --radius-panel: 12px;
-  --radius-control: 10px;
-  --radius-pill: 999px;
+  --shadow-soft: 0 12px 28px rgba(0, 0, 0, 0.16);
+
+  --radius-panel: 16px;
+  --radius-control: 12px;
+  --radius-token: 999px;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -39,7 +46,9 @@
   --space-4: 16px;
   --space-5: 20px;
   --space-6: 24px;
+  --space-7: 28px;
   --space-8: 32px;
+  --space-10: 40px;
 
-  --max-content-width: 1480px;
+  --max-content-width: 1320px;
 }

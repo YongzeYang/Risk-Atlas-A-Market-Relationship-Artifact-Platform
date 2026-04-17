@@ -1,3 +1,4 @@
+// apps/web/src/app/shell/TopBar.tsx
 import { Link } from 'react-router-dom';
 
 import { appConfig } from '../../lib/config';
@@ -9,21 +10,16 @@ export default function TopBar() {
         <Link to="/" className="topbar__brand-link">
           {appConfig.title}
         </Link>
-
-        <div className="topbar__chips">
-          <span className="topbar__chip">MVP</span>
-          <span className="topbar__chip topbar__chip--muted">{appConfig.environmentLabel}</span>
-        </div>
       </div>
 
-      <div className="topbar__actions">
+      <nav className="topbar__actions" aria-label="Primary">
         <a
           className="topbar__link"
           href={appConfig.apiDocsPath}
           target="_blank"
           rel="noreferrer"
         >
-          API Docs
+          API docs
         </a>
 
         {appConfig.repositoryUrl ? (
@@ -36,7 +32,7 @@ export default function TopBar() {
             GitHub
           </a>
         ) : null}
-      </div>
+      </nav>
     </header>
   );
 }

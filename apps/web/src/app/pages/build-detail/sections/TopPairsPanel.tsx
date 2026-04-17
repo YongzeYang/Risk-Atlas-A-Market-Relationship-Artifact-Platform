@@ -1,3 +1,4 @@
+// apps/web/src/app/pages/build-detail/sections/TopPairsPanel.tsx
 import ScorePill from '../../../../components/data-display/ScorePill';
 import Panel from '../../../../components/ui/Panel';
 import SectionHeader from '../../../../components/ui/SectionHeader';
@@ -5,56 +6,42 @@ import type { TopPairItem } from '../../../../types/api';
 
 type TopPairsPanelProps = {
   topPairs: TopPairItem[];
-  loading: boolean;
-  disabled: boolean;
 };
 
-export default function TopPairsPanel({ topPairs, loading, disabled }: TopPairsPanelProps) {
+export default function TopPairsPanel({ topPairs }: TopPairsPanelProps) {
   return (
-    <Panel>
+    <Panel variant="secondary">
       <SectionHeader
-        title="Top Pairs"
-        subtitle="Strongest off-diagonal relationships from the built correlation matrix."
+        title="Strongest pairs"
+        subtitle="Highest absolute scores in this build."
       />
 
-      {loading ? <div className="state-note">Loading pair summaries…</div> : null}
+      {topPairs.length === 0 ? (
+        <div className="state-note">No pair summary is available for this build.</div>
+      ) : (
+        <ol className="rank-list">
+          {topPairs.map((pair, index) => (
+            <li
+              key={`${pair.left}-${pair.right}`}
+              className={`rank-list__item${index < 3 ? ' rank-list__item--top' : ''}`}
+            >
+              <div className="rank-list__index mono">{index + 1}</div>
 
-      {!loading && disabled ? (
-        <div className="state-note">
-          Pair summaries become available when the build reaches succeeded status.
-        </div>
-      ) : null}
+              <div className="rank-list__body">
+                <div className="rank-list__pair">
+                  <span className="mono">{pair.left}</span>
+                  <span className="rank-list__pair-sep">↔</span>
+                  <span className="mono">{pair.right}</span>
+                </div>
 
-      {!loading && !disabled && topPairs.length === 0 ? (
-        <div className="state-note">No top pairs available for this build.</div>
-      ) : null}
+                <div className="rank-list__meta">Strongest relationship ranking</div>
+              </div>
 
-      {!loading && !disabled && topPairs.length > 0 ? (
-        <div className="table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Left</th>
-                <th>Right</th>
-                <th>Score</th>
-              </tr>
-            </thead>
-            <tbody>
-              {topPairs.map((pair, index) => (
-                <tr key={`${pair.left}-${pair.right}`} className="data-table__row">
-                  <td className="mono">{index + 1}</td>
-                  <td className="mono">{pair.left}</td>
-                  <td className="mono">{pair.right}</td>
-                  <td>
-                    <ScorePill score={pair.score} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
+              <ScorePill score={pair.score} digits={3} />
+            </li>
+          ))}
+        </ol>
+      )}
     </Panel>
   );
 }

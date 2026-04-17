@@ -1,3 +1,4 @@
+// apps/web/src/app/pages/build-detail/sections/NeighborsPanel.tsx
 import { useEffect, useState } from 'react';
 
 import ScorePill from '../../../../components/data-display/ScorePill';
@@ -9,19 +10,19 @@ import type { NeighborsResponse } from '../../../../types/api';
 type NeighborsPanelProps = {
   buildRunId: string;
   symbols: string[];
-  disabled: boolean;
 };
 
 export default function NeighborsPanel({
   buildRunId,
-  symbols,
-  disabled
+  symbols
 }: NeighborsPanelProps) {
   const [symbol, setSymbol] = useState('');
   const [k, setK] = useState(5);
   const [result, setResult] = useState<NeighborsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const symbolsKey = symbols.join('|');
 
   useEffect(() => {
     if (symbols.length === 0) {
@@ -31,10 +32,10 @@ export default function NeighborsPanel({
     }
 
     setSymbol(symbols[0]);
-  }, [symbols]);
+  }, [symbolsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!symbol || disabled) {
+    if (!symbol) {
       return;
     }
 
@@ -46,12 +47,13 @@ export default function NeighborsPanel({
 
       try {
         const next = await getNeighbors(buildRunId, { symbol, k });
+
         if (active) {
           setResult(next);
         }
       } catch (err) {
         if (active) {
-          setError(err instanceof Error ? err.message : 'Failed to query neighbors.');
+          setError(err instanceof Error ? err.message : 'Failed to load related symbols.');
           setResult(null);
         }
       } finally {
@@ -66,20 +68,17 @@ export default function NeighborsPanel({
     return () => {
       active = false;
     };
-  }, [buildRunId, symbol, k, disabled]);
+  }, [buildRunId, symbol, k]);
 
   return (
-    <Panel>
-      <SectionHeader
-        title="Neighbors"
-        subtitle="Top-k positive correlations for one symbol, excluding self."
-      />
+    <Panel variant="utility">
+      <SectionHeader title="Related symbols" />
 
-      {disabled ? (
-        <div className="state-note">Neighbors become available after the build succeeds.</div>
+      {symbols.length === 0 ? (
+        <div className="state-note">No symbols are available for this build.</div>
       ) : (
         <>
-          <div className="query-form">
+          <div className="query-form query-form--inline">
             <label className="field">
               <span className="field__label">Symbol</span>
               <select
@@ -111,36 +110,28 @@ export default function NeighborsPanel({
             </label>
           </div>
 
-          {loading ? <div className="state-note">Loading neighbors…</div> : null}
+          {loading ? <div className="state-note">Loading related symbols…</div> : null}
           {error ? <div className="state-note state-note--error">{error}</div> : null}
 
           {result && result.neighbors.length > 0 ? (
-            <div className="table-wrap">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Symbol</th>
-                    <th>Score</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.neighbors.map((entry, index) => (
-                    <tr key={entry.symbol} className="data-table__row">
-                      <td className="mono">{index + 1}</td>
-                      <td className="mono">{entry.symbol}</td>
-                      <td>
-                        <ScorePill score={entry.score} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <ol className="neighbor-list">
+              {result.neighbors.map((entry, index) => (
+                <li key={entry.symbol} className="neighbor-list__item">
+                  <div className="neighbor-list__index mono">{index + 1}</div>
+
+                  <div className="neighbor-list__body">
+                    <div className="neighbor-list__symbol mono">{entry.symbol}</div>
+                    <div className="neighbor-list__meta">Top positive score for {result.symbol}</div>
+                  </div>
+
+                  <ScorePill score={entry.score} digits={3} />
+                </li>
+              ))}
+            </ol>
           ) : null}
 
           {!loading && !error && result && result.neighbors.length === 0 ? (
-            <div className="state-note">No neighbors found.</div>
+            <div className="state-note">No related symbols found.</div>
           ) : null}
         </>
       )}

@@ -1,3 +1,4 @@
+// apps/web/src/components/ui/StatCard.tsx
 type StatCardProps = {
   label: string;
   value: string;

@@ -1,3 +1,4 @@
+// apps/web/src/app/pages/home/sections/BuildRunsPanel.tsx
 import { Link } from 'react-router-dom';
 
 import Panel from '../../../../components/ui/Panel';
@@ -15,6 +16,24 @@ type BuildRunsPanelProps = {
   onRefresh: () => void;
 };
 
+function formatBuildDuration(buildRun: BuildRunListItem): string {
+  if (buildRun.startedAt && buildRun.finishedAt) {
+    return formatDurationMs(
+      new Date(buildRun.finishedAt).getTime() - new Date(buildRun.startedAt).getTime()
+    );
+  }
+
+  if (buildRun.status === 'running') {
+    return 'In progress';
+  }
+
+  if (buildRun.status === 'pending') {
+    return 'Queued';
+  }
+
+  return '—';
+}
+
 export default function BuildRunsPanel({
   buildRuns,
   loading,
@@ -24,10 +43,9 @@ export default function BuildRunsPanel({
   onRefresh
 }: BuildRunsPanelProps) {
   return (
-    <Panel>
+    <Panel variant="primary">
       <SectionHeader
-        title="Build Runs"
-        subtitle="Newest first. This list polls automatically while runs are active."
+        title="Recent builds"
         action={
           <button type="button" className="button button--ghost button--sm" onClick={onRefresh}>
             {refreshing ? 'Refreshing…' : 'Refresh'}
@@ -35,67 +53,71 @@ export default function BuildRunsPanel({
         }
       />
 
-      {loading ? <div className="state-note">Loading build runs…</div> : null}
+      {loading ? <div className="state-note">Loading builds…</div> : null}
       {error ? <div className="state-note state-note--error">{error}</div> : null}
 
       {!loading && buildRuns.length === 0 ? (
-        <div className="state-note">No build runs yet. Queue the first one from the build form.</div>
+        <div className="state-note">No builds yet. Start one from the left.</div>
       ) : null}
 
       {buildRuns.length > 0 ? (
-        <div className="table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Status</th>
-                <th>Build</th>
-                <th>Universe</th>
-                <th>As of</th>
-                <th>Window</th>
-                <th>Method</th>
-                <th>Created</th>
-                <th>Duration</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {buildRuns.map((buildRun) => (
-                <tr
-                  key={buildRun.id}
-                  className={
-                    lastCreatedBuildId === buildRun.id ? 'data-table__row data-table__row--highlight' : 'data-table__row'
-                  }
-                >
-                  <td>
-                    <StatusBadge status={buildRun.status} />
-                  </td>
-                  <td className="mono">{truncateMiddle(buildRun.id, 8, 4)}</td>
-                  <td>
-                    <div className="table-stack">
-                      <span className="mono">{buildRun.universeId}</span>
-                      <span className="table-stack__subtle mono">{buildRun.datasetId}</span>
-                    </div>
-                  </td>
-                  <td className="mono">{formatDateOnly(buildRun.asOfDate)}</td>
-                  <td className="mono">{buildRun.windowDays}d</td>
-                  <td className="mono">{buildRun.scoreMethod}</td>
-                  <td className="mono">{formatDateTime(buildRun.createdAt)}</td>
-                  <td className="mono">
-                    {buildRun.startedAt && buildRun.finishedAt
-                      ? formatDurationMs(
-                          new Date(buildRun.finishedAt).getTime() - new Date(buildRun.startedAt).getTime()
-                        )
-                      : '—'}
-                  </td>
-                  <td className="table-action">
-                    <Link to={`/builds/${buildRun.id}`} className="button button--secondary button--sm">
-                      Open
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="build-stream">
+          {buildRuns.map((buildRun) => (
+            <article
+              key={buildRun.id}
+              className={`build-stream__item${
+                lastCreatedBuildId === buildRun.id ? ' build-stream__item--highlight' : ''
+              }`}
+            >
+              <div className="build-stream__main">
+                <div className="build-stream__topline">
+                  <StatusBadge status={buildRun.status} />
+
+                  <div className="build-stream__scope">
+                    <span className="mono">{buildRun.universeId}</span>
+                    <span className="build-stream__divider">·</span>
+                    <span className="mono">{formatDateOnly(buildRun.asOfDate)}</span>
+                    <span className="build-stream__divider">·</span>
+                    <span>{buildRun.windowDays}-day window</span>
+                  </div>
+                </div>
+
+                <div className="build-stream__meta">
+                  <span>
+                    <span className="build-stream__meta-label">Dataset</span>
+                    <span className="mono">{buildRun.datasetId}</span>
+                  </span>
+
+                  <span>
+                    <span className="build-stream__meta-label">Created</span>
+                    <span className="mono">{formatDateTime(buildRun.createdAt)}</span>
+                  </span>
+
+                  <span>
+                    <span className="build-stream__meta-label">Duration</span>
+                    <span className="mono">{formatBuildDuration(buildRun)}</span>
+                  </span>
+
+                  <span>
+                    <span className="build-stream__meta-label">Build</span>
+                    <span className="mono">{truncateMiddle(buildRun.id, 8, 6)}</span>
+                  </span>
+                </div>
+
+                {buildRun.errorMessage ? (
+                  <div className="state-note state-note--error build-stream__error">
+                    {buildRun.errorMessage}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="build-stream__action">
+                <Link to={`/builds/${buildRun.id}`} className="button button--secondary button--sm">
+                  Open build
+                </Link>
+              </div>
+            </article>
+          ))}
         </div>
       ) : null}
     </Panel>

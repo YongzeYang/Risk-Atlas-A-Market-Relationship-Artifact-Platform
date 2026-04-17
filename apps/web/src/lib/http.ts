@@ -1,3 +1,4 @@
+// apps/web/src/lib/http.ts
 import { resolveApiPath } from './config';
 
 export class ApiError extends Error {

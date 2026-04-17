@@ -1,3 +1,4 @@
+// apps/web/src/components/ui/SectionHeader.tsx
 import type { ReactNode } from 'react';
 
 type SectionHeaderProps = {

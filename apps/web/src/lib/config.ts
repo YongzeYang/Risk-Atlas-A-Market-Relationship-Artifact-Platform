@@ -1,3 +1,4 @@
+// apps/web/src/lib/config.ts
 function normalizeBaseUrl(value: string | undefined): string {
   if (!value) {
     return '';

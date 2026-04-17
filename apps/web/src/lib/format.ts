@@ -1,3 +1,4 @@
+// apps/web/src/lib/format.ts
 export function formatDateTime(value: string | null): string {
   if (!value) {
     return '—';

@@ -6,9 +6,7 @@ import { resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 
-import { DatasetSource, Market, PrismaClient } from '@prisma/client';
-import { Pool } from 'pg';
-import { PrismaPg } from '@prisma/adapter-pg';
+import { prisma } from '../src/lib/prisma.js';
 
 import { DEFAULT_DEMO_CSV_PATH } from './generate-sample-eod.js';
 import {
@@ -18,14 +16,6 @@ import {
   ISO_DATE_PATTERN
 } from './mvp-config.js';
 
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) {
-  throw new Error('DATABASE_URL is not defined in the environment.');
-}
-
-const pool = new Pool({ connectionString });
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
 const CSV_HEADER = 'tradeDate,symbol,adjClose';
 const BATCH_SIZE = 1000;
 
@@ -41,7 +31,7 @@ export type ImportEodCsvOptions = {
   datasetName: string;
   csvPath: string;
   replaceExisting?: boolean;
-  prismaClient?: PrismaClient;
+  prismaClient?: typeof prisma;
 };
 
 export type ImportEodCsvSummary = {
@@ -168,21 +158,21 @@ export async function importEodCsv(options: ImportEodCsvOptions): Promise<Import
     options.datasetId
   );
 
-  await client.$transaction(async (tx) => {
+  await client.$transaction(async (tx: any) => {
     await tx.dataset.upsert({
       where: {
         id: options.datasetId
       },
       update: {
         name: options.datasetName,
-        source: DatasetSource.curated_csv,
-        market: Market.HK
+        source: 'curated_csv',
+        market: 'HK'
       },
       create: {
         id: options.datasetId,
         name: options.datasetName,
-        source: DatasetSource.curated_csv,
-        market: Market.HK
+        source: 'curated_csv',
+        market: 'HK'
       }
     });
 
