@@ -23,12 +23,17 @@ export const ARTIFACT_FILE_NAMES = {
 export const LOCAL_ARTIFACT_ROOT_DIR = 'artifacts' as const;
 export const ARTIFACT_OBJECT_PREFIX_ROOT = 'build-runs' as const;
 
+export const MATRIX_ARTIFACT_MEDIA_TYPE = 'application/octet-stream' as const;
+
 export const MIN_BUILD_UNIVERSE_SIZE = 2;
 export const MAX_BUILD_UNIVERSE_SIZE = 50;
+
 export const DEFAULT_NEIGHBOR_K = 10;
 export const MAX_NEIGHBOR_K = 20;
+
 export const MIN_HEATMAP_SUBSET_SIZE = 2;
 export const MAX_HEATMAP_SUBSET_SIZE = 12;
+
 export const TOP_PAIR_LIMIT = 20;
 
 export const ISO_DATE_PATTERN_SOURCE = '^\\d{4}-\\d{2}-\\d{2}$';
@@ -92,8 +97,19 @@ export type ArtifactSummary = {
   manifestByteSize: number | null;
 };
 
+export type ArtifactDownloadInfo = {
+  url: string;
+  filename: string;
+  mediaType: typeof MATRIX_ARTIFACT_MEDIA_TYPE;
+};
+
 export type BuildRunDetailResponse = BuildRunListItem & {
+  durationMs: number | null;
+  symbolCount: number | null;
+  minScore: number | null;
+  maxScore: number | null;
   artifact: ArtifactSummary | null;
+  artifactDownload: ArtifactDownloadInfo | null;
   symbolOrder: string[];
   topPairs: TopPairItem[];
 };
@@ -298,6 +314,17 @@ export const artifactSummarySchema = {
   ]
 } as const;
 
+export const artifactDownloadInfoSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    url: { type: 'string' },
+    filename: { type: 'string' },
+    mediaType: { type: 'string', enum: [MATRIX_ARTIFACT_MEDIA_TYPE] }
+  },
+  required: ['url', 'filename', 'mediaType']
+} as const;
+
 export const buildRunDetailResponseSchema = {
   type: 'object',
   additionalProperties: false,
@@ -313,8 +340,15 @@ export const buildRunDetailResponseSchema = {
     startedAt: nullableDateTimeSchema,
     finishedAt: nullableDateTimeSchema,
     errorMessage: nullableStringSchema,
+    durationMs: nullableIntegerSchema,
+    symbolCount: nullableIntegerSchema,
+    minScore: nullableNumberSchema,
+    maxScore: nullableNumberSchema,
     artifact: {
       anyOf: [artifactSummarySchema, { type: 'null' }]
+    },
+    artifactDownload: {
+      anyOf: [artifactDownloadInfoSchema, { type: 'null' }]
     },
     symbolOrder: {
       type: 'array',
@@ -337,7 +371,12 @@ export const buildRunDetailResponseSchema = {
     'startedAt',
     'finishedAt',
     'errorMessage',
+    'durationMs',
+    'symbolCount',
+    'minScore',
+    'maxScore',
     'artifact',
+    'artifactDownload',
     'symbolOrder',
     'topPairs'
   ]

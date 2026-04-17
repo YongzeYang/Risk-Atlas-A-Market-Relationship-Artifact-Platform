@@ -2,8 +2,11 @@ import { prisma } from '../lib/prisma.js';
 import { ServiceError } from '../lib/service-error.js';
 import { parseUniverseSymbolsJson } from '../lib/universe-symbols.js';
 import {
+  MATRIX_ARTIFACT_MEDIA_TYPE,
   isBuildRunScoreMethod,
   isBuildRunWindowDays,
+  type ArtifactDownloadInfo,
+  type ArtifactStorageKind,
   type ArtifactSummary,
   type BuildRunDetailResponse,
   type BuildRunIdParams,
@@ -42,6 +45,13 @@ type ArtifactRow = {
   matrixByteSize: bigint | null;
   previewByteSize: bigint | null;
   manifestByteSize: bigint | null;
+};
+
+export type BuildRunDownloadDescriptor = {
+  storageKind: ArtifactStorageKind;
+  storagePrefix: string;
+  filename: string;
+  mediaType: typeof MATRIX_ARTIFACT_MEDIA_TYPE;
 };
 
 export async function createBuildRun(
@@ -92,8 +102,6 @@ export async function createBuildRun(
     );
   }
 
-  // Validate the stored universe payload early so that invalid seed/config data
-  // fails at request time instead of producing a mysterious background failure.
   parseUniverseSymbolsJson(universe.symbolsJson);
 
   const buildRun = await prisma.buildRun.create({
@@ -121,7 +129,9 @@ export async function listBuildRuns(): Promise<BuildRunListItem[]> {
   return buildRuns.map(mapBuildRunListItem);
 }
 
-export async function getBuildRunDetail(id: BuildRunIdParams['id']): Promise<BuildRunDetailResponse | null> {
+export async function getBuildRunDetail(
+  id: BuildRunIdParams['id']
+): Promise<BuildRunDetailResponse | null> {
   const buildRun = await prisma.buildRun.findUnique({
     where: {
       id
@@ -135,9 +145,22 @@ export async function getBuildRunDetail(id: BuildRunIdParams['id']): Promise<Bui
     return null;
   }
 
+  const base = mapBuildRunListItem(buildRun);
+
   let symbolOrder: string[] = [];
   let topPairs: TopPairItem[] = [];
   let artifact: ArtifactSummary | null = null;
+  let artifactDownload: ArtifactDownloadInfo | null = null;
+  let symbolCount: number | null = null;
+  let minScore: number | null = null;
+  let maxScore: number | null = null;
+
+  if (buildRun.artifact) {
+    artifact = mapArtifactSummary(buildRun.artifact);
+    symbolCount = artifact.symbolCount;
+    minScore = artifact.minScore;
+    maxScore = artifact.maxScore;
+  }
 
   if (buildRun.status === 'succeeded' && buildRun.artifact) {
     const preview = await readPreviewArtifact(
@@ -145,16 +168,70 @@ export async function getBuildRunDetail(id: BuildRunIdParams['id']): Promise<Bui
       buildRun.artifact.storagePrefix
     );
 
+    if (artifact && artifact.symbolCount !== preview.symbolOrder.length) {
+      throw new Error(
+        `Artifact symbolCount mismatch for build "${buildRun.id}": ` +
+          `metadata=${artifact.symbolCount}, preview=${preview.symbolOrder.length}.`
+      );
+    }
+
     symbolOrder = preview.symbolOrder;
     topPairs = preview.topPairs;
-    artifact = mapArtifactSummary(buildRun.artifact);
+    artifactDownload = makeArtifactDownloadInfo(buildRun.id);
+
+    if (symbolCount === null) {
+      symbolCount = preview.symbolOrder.length;
+    }
+
+    if (minScore === null) {
+      minScore = preview.minScore;
+    }
+
+    if (maxScore === null) {
+      maxScore = preview.maxScore;
+    }
   }
 
   return {
-    ...mapBuildRunListItem(buildRun),
+    ...base,
+    durationMs: computeDurationMs(buildRun.startedAt, buildRun.finishedAt),
+    symbolCount,
+    minScore,
+    maxScore,
     artifact,
+    artifactDownload,
     symbolOrder,
     topPairs
+  };
+}
+
+export async function getBuildRunDownloadArtifact(
+  id: BuildRunIdParams['id']
+): Promise<BuildRunDownloadDescriptor> {
+  const buildRun = await prisma.buildRun.findUnique({
+    where: {
+      id
+    },
+    include: {
+      artifact: true
+    }
+  });
+
+  if (!buildRun) {
+    throw new ServiceError(404, `Build run "${id}" was not found.`);
+  }
+
+  if (buildRun.status !== 'succeeded' || !buildRun.artifact) {
+    throw new ServiceError(409, `Build run "${id}" is not ready for artifact download.`);
+  }
+
+  const downloadInfo = makeArtifactDownloadInfo(buildRun.id);
+
+  return {
+    storageKind: buildRun.artifact.storageKind as ArtifactStorageKind,
+    storagePrefix: buildRun.artifact.storagePrefix,
+    filename: downloadInfo.filename,
+    mediaType: downloadInfo.mediaType
   };
 }
 
@@ -178,7 +255,7 @@ function mapArtifactSummary(artifact: ArtifactRow): ArtifactSummary {
   return {
     id: artifact.id,
     bundleVersion: artifact.bundleVersion,
-    storageKind: artifact.storageKind as ArtifactSummary['storageKind'],
+    storageKind: artifact.storageKind as ArtifactStorageKind,
     storageBucket: artifact.storageBucket,
     storagePrefix: artifact.storagePrefix,
     symbolCount: artifact.symbolCount,
@@ -202,4 +279,20 @@ function bigIntToSafeInteger(value: bigint | null): number | null {
   }
 
   return asNumber;
+}
+
+function computeDurationMs(startedAt: Date | null, finishedAt: Date | null): number | null {
+  if (!startedAt || !finishedAt) {
+    return null;
+  }
+
+  return Math.max(0, finishedAt.getTime() - startedAt.getTime());
+}
+
+function makeArtifactDownloadInfo(buildRunId: string): ArtifactDownloadInfo {
+  return {
+    url: `/build-runs/${buildRunId}/download`,
+    filename: `risk-atlas-${buildRunId}.bsm`,
+    mediaType: MATRIX_ARTIFACT_MEDIA_TYPE
+  };
 }

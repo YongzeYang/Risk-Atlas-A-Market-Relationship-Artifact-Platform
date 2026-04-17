@@ -134,8 +134,13 @@ async function readImportRows(csvPath: string, datasetId: string) {
     });
 
     symbols.add(symbol);
-    minTradeDate = minTradeDate === null || tradeDate < minTradeDate ? tradeDate : minTradeDate;
-    maxTradeDate = maxTradeDate === null || tradeDate > maxTradeDate ? tradeDate : maxTradeDate;
+    
+    if (minTradeDate === null || tradeDate < minTradeDate) {
+      minTradeDate = tradeDate;
+    }
+    if (maxTradeDate === null || tradeDate > maxTradeDate) {
+      maxTradeDate = tradeDate;
+    }
   }
 
   if (!seenHeader) {
