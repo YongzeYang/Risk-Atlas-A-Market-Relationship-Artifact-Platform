@@ -1,4 +1,8 @@
-import { buildApp } from './app';
+// apps/api/src/server.ts
+
+import 'dotenv/config';
+
+import { buildApp } from './app.js';
 
 const PORT = Number(process.env.PORT ?? 3000);
 const HOST = process.env.HOST ?? '0.0.0.0';

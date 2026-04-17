@@ -1,4 +1,10 @@
 {
   "name": "risk-atlas",
-  "private": true
+  "private": true,
+  "scripts": {
+    "deps:bsm": "git submodule update --init --recursive cpp/third_party/bsm",
+    "cpp:configure": "cmake -S cpp -B cpp/build",
+    "cpp:build": "cmake --build cpp/build --parallel",
+    "cpp:writer": "cmake --build cpp/build --target risk_atlas_bsm_writer --parallel"
+  }
 }

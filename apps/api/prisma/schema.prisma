@@ -1,8 +1,115 @@
+datasource db {
+  provider = "postgresql"
+}
+
 generator client {
   provider = "prisma-client-js"
 }
 
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+enum ScoreMethod {
+  pearson_corr
+}
+
+enum BuildStatus {
+  pending
+  running
+  succeeded
+  failed
+}
+
+enum ArtifactStorageKind {
+  local_fs
+  s3
+}
+
+enum DatasetSource {
+  curated_csv
+}
+
+enum Market {
+  HK
+}
+
+model Dataset {
+  id        String          @id @default(cuid())
+  name      String
+  source    DatasetSource
+  market    Market
+  createdAt DateTime        @default(now())
+
+  eodPrices EodPrice[]
+  buildRuns BuildRun[]
+
+  @@map("datasets")
+}
+
+model Universe {
+  id          String     @id @default(cuid())
+  name        String
+  market      Market
+  symbolsJson Json
+  symbolCount Int
+  createdAt   DateTime   @default(now())
+
+  buildRuns   BuildRun[]
+
+  @@map("universes")
+}
+
+model EodPrice {
+  id        String   @id @default(cuid())
+  datasetId String
+  tradeDate String   @db.VarChar(10)
+  symbol    String
+  adjClose  Float
+
+  dataset   Dataset  @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+
+  @@index([datasetId, tradeDate])
+  @@index([datasetId, symbol])
+  @@map("eod_prices")
+}
+
+model BuildRun {
+  id           String       @id @default(cuid())
+  datasetId    String
+  universeId   String
+  asOfDate     String       @db.VarChar(10) // ISO 8601 calendar date: YYYY-MM-DD
+  windowDays   Int
+  scoreMethod  ScoreMethod
+  status       BuildStatus  @default(pending)
+  createdAt    DateTime     @default(now())
+  startedAt    DateTime?
+  finishedAt   DateTime?
+  errorMessage String?      @db.Text
+
+  dataset      Dataset      @relation(fields: [datasetId], references: [id], onDelete: Restrict)
+  universe     Universe     @relation(fields: [universeId], references: [id], onDelete: Restrict)
+  artifact     Artifact?
+
+  @@index([status, createdAt])
+  @@index([datasetId, asOfDate])
+  @@index([universeId, asOfDate])
+  @@map("build_runs")
+}
+
+model Artifact {
+  id               String              @id @default(cuid())
+  buildRunId       String              @unique
+  bundleVersion    Int                 @default(1)
+  storageKind      ArtifactStorageKind @default(local_fs)
+  storageBucket    String?             @db.VarChar(128)
+  storagePrefix    String              @db.Text
+  matrixByteSize   BigInt?
+  previewByteSize  BigInt?
+  manifestByteSize BigInt?
+  symbolCount      Int
+  minScore         Float?
+  maxScore         Float?
+  createdAt        DateTime            @default(now())
+
+  buildRun         BuildRun            @relation(fields: [buildRunId], references: [id], onDelete: Cascade)
+
+  @@index([storageKind, createdAt])
+  @@map("artifacts")
 }
