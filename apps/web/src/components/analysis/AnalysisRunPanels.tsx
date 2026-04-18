@@ -82,27 +82,28 @@ export function RecentAnalysisRunsPanel({
   }
 
   return (
-    <div className="rank-list">
+    <div className="recent-run-list">
       {runs.map((run) => (
         <article
           key={run.id}
-          className={`rank-list__item${activeRunId === run.id ? ' rank-list__item--top' : ''}`}
+          className={`recent-run-card${activeRunId === run.id ? ' recent-run-card--active' : ''}`}
         >
-          <span className="rank-list__index">
-            <StatusBadge status={run.status} />
-          </span>
-          <div className="rank-list__body">
-            <div className="rank-list__pair mono">{truncateMiddle(run.id, 8, 6)}</div>
-            <div className="rank-list__meta">{formatSummary(run)}</div>
-            <div className="rank-list__meta">Queued {formatDateTime(run.createdAt)}</div>
+          <div className="recent-run-card__header">
+            <div className="recent-run-card__identity">
+              <StatusBadge status={run.status} />
+              <span className="mono recent-run-card__id">{truncateMiddle(run.id, 8, 6)}</span>
+            </div>
+            <button
+              type="button"
+              className="button button--secondary button--sm"
+              onClick={() => onSelect(run.id)}
+            >
+              Open
+            </button>
           </div>
-          <button
-            type="button"
-            className="button button--secondary button--sm"
-            onClick={() => onSelect(run.id)}
-          >
-            Open
-          </button>
+
+          <div className="recent-run-card__summary">{formatSummary(run)}</div>
+          <div className="recent-run-card__meta">Queued {formatDateTime(run.createdAt)}</div>
         </article>
       ))}
     </div>

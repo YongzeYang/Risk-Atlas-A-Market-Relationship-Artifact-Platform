@@ -4,6 +4,7 @@ import type {
   AnalysisRunDetailResponse,
   AnalysisRunKind,
   AnalysisRunListItem,
+  BuildRequestValidationResponse,
   BuildRunDetailResponse,
   BuildRunListItem,
   BuildSeriesDetailResponse,
@@ -20,6 +21,7 @@ import type {
   PairDivergenceAnalysisRunRequest,
   PairDivergenceResponse,
   PairScoreResponse,
+  ValidateBuildRunInput,
   StructureAnalysisRunListItem,
   StructureAnalysisRunRequest,
   StructureResponse
@@ -33,6 +35,15 @@ function analysisHeaders(inviteCode: string): HeadersInit {
 
 export async function createBuildRun(input: CreateBuildRunInput): Promise<BuildRunListItem> {
   return apiRequest<BuildRunListItem>('/build-runs', {
+    method: 'POST',
+    body: JSON.stringify(input)
+  });
+}
+
+export async function validateBuildRun(
+  input: ValidateBuildRunInput
+): Promise<BuildRequestValidationResponse> {
+  return apiRequest<BuildRequestValidationResponse>('/build-runs/validate', {
     method: 'POST',
     body: JSON.stringify(input)
   });

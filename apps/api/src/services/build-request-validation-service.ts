@@ -5,37 +5,173 @@ import { ServiceError } from '../lib/service-error.js';
 import {
   MAX_BUILD_UNIVERSE_SIZE,
   MIN_BUILD_UNIVERSE_SIZE,
+  type BuildRequestValidationReasonCode,
+  type BuildRequestValidationResponse,
   type BuildRunWindowDays
 } from '../contracts/build-runs.js';
 import { resolveUniverseSymbols } from './universe-resolver.js';
 
 type UniverseValidationRow = {
   id: string;
+  market?: string;
   definitionKind: string;
   symbolsJson: Prisma.JsonValue;
   definitionParams: Prisma.JsonValue;
 };
 
-export async function validateBuildRequestCoverage(args: {
+type DatasetValidationRow = {
+  id: string;
+  market: string;
+};
+
+type InsufficientSymbol = {
+  symbol: string;
+  rowCount: number;
+};
+
+type BuildRequestCoverageAssessment = {
+  resolvedSymbols: string[];
+  requiredRows: number;
+  insufficientSymbols: InsufficientSymbol[];
+};
+
+export async function getBuildRequestValidation(args: {
+  datasetId: string;
+  universeId: string;
+  asOfDate: string;
+  windowDays: BuildRunWindowDays;
+}): Promise<BuildRequestValidationResponse> {
+  const [dataset, universe] = await Promise.all([
+    prisma.dataset.findUnique({
+      where: { id: args.datasetId },
+      select: { id: true, market: true }
+    }),
+    prisma.universe.findUnique({
+      where: { id: args.universeId },
+      select: {
+        id: true,
+        market: true,
+        definitionKind: true,
+        symbolsJson: true,
+        definitionParams: true
+      }
+    })
+  ]);
+
+  if (!dataset) {
+    return makeInvalidValidationResponse({
+      ...args,
+      reasonCode: 'dataset_not_found',
+      message: `Dataset "${args.datasetId}" was not found.`
+    });
+  }
+
+  if (!universe) {
+    return makeInvalidValidationResponse({
+      ...args,
+      reasonCode: 'universe_not_found',
+      message: `Universe "${args.universeId}" was not found.`
+    });
+  }
+
+  if (dataset.market !== universe.market) {
+    return makeInvalidValidationResponse({
+      ...args,
+      reasonCode: 'market_mismatch',
+      message:
+        `Dataset "${dataset.id}" and universe "${universe.id}" must belong to the same market.`
+    });
+  }
+
+  return getBuildRequestValidationForResolvedUniverse({
+    dataset,
+    universe,
+    asOfDate: args.asOfDate,
+    windowDays: args.windowDays
+  });
+}
+
+export async function getBuildRequestValidationForResolvedUniverse(args: {
+  dataset: DatasetValidationRow;
+  universe: UniverseValidationRow;
+  asOfDate: string;
+  windowDays: BuildRunWindowDays;
+}): Promise<BuildRequestValidationResponse> {
+  const assessment = await assessBuildRequestCoverage({
+    datasetId: args.dataset.id,
+    universe: args.universe,
+    asOfDate: args.asOfDate,
+    windowDays: args.windowDays
+  });
+
+  if (
+    assessment.resolvedSymbols.length < MIN_BUILD_UNIVERSE_SIZE ||
+    assessment.resolvedSymbols.length > MAX_BUILD_UNIVERSE_SIZE
+  ) {
+    return makeInvalidValidationResponse({
+      datasetId: args.dataset.id,
+      universeId: args.universe.id,
+      asOfDate: args.asOfDate,
+      windowDays: args.windowDays,
+      reasonCode: 'universe_size',
+      message:
+        `Universe symbol count must be between ${MIN_BUILD_UNIVERSE_SIZE} and ${MAX_BUILD_UNIVERSE_SIZE}. ` +
+        `Resolved ${assessment.resolvedSymbols.length} symbols for this selection.`,
+      resolvedSymbolCount: assessment.resolvedSymbols.length,
+      requiredRows: assessment.requiredRows
+    });
+  }
+
+  if (assessment.insufficientSymbols.length > 0) {
+    const preview = assessment.insufficientSymbols
+      .slice(0, 5)
+      .map((entry) => `${entry.symbol}(${entry.rowCount})`)
+      .join(', ');
+
+    return makeInvalidValidationResponse({
+      datasetId: args.dataset.id,
+      universeId: args.universe.id,
+      asOfDate: args.asOfDate,
+      windowDays: args.windowDays,
+      reasonCode: 'insufficient_history',
+      message:
+        `Dataset "${args.dataset.id}" does not have enough history for universe "${args.universe.id}" at ${args.asOfDate}. ` +
+        `Need ${assessment.requiredRows} rows per symbol. First insufficient symbols: ${preview}.`,
+      resolvedSymbolCount: assessment.resolvedSymbols.length,
+      requiredRows: assessment.requiredRows
+    });
+  }
+
+  return {
+    valid: true,
+    reasonCode: 'ok',
+    message: null,
+    datasetId: args.dataset.id,
+    universeId: args.universe.id,
+    asOfDate: args.asOfDate,
+    windowDays: args.windowDays,
+    resolvedSymbolCount: assessment.resolvedSymbols.length,
+    requiredRows: assessment.requiredRows
+  };
+}
+
+export async function assessBuildRequestCoverage(args: {
   datasetId: string;
   universe: UniverseValidationRow;
   asOfDate: string;
   windowDays: BuildRunWindowDays;
-}): Promise<string[]> {
-  const resolvedSymbols = await resolveUniverseSymbols(
-    args.universe,
-    args.datasetId,
-    args.asOfDate
-  );
+}): Promise<BuildRequestCoverageAssessment> {
+  const requiredRows = args.windowDays + 1;
+  const resolvedSymbols = await resolveUniverseSymbols(args.universe, args.datasetId, args.asOfDate, {
+    minimumRows: requiredRows
+  });
 
-  if (
-    resolvedSymbols.length < MIN_BUILD_UNIVERSE_SIZE ||
-    resolvedSymbols.length > MAX_BUILD_UNIVERSE_SIZE
-  ) {
-    throw new ServiceError(
-      400,
-      `Universe symbol count must be between ${MIN_BUILD_UNIVERSE_SIZE} and ${MAX_BUILD_UNIVERSE_SIZE}.`
-    );
+  if (resolvedSymbols.length === 0) {
+    return {
+      resolvedSymbols,
+      requiredRows,
+      insufficientSymbols: []
+    };
   }
 
   const grouped = await prisma.eodPrice.groupBy({
@@ -55,24 +191,73 @@ export async function validateBuildRequestCoverage(args: {
   });
 
   const countsBySymbol = new Map(grouped.map((entry) => [entry.symbol, entry._count._all] as const));
-  const requiredRows = args.windowDays + 1;
+  const insufficientSymbols = resolvedSymbols
+    .map((symbol) => ({
+      symbol,
+      rowCount: countsBySymbol.get(symbol) ?? 0
+    }))
+    .filter((entry) => entry.rowCount < requiredRows);
 
-  const insufficient = resolvedSymbols.filter(
-    (symbol) => (countsBySymbol.get(symbol) ?? 0) < requiredRows
-  );
+  return {
+    resolvedSymbols,
+    requiredRows,
+    insufficientSymbols
+  };
+}
 
-  if (insufficient.length > 0) {
-    const preview = insufficient
+export async function validateBuildRequestCoverage(args: {
+  datasetId: string;
+  universe: UniverseValidationRow;
+  asOfDate: string;
+  windowDays: BuildRunWindowDays;
+}): Promise<string[]> {
+  const assessment = await assessBuildRequestCoverage(args);
+
+  if (
+    assessment.resolvedSymbols.length < MIN_BUILD_UNIVERSE_SIZE ||
+    assessment.resolvedSymbols.length > MAX_BUILD_UNIVERSE_SIZE
+  ) {
+    throw new ServiceError(
+      400,
+      `Universe symbol count must be between ${MIN_BUILD_UNIVERSE_SIZE} and ${MAX_BUILD_UNIVERSE_SIZE}.`
+    );
+  }
+
+  if (assessment.insufficientSymbols.length > 0) {
+    const preview = assessment.insufficientSymbols
       .slice(0, 5)
-      .map((symbol) => `${symbol}(${countsBySymbol.get(symbol) ?? 0})`)
+      .map((entry) => `${entry.symbol}(${entry.rowCount})`)
       .join(', ');
 
     throw new ServiceError(
       400,
       `Dataset "${args.datasetId}" does not have enough history for universe "${args.universe.id}" at ${args.asOfDate}. ` +
-        `Need ${requiredRows} rows per symbol. First insufficient symbols: ${preview}.`
+        `Need ${assessment.requiredRows} rows per symbol. First insufficient symbols: ${preview}.`
     );
   }
 
-  return resolvedSymbols;
+  return assessment.resolvedSymbols;
+}
+
+function makeInvalidValidationResponse(args: {
+  datasetId: string;
+  universeId: string;
+  asOfDate: string;
+  windowDays: BuildRunWindowDays;
+  reasonCode: Exclude<BuildRequestValidationReasonCode, 'ok'>;
+  message: string;
+  resolvedSymbolCount?: number | null;
+  requiredRows?: number;
+}): BuildRequestValidationResponse {
+  return {
+    valid: false,
+    reasonCode: args.reasonCode,
+    message: args.message,
+    datasetId: args.datasetId,
+    universeId: args.universeId,
+    asOfDate: args.asOfDate,
+    windowDays: args.windowDays,
+    resolvedSymbolCount: args.resolvedSymbolCount ?? null,
+    requiredRows: args.requiredRows ?? args.windowDays + 1
+  };
 }

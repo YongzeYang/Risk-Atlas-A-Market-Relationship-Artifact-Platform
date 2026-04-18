@@ -6,7 +6,11 @@ import Panel from '../../../components/ui/Panel';
 import SectionHeader from '../../../components/ui/SectionHeader';
 import StatusBadge from '../../../components/ui/StatusBadge';
 import { createBuildSeries } from '../../../features/builds/api';
-import { useBuildSeriesData, useInviteCode } from '../../../features/builds/hooks';
+import {
+  useBuildRequestValidation,
+  useBuildSeriesData,
+  useInviteCode
+} from '../../../features/builds/hooks';
 import { useCatalogData } from '../../../features/catalog/hooks';
 import { formatDateOnly, formatDateTime } from '../../../lib/format';
 import type {
@@ -44,6 +48,10 @@ export default function BuildSeriesPage() {
     () => datasets.find((d) => d.id === datasetId) ?? null,
     [datasetId, datasets]
   );
+  const selectedUniverse = useMemo(
+    () => universes.find((universe) => universe.id === universeId) ?? null,
+    [universeId, universes]
+  );
   const compatibleUniverses = useMemo(
     () =>
       universes.filter((universe) => {
@@ -63,6 +71,17 @@ export default function BuildSeriesPage() {
       }),
     [selectedDataset, universes]
   );
+  const {
+    validation: startValidation,
+    validating: startValidationLoading,
+    error: startValidationError
+  } = useBuildRequestValidation({
+    datasetId,
+    universeId,
+    asOfDate: startDate,
+    windowDays,
+    enabled: Boolean(datasetId && universeId && startDate && compatibleUniverses.length > 0)
+  });
   const activeSeries = useMemo(
     () => series.filter((item) => item.status === 'pending' || item.status === 'running'),
     [series]
@@ -77,11 +96,13 @@ export default function BuildSeriesPage() {
   );
 
   useEffect(() => {
-    if (selectedDataset) {
-      if (!endDate) setEndDate(selectedDataset.maxTradeDate ?? '');
-      if (!startDate) setStartDate(selectedDataset.minTradeDate ?? '');
+    if (!selectedDataset) {
+      return;
     }
-  }, [selectedDataset?.id]);
+
+    setStartDate(selectedDataset.minTradeDate ?? '');
+    setEndDate(selectedDataset.maxTradeDate ?? '');
+  }, [selectedDataset?.id, selectedDataset?.maxTradeDate, selectedDataset?.minTradeDate]);
 
   useEffect(() => {
     if (compatibleUniverses.length === 0) {
@@ -126,6 +147,25 @@ export default function BuildSeriesPage() {
     },
     [seriesName, datasetId, universeId, windowDays, startDate, endDate, frequency, inviteCode, refresh]
   );
+  const dateRangeError = useMemo(() => {
+    if (!startDate || !endDate) {
+      return null;
+    }
+
+    if (startDate >= endDate) {
+      return 'Start date must be earlier than end date.';
+    }
+
+    if (selectedDataset?.minTradeDate && startDate < selectedDataset.minTradeDate) {
+      return `Start date is earlier than the dataset range (${selectedDataset.minTradeDate}).`;
+    }
+
+    if (selectedDataset?.maxTradeDate && endDate > selectedDataset.maxTradeDate) {
+      return `End date is later than the dataset range (${selectedDataset.maxTradeDate}).`;
+    }
+
+    return null;
+  }, [endDate, selectedDataset?.maxTradeDate, selectedDataset?.minTradeDate, startDate]);
 
   return (
     <div className="page page--series">
@@ -235,6 +275,11 @@ export default function BuildSeriesPage() {
                     <option key={d.id} value={d.id}>{d.id}</option>
                   ))}
                 </select>
+                <span className="field__hint">
+                  {selectedDataset
+                    ? `${selectedDataset.name} · ${formatDateOnly(selectedDataset.minTradeDate)} → ${formatDateOnly(selectedDataset.maxTradeDate)}`
+                    : 'Select one dataset.'}
+                </span>
               </label>
 
               <label className="field">
@@ -249,12 +294,53 @@ export default function BuildSeriesPage() {
                     <option key={u.id} value={u.id}>{u.id}</option>
                   ))}
                 </select>
+                <span className="field__hint">
+                  {(() => {
+                    if (!selectedUniverse) {
+                      return 'Select one universe.';
+                    }
+
+                    const kind = selectedUniverse.definitionKind === 'static' ? 'static' : 'dynamic';
+
+                    if (startValidation?.valid && startValidation.resolvedSymbolCount != null) {
+                      return `${selectedUniverse.name} · ${kind} · ${startValidation.resolvedSymbolCount} coverage-qualified symbols at the first scheduled run`;
+                    }
+
+                    const count =
+                      selectedUniverse.symbolCount != null
+                        ? `${selectedUniverse.symbolCount} symbols`
+                        : 'resolved against the selected dataset/date';
+                    return `${selectedUniverse.name} · ${kind} · ${count}`;
+                  })()}
+                </span>
               </label>
             </div>
 
             {compatibleUniverses.length === 0 ? (
               <div className="state-note state-note--error">
                 No compatible universes are available for dataset "{selectedDataset?.id ?? datasetId}".
+              </div>
+            ) : null}
+
+            {dateRangeError ? (
+              <div className="state-note state-note--error">{dateRangeError}</div>
+            ) : null}
+
+            {startValidationLoading ? (
+              <div className="state-note">Checking the first scheduled build for coverage and size…</div>
+            ) : null}
+
+            {!startValidationLoading && startValidationError ? (
+              <div className="state-note state-note--error">{startValidationError}</div>
+            ) : null}
+
+            {!startValidationLoading && startValidation && !startValidation.valid && startValidation.message ? (
+              <div className="state-note state-note--error">{startValidation.message}</div>
+            ) : null}
+
+            {!startValidationLoading && startValidation?.valid && startValidation.resolvedSymbolCount != null ? (
+              <div className="state-note">
+                First scheduled run resolves to {startValidation.resolvedSymbolCount} coverage-qualified symbols with at least {startValidation.requiredRows} rows each. Flat return series, if any, are filtered during build preparation.
               </div>
             ) : null}
 
@@ -266,6 +352,8 @@ export default function BuildSeriesPage() {
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
+                  min={selectedDataset?.minTradeDate ?? undefined}
+                  max={selectedDataset?.maxTradeDate ?? undefined}
                   disabled={submitting}
                 />
               </label>
@@ -277,9 +365,15 @@ export default function BuildSeriesPage() {
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
+                  min={selectedDataset?.minTradeDate ?? undefined}
+                  max={selectedDataset?.maxTradeDate ?? undefined}
                   disabled={submitting}
                 />
               </label>
+            </div>
+
+            <div className="field__hint">
+              The first scheduled run must already be buildable. The server rechecks the first and last scheduled dates when you submit.
             </div>
 
             <div className="form-grid__inline">
@@ -339,7 +433,10 @@ export default function BuildSeriesPage() {
                   !startDate ||
                   !endDate ||
                   !inviteCode ||
-                  compatibleUniverses.length === 0
+                  compatibleUniverses.length === 0 ||
+                  Boolean(dateRangeError) ||
+                  startValidationLoading ||
+                  !startValidation?.valid
                 }
               >
                 {submitting ? 'Creating…' : 'Create series'}

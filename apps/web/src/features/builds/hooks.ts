@@ -5,6 +5,7 @@ import {
   getAnalysisRun,
   getBuildRunDetail,
   getBuildSeriesDetail,
+  validateBuildRun,
   listAnalysisRuns,
   listBuildRuns,
   listBuildSeries
@@ -13,8 +14,10 @@ import type {
   AnalysisRunDetailResponse,
   AnalysisRunKind,
   AnalysisRunListItem,
+  BuildRequestValidationResponse,
   BuildRunDetailResponse,
   BuildRunListItem,
+  BuildRunWindowDays,
   BuildSeriesDetailResponse,
   BuildSeriesListItem
 } from '../../types/api';
@@ -52,6 +55,76 @@ function toErrorMessage(error: unknown): string {
   }
 
   return 'Unknown error while loading build data.';
+}
+
+export function useBuildRequestValidation(args: {
+  datasetId: string;
+  universeId: string;
+  asOfDate: string;
+  windowDays: BuildRunWindowDays;
+  enabled: boolean;
+  debounceMs?: number;
+}) {
+  const {
+    datasetId,
+    universeId,
+    asOfDate,
+    windowDays,
+    enabled,
+    debounceMs = 200
+  } = args;
+  const [validation, setValidation] = useState<BuildRequestValidationResponse | null>(null);
+  const [validating, setValidating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!enabled || !datasetId || !universeId || !asOfDate) {
+      setValidation(null);
+      setValidating(false);
+      setError(null);
+      return;
+    }
+
+    let active = true;
+    setValidation(null);
+    setError(null);
+    const timerId = window.setTimeout(() => {
+      setValidating(true);
+
+      void validateBuildRun({ datasetId, universeId, asOfDate, windowDays })
+        .then((result) => {
+          if (!active) {
+            return;
+          }
+
+          setValidation(result);
+        })
+        .catch((err) => {
+          if (!active) {
+            return;
+          }
+
+          setValidation(null);
+          setError(toErrorMessage(err));
+        })
+        .finally(() => {
+          if (active) {
+            setValidating(false);
+          }
+        });
+    }, debounceMs);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timerId);
+    };
+  }, [asOfDate, datasetId, debounceMs, enabled, universeId, windowDays]);
+
+  return {
+    validation,
+    validating,
+    error
+  };
 }
 
 export function useBuildRunsData(pollMs = 3000) {

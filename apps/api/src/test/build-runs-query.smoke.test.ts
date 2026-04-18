@@ -17,6 +17,7 @@ import type {
   StructureAnalysisRunListItem
 } from '../contracts/analysis-runs.js';
 import type {
+  BuildRequestValidationResponse,
   BuildRunDetailResponse,
   BuildRunListItem,
   CompareBuildStructuresResponse,
@@ -107,6 +108,46 @@ test('build-runs query API smoke', async (t) => {
 
       const list = parseJson<BuildRunListItem[]>(listResponse.body);
       assert.ok(list.some((item) => item.id === buildRunId));
+    });
+
+    await t.test('build validation reports valid and invalid requests explicitly', async () => {
+      const validResponse = await app.inject({
+        method: 'POST',
+        url: '/build-runs/validate',
+        payload: {
+          datasetId: BUILD_REQUEST.datasetId,
+          universeId: BUILD_REQUEST.universeId,
+          asOfDate: BUILD_REQUEST.asOfDate,
+          windowDays: BUILD_REQUEST.windowDays
+        }
+      });
+
+      assert.equal(validResponse.statusCode, 200, validResponse.body);
+
+      const valid = parseJson<BuildRequestValidationResponse>(validResponse.body);
+      assert.equal(valid.valid, true);
+      assert.equal(valid.reasonCode, 'ok');
+      assert.equal(valid.resolvedSymbolCount, 20);
+      assert.equal(valid.requiredRows, 253);
+
+      const invalidResponse = await app.inject({
+        method: 'POST',
+        url: '/build-runs/validate',
+        payload: {
+          datasetId: BUILD_REQUEST.datasetId,
+          universeId: BUILD_REQUEST.universeId,
+          asOfDate: '2025-04-15',
+          windowDays: BUILD_REQUEST.windowDays
+        }
+      });
+
+      assert.equal(invalidResponse.statusCode, 200, invalidResponse.body);
+
+      const invalid = parseJson<BuildRequestValidationResponse>(invalidResponse.body);
+      assert.equal(invalid.valid, false);
+      assert.equal(invalid.reasonCode, 'insufficient_history');
+      assert.match(invalid.message ?? '', /does not have enough history/i);
+      assert.equal(invalid.requiredRows, 253);
     });
 
     await t.test('pair-score endpoint is correct, self score = 1, and pair symmetry holds', async () => {

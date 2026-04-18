@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 
 import { prisma } from '../lib/prisma.js';
 import { BUILD_RUN_WINDOW_DAYS } from '../contracts/build-runs.js';
+import { getBuildRequestValidationForResolvedUniverse } from './build-request-validation-service.js';
 
 function asStringArray(value: Prisma.JsonValue): string[] {
   if (value === null || value === undefined) return [];
@@ -121,48 +122,50 @@ export async function listUniverses(): Promise<UniverseListItem[]> {
     }
   });
 
-  const minRequiredRows = Math.max(...BUILD_RUN_WINDOW_DAYS) + 1;
+  const datasetsWithMaxTradeDate = await Promise.all(
+    datasets.map(async (dataset) => {
+      const maxTradeDateRow = await prisma.eodPrice.findFirst({
+        where: {
+          datasetId: dataset.id
+        },
+        orderBy: {
+          tradeDate: 'desc'
+        },
+        select: {
+          tradeDate: true
+        }
+      });
+
+      return {
+        ...dataset,
+        maxTradeDate: maxTradeDateRow?.tradeDate ?? null
+      };
+    })
+  );
+
+  const maxWindowDays = Math.max(...BUILD_RUN_WINDOW_DAYS) as (typeof BUILD_RUN_WINDOW_DAYS)[number];
 
   return Promise.all(
     universes.map(async (universe) => {
       const symbols = asStringArray(universe.symbolsJson);
-      let supportedDatasetIds: string[] | null = null;
+      let supportedDatasetIds: string[] = [];
 
-      if (universe.definitionKind === 'static' && symbols.length > 0) {
-        supportedDatasetIds = [];
+      for (const dataset of datasetsWithMaxTradeDate) {
+        if (dataset.market !== universe.market || !dataset.maxTradeDate) {
+          continue;
+        }
 
-        for (const dataset of datasets) {
-          if (dataset.market !== universe.market) {
-            continue;
-          }
+        const validation = await getBuildRequestValidationForResolvedUniverse({
+          dataset,
+          universe,
+          asOfDate: dataset.maxTradeDate,
+          windowDays: maxWindowDays
+        });
 
-          const coverage = await prisma.eodPrice.groupBy({
-            by: ['symbol'],
-            where: {
-              datasetId: dataset.id,
-              symbol: {
-                in: symbols
-              }
-            },
-            _count: {
-              _all: true
-            }
-          });
-
-          const countsBySymbol = new Map(
-            coverage.map((entry) => [entry.symbol, entry._count._all] as const)
-          );
-
-          const fullyCovered = symbols.every(
-            (symbol) => (countsBySymbol.get(symbol) ?? 0) >= minRequiredRows
-          );
-
-          if (fullyCovered) {
-            supportedDatasetIds.push(dataset.id);
-          }
+        if (validation.valid) {
+          supportedDatasetIds.push(dataset.id);
         }
       }
-
       return {
         id: universe.id,
         name: universe.name,

@@ -162,7 +162,7 @@ export default function HomePage() {
               </div>
 
               <div className="coverage-panel__section coverage-panel__section--note">
-                Largest dataset currently contains 60 raw HK listings. Dynamic universes such as all common equity can resolve to fewer symbols because non-common securities are excluded at build time.
+                Largest dataset currently contains {largestDataset?.symbolCount ?? 0} symbols. Dynamic universes such as HK All Common Equities now resolve against the selected dataset, as-of date, and window, so the preflight count reflects coverage-qualified names first and the build pipeline can still drop flat return series before matrix generation.
               </div>
             </div>
           ) : null}

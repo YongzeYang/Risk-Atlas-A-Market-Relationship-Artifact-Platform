@@ -6,7 +6,7 @@ import Panel from '../../../../components/ui/Panel';
 import SectionHeader from '../../../../components/ui/SectionHeader';
 import StatusBadge from '../../../../components/ui/StatusBadge';
 import { createBuildRun } from '../../../../features/builds/api';
-import { useInviteCode } from '../../../../features/builds/hooks';
+import { useBuildRequestValidation, useInviteCode } from '../../../../features/builds/hooks';
 import { formatDateOnly } from '../../../../lib/format';
 import type {
   BuildRunListItem,
@@ -55,6 +55,10 @@ export default function BuildFormPanel({
     () => datasets.find((dataset) => dataset.id === datasetId) ?? null,
     [datasetId, datasets]
   );
+  const selectedUniverse = useMemo(
+    () => universes.find((universe) => universe.id === universeId) ?? null,
+    [universeId, universes]
+  );
 
   const compatibleUniverses = useMemo(
     () =>
@@ -75,6 +79,17 @@ export default function BuildFormPanel({
       }),
     [selectedDataset, universes]
   );
+  const {
+    validation: buildValidation,
+    validating: buildValidating,
+    error: buildValidationError
+  } = useBuildRequestValidation({
+    datasetId,
+    universeId,
+    asOfDate,
+    windowDays,
+    enabled: Boolean(datasetId && universeId && asOfDate && compatibleUniverses.length > 0)
+  });
 
   useEffect(() => {
     if (compatibleUniverses.length === 0) {
@@ -192,11 +207,18 @@ export default function BuildFormPanel({
 
           <span className="field__hint">
             {(() => {
-              const u = compatibleUniverses.find((item) => item.id === universeId);
-              if (!u) return 'Select one universe.';
-              const kind = u.definitionKind === 'static' ? 'static' : 'dynamic';
-              const count = u.symbolCount != null ? `${u.symbolCount} symbols` : 'resolved at build time';
-              return `${u.name} · ${kind} · ${count}`;
+              if (!selectedUniverse) return 'Select one universe.';
+              const kind = selectedUniverse.definitionKind === 'static' ? 'static' : 'dynamic';
+
+              if (buildValidation?.valid && buildValidation.resolvedSymbolCount != null) {
+                return `${selectedUniverse.name} · ${kind} · ${buildValidation.resolvedSymbolCount} coverage-qualified symbols at this date`;
+              }
+
+              const count =
+                selectedUniverse.symbolCount != null
+                  ? `${selectedUniverse.symbolCount} symbols`
+                  : 'resolved against the selected dataset/date';
+              return `${selectedUniverse.name} · ${kind} · ${count}`;
             })()}
           </span>
         </label>
@@ -208,10 +230,16 @@ export default function BuildFormPanel({
             type="date"
             value={asOfDate}
             onChange={(event) => setAsOfDate(event.target.value)}
+            min={selectedDataset?.minTradeDate ?? undefined}
+            max={selectedDataset?.maxTradeDate ?? undefined}
             disabled={loading || submitting}
           />
 
-          <span className="field__hint">Uses daily log returns ending on this trading date.</span>
+          <span className="field__hint">
+            {buildValidation?.valid && buildValidation.resolvedSymbolCount != null
+              ? `Uses daily log returns ending on this trading date. Resolved ${buildValidation.resolvedSymbolCount} coverage-qualified symbols with at least ${buildValidation.requiredRows} rows each. Flat return series, if any, are filtered during build preparation.`
+              : 'Uses daily log returns ending on this trading date.'}
+          </span>
         </label>
 
         <div className="form-grid__inline">
@@ -247,6 +275,18 @@ export default function BuildFormPanel({
           </div>
         ) : null}
 
+        {buildValidating ? (
+          <div className="state-note">Checking dataset coverage and resolved universe size…</div>
+        ) : null}
+
+        {!buildValidating && buildValidationError ? (
+          <div className="state-note state-note--error">{buildValidationError}</div>
+        ) : null}
+
+        {!buildValidating && buildValidation && !buildValidation.valid && buildValidation.message ? (
+          <div className="state-note state-note--error">{buildValidation.message}</div>
+        ) : null}
+
         {submitError ? <div className="state-note state-note--error">{submitError}</div> : null}
 
         <label className="field">
@@ -274,7 +314,9 @@ export default function BuildFormPanel({
               !universeId ||
               !asOfDate ||
               !inviteCode ||
-              compatibleUniverses.length === 0
+              compatibleUniverses.length === 0 ||
+              buildValidating ||
+              !buildValidation?.valid
             }
           >
             {submitting ? 'Starting build…' : 'Start build'}

@@ -72,12 +72,19 @@ export async function createBuildSeries(
     throw new ServiceError(400, 'No build dates in the given range.');
   }
 
-  await validateBuildRequestCoverage({
-    datasetId: input.datasetId,
-    universe,
-    asOfDate: asOfDates[asOfDates.length - 1]!,
-    windowDays: input.windowDays
-  });
+  const boundaryDates = new Set<string>([
+    asOfDates[0]!,
+    asOfDates[asOfDates.length - 1]!
+  ]);
+
+  for (const asOfDate of boundaryDates) {
+    await validateBuildRequestCoverage({
+      datasetId: input.datasetId,
+      universe,
+      asOfDate,
+      windowDays: input.windowDays
+    });
+  }
 
   const series = await prisma.buildSeries.create({
     data: {

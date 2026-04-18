@@ -6,7 +6,7 @@ import {
   MIN_BUILD_UNIVERSE_SIZE
 } from '../contracts/build-runs.js';
 
-const hkSymbolRegex = new RegExp(HK_SYMBOL_PATTERN_SOURCE);
+const symbolRegex = new RegExp(HK_SYMBOL_PATTERN_SOURCE);
 
 function isStringArray(value: Prisma.JsonValue): value is string[] {
   return Array.isArray(value) && value.every((item): item is string => typeof item === 'string');
@@ -34,10 +34,8 @@ export function parseUniverseSymbolsJson(value: Prisma.JsonValue): string[] {
   }
 
   for (const symbol of normalized) {
-    if (!hkSymbolRegex.test(symbol)) {
-      throw new Error(
-        `Invalid Hong Kong symbol "${symbol}" in universe symbolsJson. Expected zero-padded format like 0700.HK.`
-      );
+    if (!symbolRegex.test(symbol)) {
+      throw new Error(`Invalid symbol "${symbol}" in universe symbolsJson.`);
     }
   }
 

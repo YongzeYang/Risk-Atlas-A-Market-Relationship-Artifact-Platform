@@ -6,6 +6,7 @@ import {
   ARTIFACT_FILE_NAMES,
   ISO_DATE_PATTERN_SOURCE,
   MANIFEST_FORMAT,
+  MIN_BUILD_UNIVERSE_SIZE,
   PREVIEW_FORMAT,
   TOP_PAIR_LIMIT,
   isBuildRunWindowDays,
@@ -27,6 +28,7 @@ import {
   buildCorrelationMatrix,
   buildRowsBySymbol,
   computeLogReturns,
+  hasSufficientVariance,
   selectAlignedWindowDates,
   type PriceRow
 } from './correlation-analytics.js';
@@ -110,23 +112,24 @@ async function runBuildInternal(buildRunId: string): Promise<void> {
     }
 
     const windowDays: BuildRunWindowDays = buildRun.windowDays;
-    const symbolOrder = await resolveUniverseSymbols(
+    const resolvedUniverseSymbols = await resolveUniverseSymbols(
       buildRun.universe,
       buildRun.datasetId,
-      buildRun.asOfDate
+      buildRun.asOfDate,
+      { minimumRows: windowDays + 1 }
     );
-
-    // Store the resolved symbols snapshot
-    await prisma.buildRun.update({
-      where: { id: buildRunId },
-      data: { resolvedSymbolsJson: symbolOrder }
-    });
 
     const prepared = await buildCorrelationArtifactData({
       datasetId: buildRun.datasetId,
-      symbolOrder,
+      symbolOrder: resolvedUniverseSymbols,
       asOfDate: buildRun.asOfDate,
       windowDays
+    });
+
+    // Store the final symbol snapshot after filtering out unusable series.
+    await prisma.buildRun.update({
+      where: { id: buildRunId },
+      data: { resolvedSymbolsJson: prepared.symbolOrder }
     });
 
     const securityMasterEntries = await prisma.securityMaster.findMany({
@@ -342,6 +345,7 @@ async function buildCorrelationArtifactData(args: {
   );
 
   const returnSeriesBySymbol = new Map<string, number[]>();
+  const filteredSymbolOrder: string[] = [];
 
   for (const symbol of args.symbolOrder) {
     const alignedPrices = alignedPriceSeries.get(symbol);
@@ -349,15 +353,27 @@ async function buildCorrelationArtifactData(args: {
       throw new Error(`Missing aligned price series for symbol "${symbol}".`);
     }
 
-    returnSeriesBySymbol.set(symbol, computeLogReturns(alignedPrices));
+    const returns = computeLogReturns(alignedPrices);
+    if (!hasSufficientVariance(returns)) {
+      continue;
+    }
+
+    returnSeriesBySymbol.set(symbol, returns);
+    filteredSymbolOrder.push(symbol);
   }
 
-  const scores = buildCorrelationMatrix(args.symbolOrder, returnSeriesBySymbol);
+  if (filteredSymbolOrder.length < MIN_BUILD_UNIVERSE_SIZE) {
+    throw new Error(
+      `Only ${filteredSymbolOrder.length} symbols remain after filtering near-zero-variance return series.`
+    );
+  }
+
+  const scores = buildCorrelationMatrix(filteredSymbolOrder, returnSeriesBySymbol);
   const { minScore, maxScore } = computeMatrixScoreRange(scores);
-  const topPairs = computeTopPairs(args.symbolOrder, scores);
+  const topPairs = computeTopPairs(filteredSymbolOrder, scores);
 
   return {
-    symbolOrder: args.symbolOrder,
+    symbolOrder: filteredSymbolOrder,
     scores,
     topPairs,
     minScore,

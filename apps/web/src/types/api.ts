@@ -2,6 +2,13 @@
 export type BuildRunStatus = 'pending' | 'running' | 'succeeded' | 'failed';
 export type BuildRunScoreMethod = 'pearson_corr';
 export type BuildRunWindowDays = 60 | 120 | 252;
+export type BuildRequestValidationReasonCode =
+  | 'ok'
+  | 'dataset_not_found'
+  | 'universe_not_found'
+  | 'market_mismatch'
+  | 'universe_size'
+  | 'insufficient_history';
 export type ArtifactStorageKind = 'local_fs' | 's3';
 export type BuildSeriesFrequency = 'daily' | 'weekly' | 'monthly';
 export type BuildSeriesStatus =
@@ -95,6 +102,25 @@ export type CreateBuildRunInput = {
   windowDays: BuildRunWindowDays;
   scoreMethod: BuildRunScoreMethod;
   inviteCode: string;
+};
+
+export type ValidateBuildRunInput = {
+  datasetId: string;
+  universeId: string;
+  asOfDate: string;
+  windowDays: BuildRunWindowDays;
+};
+
+export type BuildRequestValidationResponse = {
+  valid: boolean;
+  reasonCode: BuildRequestValidationReasonCode;
+  message: string | null;
+  datasetId: string;
+  universeId: string;
+  asOfDate: string;
+  windowDays: BuildRunWindowDays;
+  resolvedSymbolCount: number | null;
+  requiredRows: number;
 };
 
 export type CreateBuildSeriesInput = {

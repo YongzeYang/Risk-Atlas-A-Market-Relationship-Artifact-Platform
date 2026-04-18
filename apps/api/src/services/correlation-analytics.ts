@@ -201,6 +201,18 @@ export function pearsonCorrelation(left: number[], right: number[]): number {
   return clamp(raw, -1, 1);
 }
 
+export function hasSufficientVariance(values: number[], minimumVariance = 1e-20): boolean {
+  const valuesMean = mean(values);
+  let variance = 0;
+
+  for (const value of values) {
+    const centered = value - valuesMean;
+    variance += centered * centered;
+  }
+
+  return variance > minimumVariance;
+}
+
 export function computeCumulativeReturn(prices: number[]): number {
   if (prices.length < 2) {
     throw new Error('At least two prices are required to compute a cumulative return.');

@@ -5,6 +5,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import {
   ARTIFACT_FILE_NAMES,
   analysisInviteHeadersSchema,
+  buildRequestValidationResponseSchema,
   buildRunDetailResponseSchema,
   buildRunIdParamSchema,
   buildRunListItemSchema,
@@ -22,6 +23,7 @@ import {
   pairScoreResponseSchema,
   structureQuerystringSchema,
   structureResponseSchema,
+  validateBuildRunBodySchema,
   type BuildRunIdParams,
   type CreateBuildRunRequestBody,
   type ExposureQuerystring,
@@ -29,7 +31,8 @@ import {
   type NeighborsQuerystring,
   type PairDivergenceQuerystring,
   type PairScoreQuerystring,
-  type StructureQuerystring
+  type StructureQuerystring,
+  type ValidateBuildRunRequestBody
 } from '../contracts/build-runs.js';
 import { ServiceError } from '../lib/service-error.js';
 import {
@@ -38,6 +41,7 @@ import {
   getBuildRunDownloadArtifact,
   listBuildRuns
 } from '../services/build-run-service.js';
+import { getBuildRequestValidation } from '../services/build-request-validation-service.js';
 import {
   getBuildRunHeatmapSubset,
   getBuildRunNeighbors,
@@ -78,6 +82,23 @@ export const buildRunRoutes: FastifyPluginAsync = async (app) => {
 
         throw error;
       }
+    }
+  );
+
+  app.post<{ Body: ValidateBuildRunRequestBody }>(
+    '/build-runs/validate',
+    {
+      schema: {
+        tags: ['build-runs'],
+        summary: 'Validate one build run request before queueing it',
+        body: validateBuildRunBodySchema,
+        response: {
+          200: buildRequestValidationResponseSchema
+        }
+      }
+    },
+    async (request) => {
+      return getBuildRequestValidation(request.body);
     }
   );
 

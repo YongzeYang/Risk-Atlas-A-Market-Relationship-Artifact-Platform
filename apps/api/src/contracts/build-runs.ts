@@ -63,7 +63,7 @@ export const BUILD_SERIES_STATUSES = [
 export type BuildSeriesStatus = (typeof BUILD_SERIES_STATUSES)[number];
 
 export const ISO_DATE_PATTERN_SOURCE = '^\\d{4}-\\d{2}-\\d{2}$';
-export const HK_SYMBOL_PATTERN_SOURCE = '^\\d{4}\\.HK$';
+export const HK_SYMBOL_PATTERN_SOURCE = '^[A-Z0-9][A-Z0-9._/-]{1,31}$';
 export const ANALYSIS_INVITE_HEADER_NAME = 'x-invite-code' as const;
 
 export function isBuildRunScoreMethod(value: string): value is BuildRunScoreMethod {
@@ -89,6 +89,36 @@ export type CreateBuildRunRequestBody = {
   windowDays: BuildRunWindowDays;
   scoreMethod: BuildRunScoreMethod;
   inviteCode?: string;
+};
+
+export const BUILD_REQUEST_VALIDATION_REASON_CODES = [
+  'ok',
+  'dataset_not_found',
+  'universe_not_found',
+  'market_mismatch',
+  'universe_size',
+  'insufficient_history'
+] as const;
+export type BuildRequestValidationReasonCode =
+  (typeof BUILD_REQUEST_VALIDATION_REASON_CODES)[number];
+
+export type ValidateBuildRunRequestBody = {
+  datasetId: string;
+  universeId: string;
+  asOfDate: string;
+  windowDays: BuildRunWindowDays;
+};
+
+export type BuildRequestValidationResponse = {
+  valid: boolean;
+  reasonCode: BuildRequestValidationReasonCode;
+  message: string | null;
+  datasetId: string;
+  universeId: string;
+  asOfDate: string;
+  windowDays: BuildRunWindowDays;
+  resolvedSymbolCount: number | null;
+  requiredRows: number;
 };
 
 export type CreateBuildSeriesRequestBody = {
@@ -476,6 +506,45 @@ export const createBuildRunBodySchema = {
     inviteCode: { type: 'string', minLength: 1 }
   },
   required: ['datasetId', 'universeId', 'asOfDate', 'windowDays', 'scoreMethod', 'inviteCode']
+} as const;
+
+export const validateBuildRunBodySchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    datasetId: { type: 'string', minLength: 1 },
+    universeId: { type: 'string', minLength: 1 },
+    asOfDate: { type: 'string', pattern: ISO_DATE_PATTERN_SOURCE },
+    windowDays: { type: 'integer', enum: [...BUILD_RUN_WINDOW_DAYS] }
+  },
+  required: ['datasetId', 'universeId', 'asOfDate', 'windowDays']
+} as const;
+
+export const buildRequestValidationResponseSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    valid: { type: 'boolean' },
+    reasonCode: { type: 'string', enum: [...BUILD_REQUEST_VALIDATION_REASON_CODES] },
+    message: nullableStringSchema,
+    datasetId: { type: 'string' },
+    universeId: { type: 'string' },
+    asOfDate: { type: 'string', pattern: ISO_DATE_PATTERN_SOURCE },
+    windowDays: { type: 'integer', enum: [...BUILD_RUN_WINDOW_DAYS] },
+    resolvedSymbolCount: nullableIntegerSchema,
+    requiredRows: { type: 'integer' }
+  },
+  required: [
+    'valid',
+    'reasonCode',
+    'message',
+    'datasetId',
+    'universeId',
+    'asOfDate',
+    'windowDays',
+    'resolvedSymbolCount',
+    'requiredRows'
+  ]
 } as const;
 
 export const createBuildSeriesBodySchema = {
