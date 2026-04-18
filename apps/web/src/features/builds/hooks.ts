@@ -1,8 +1,23 @@
 // apps/web/src/features/builds/hooks.ts
 import { useCallback, useEffect, useState } from 'react';
 
-import { getBuildRunDetail, getBuildSeriesDetail, listBuildRuns, listBuildSeries } from './api';
-import type { BuildRunDetailResponse, BuildRunListItem, BuildSeriesDetailResponse, BuildSeriesListItem } from '../../types/api';
+import {
+  getAnalysisRun,
+  getBuildRunDetail,
+  getBuildSeriesDetail,
+  listAnalysisRuns,
+  listBuildRuns,
+  listBuildSeries
+} from './api';
+import type {
+  AnalysisRunDetailResponse,
+  AnalysisRunKind,
+  AnalysisRunListItem,
+  BuildRunDetailResponse,
+  BuildRunListItem,
+  BuildSeriesDetailResponse,
+  BuildSeriesListItem
+} from '../../types/api';
 
 const INVITE_CODE_STORAGE_KEY = 'risk-atlas:invite-code';
 
@@ -266,4 +281,152 @@ export function useBuildSeriesDetailData(seriesId: string | undefined, pollMs = 
   }, [pollMs, refresh]);
 
   return { detail, loading, error, refresh: () => refresh('refresh') };
+}
+
+export function useAnalysisRunData(runId: string | undefined, pollMs = 2000) {
+  const [run, setRun] = useState<AnalysisRunDetailResponse | null>(null);
+  const [loading, setLoading] = useState(Boolean(runId));
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(
+    async (mode: 'initial' | 'refresh' = 'refresh') => {
+      if (!runId) {
+        setRun(null);
+        setLoading(false);
+        return null;
+      }
+
+      if (mode === 'initial') {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
+      }
+
+      setError(null);
+
+      try {
+        const next = await getAnalysisRun(runId);
+        setRun(next);
+        return next;
+      } catch (err) {
+        setError(toErrorMessage(err));
+        return null;
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [runId]
+  );
+
+  useEffect(() => {
+    let active = true;
+    let timerId: number | undefined;
+
+    const loop = async (mode: 'initial' | 'refresh') => {
+      if (!active) {
+        return;
+      }
+
+      const next = await refresh(mode);
+      if (!active) {
+        return;
+      }
+
+      if (next && (next.status === 'pending' || next.status === 'running')) {
+        timerId = window.setTimeout(() => {
+          void loop('refresh');
+        }, pollMs);
+      }
+    };
+
+    void loop('initial');
+
+    return () => {
+      active = false;
+      if (timerId) {
+        window.clearTimeout(timerId);
+      }
+    };
+  }, [pollMs, refresh]);
+
+  return {
+    run,
+    loading,
+    refreshing,
+    error,
+    refresh: () => refresh('refresh')
+  };
+}
+
+export function useAnalysisRunListData(
+  kind: AnalysisRunKind | undefined,
+  buildRunId: string | undefined,
+  pollMs = 5000
+) {
+  const [runs, setRuns] = useState<AnalysisRunListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(
+    async (mode: 'initial' | 'refresh' = 'refresh') => {
+      if (mode === 'initial') {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
+      }
+
+      setError(null);
+
+      try {
+        const next = await listAnalysisRuns({ kind, buildRunId, limit: 8 });
+        setRuns(next);
+      } catch (err) {
+        setError(toErrorMessage(err));
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [buildRunId, kind]
+  );
+
+  useEffect(() => {
+    let active = true;
+    let timerId: number | undefined;
+
+    const loop = async (mode: 'initial' | 'refresh') => {
+      if (!active) {
+        return;
+      }
+
+      await refresh(mode);
+      if (!active) {
+        return;
+      }
+
+      timerId = window.setTimeout(() => {
+        void loop('refresh');
+      }, pollMs);
+    };
+
+    void loop('initial');
+
+    return () => {
+      active = false;
+      if (timerId) {
+        window.clearTimeout(timerId);
+      }
+    };
+  }, [pollMs, refresh]);
+
+  return {
+    runs,
+    loading,
+    refreshing,
+    error,
+    refresh: () => refresh('refresh')
+  };
 }

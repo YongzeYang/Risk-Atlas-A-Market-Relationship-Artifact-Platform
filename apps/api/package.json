@@ -10,6 +10,7 @@
     "db:migrate": "prisma migrate dev",
     "db:generate-sample-eod": "tsx prisma/generate-sample-eod.ts",
     "db:import-eod": "tsx prisma/import-eod.ts",
+    "db:benchmark-real-hk": "tsx prisma/real-hk-benchmark.ts",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "test:smoke": "node --import tsx --test src/test/**/*.test.ts"

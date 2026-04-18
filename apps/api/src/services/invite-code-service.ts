@@ -1,6 +1,8 @@
 import { scryptSync, timingSafeEqual } from 'node:crypto';
 
 import { prisma } from '../lib/prisma.js';
+import { ANALYSIS_INVITE_HEADER_NAME } from '../contracts/build-runs.js';
+import { ServiceError } from '../lib/service-error.js';
 
 export async function validateInviteCode(code: string): Promise<boolean> {
   if (!code || typeof code !== 'string') {
@@ -36,4 +38,20 @@ export async function validateInviteCode(code: string): Promise<boolean> {
   }
 
   return false;
+}
+
+export async function requireInviteCodeHeader(
+  headers: Record<string, string | string[] | undefined>
+): Promise<void> {
+  const headerValue = headers[ANALYSIS_INVITE_HEADER_NAME];
+  const inviteCode = Array.isArray(headerValue) ? headerValue[0] : headerValue;
+
+  if (!inviteCode || inviteCode.trim().length === 0) {
+    throw new ServiceError(403, 'Invite code is required for analysis requests.');
+  }
+
+  const validInvite = await validateInviteCode(inviteCode.trim());
+  if (!validInvite) {
+    throw new ServiceError(403, 'Invalid invite code.');
+  }
 }

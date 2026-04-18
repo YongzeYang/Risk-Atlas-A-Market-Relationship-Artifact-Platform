@@ -4,6 +4,7 @@ import swagger from '@fastify/swagger';
 import { createRequire } from 'node:module';
 import { dirname } from 'node:path';
 
+import { analysisRunRoutes } from './routes/analysis-runs.js';
 import { buildRunRoutes } from './routes/build-runs.js';
 import { buildSeriesRoutes } from './routes/build-series.js';
 import { catalogRoutes } from './routes/catalog.js';
@@ -140,6 +141,7 @@ export async function buildApp() {
   await app.register(catalogRoutes);
   await app.register(buildRunRoutes);
   await app.register(buildSeriesRoutes);
+  await app.register(analysisRunRoutes);
   await app.register(compareRoutes);
 
   app.get(

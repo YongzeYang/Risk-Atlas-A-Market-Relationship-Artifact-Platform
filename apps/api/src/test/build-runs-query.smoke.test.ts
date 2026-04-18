@@ -10,6 +10,13 @@ import { fileURLToPath } from 'node:url';
 import type { FastifyInstance } from 'fastify';
 
 import type {
+  AnalysisRunDetailResponse,
+  AnalysisRunListItem,
+  ExposureAnalysisRunListItem,
+  PairDivergenceAnalysisRunListItem,
+  StructureAnalysisRunListItem
+} from '../contracts/analysis-runs.js';
+import type {
   BuildRunDetailResponse,
   BuildRunListItem,
   CompareBuildStructuresResponse,
@@ -26,6 +33,9 @@ const repoRootDir = resolve(fileURLToPath(new URL('../../../../', import.meta.ur
 const writerBinaryPath = resolve(repoRootDir, 'cpp', 'build', 'bin', 'risk_atlas_bsm_writer');
 const queryBinaryPath = resolve(repoRootDir, 'cpp', 'build', 'bin', 'risk_atlas_bsm_query');
 const INVITE_CODE = 'risk-atlas-demo-2026';
+const ANALYSIS_HEADERS = {
+  'x-invite-code': INVITE_CODE
+} as const;
 
 const BUILD_REQUEST = {
   datasetId: 'hk_eod_demo_v1',
@@ -237,7 +247,8 @@ test('build-runs query API smoke', async (t) => {
         method: 'GET',
         url:
           `/build-runs/${buildRunId}/pair-divergence?recentWindowDays=20&limit=10` +
-          `&minLongCorrAbs=0.15&minCorrDeltaAbs=0.05`
+          `&minLongCorrAbs=0.15&minCorrDeltaAbs=0.05`,
+        headers: ANALYSIS_HEADERS
       });
 
       assert.equal(divergenceResponse.statusCode, 200, divergenceResponse.body);
@@ -271,10 +282,48 @@ test('build-runs query API smoke', async (t) => {
       }
     });
 
+    await t.test('queued pair-divergence run persists and can be listed later', async () => {
+      const createResponse = await app.inject({
+        method: 'POST',
+        url: '/analysis-runs/pair-divergence',
+        headers: ANALYSIS_HEADERS,
+        payload: {
+          buildRunId,
+          recentWindowDays: 20,
+          limit: 10,
+          minLongCorrAbs: 0.15,
+          minCorrDeltaAbs: 0.05
+        }
+      });
+
+      assert.equal(createResponse.statusCode, 202, createResponse.body);
+
+      const created = parseJson<PairDivergenceAnalysisRunListItem>(createResponse.body);
+      assert.equal(created.kind, 'pair_divergence');
+      assert.equal(created.buildRunId, buildRunId);
+      assert.ok(created.id.length > 0);
+
+      const completed = await waitForSucceededAnalysisRun(app, created.id);
+      assert.equal(completed.kind, 'pair_divergence');
+      assert.ok(completed.result);
+      assert.ok(completed.result.candidateCount >= completed.result.candidates.length);
+
+      const listResponse = await app.inject({
+        method: 'GET',
+        url: `/analysis-runs?kind=pair_divergence&buildRunId=${buildRunId}`
+      });
+
+      assert.equal(listResponse.statusCode, 200, listResponse.body);
+
+      const list = parseJson<AnalysisRunListItem[]>(listResponse.body);
+      assert.ok(list.some((item) => item.id === created.id));
+    });
+
     await t.test('exposure returns sector aggregation and concentration metrics', async () => {
       const exposureResponse = await app.inject({
         method: 'GET',
-        url: `/build-runs/${buildRunId}/exposure?symbol=0700.HK&k=10`
+        url: `/build-runs/${buildRunId}/exposure?symbol=0700.HK&k=10`,
+        headers: ANALYSIS_HEADERS
       });
 
       assert.equal(exposureResponse.statusCode, 200, exposureResponse.body);
@@ -293,10 +342,36 @@ test('build-runs query API smoke', async (t) => {
       assert.ok(Math.abs(weightShareSum - 1) < 1e-6 || weightShareSum === 0);
     });
 
+    await t.test('queued exposure run persists its result', async () => {
+      const createResponse = await app.inject({
+        method: 'POST',
+        url: '/analysis-runs/exposure',
+        headers: ANALYSIS_HEADERS,
+        payload: {
+          buildRunId,
+          symbol: '0700.HK',
+          k: 10
+        }
+      });
+
+      assert.equal(createResponse.statusCode, 202, createResponse.body);
+
+      const created = parseJson<ExposureAnalysisRunListItem>(createResponse.body);
+      assert.equal(created.kind, 'exposure');
+      assert.equal(created.buildRunId, buildRunId);
+
+      const completed = await waitForSucceededAnalysisRun(app, created.id);
+      assert.equal(completed.kind, 'exposure');
+      assert.ok(completed.result);
+      assert.equal(completed.result.symbol, '0700.HK');
+      assert.ok(completed.result.neighborCount > 0);
+    });
+
     await t.test('structure returns ordered heatmap metadata and cluster summaries', async () => {
       const structureResponse = await app.inject({
         method: 'GET',
-        url: `/build-runs/${buildRunId}/structure?heatmapSize=12`
+        url: `/build-runs/${buildRunId}/structure?heatmapSize=12`,
+        headers: ANALYSIS_HEADERS
       });
 
       assert.equal(structureResponse.statusCode, 200, structureResponse.body);
@@ -319,7 +394,38 @@ test('build-runs query API smoke', async (t) => {
       assert.ok(structure.clusters.length > 0);
     });
 
-    await t.test('compare-build-structures reports drift summary between two builds', async () => {
+    await t.test('queued structure run persists ordered structure output', async () => {
+      const createResponse = await app.inject({
+        method: 'POST',
+        url: '/analysis-runs/structure',
+        headers: ANALYSIS_HEADERS,
+        payload: {
+          buildRunId,
+          heatmapSize: 12
+        }
+      });
+
+      assert.equal(createResponse.statusCode, 202, createResponse.body);
+
+      const created = parseJson<StructureAnalysisRunListItem>(createResponse.body);
+      assert.equal(created.kind, 'structure');
+      assert.equal(created.buildRunId, buildRunId);
+
+      const completed = await waitForSucceededAnalysisRun(app, created.id);
+      assert.equal(completed.kind, 'structure');
+      assert.ok(completed.result);
+      assert.ok(completed.result.clusterCount > 0);
+      assert.ok(completed.result.heatmapSymbols.length > 0);
+    });
+
+    await t.test('compare-builds requires invite and returns pair drift with invite', async () => {
+      const missingInviteResponse = await app.inject({
+        method: 'GET',
+        url: `/compare-builds?leftId=${buildRunId}&rightId=${buildRunId}`
+      });
+
+      assert.equal(missingInviteResponse.statusCode, 400, missingInviteResponse.body);
+
       const createResponse = await app.inject({
         method: 'POST',
         url: '/build-runs',
@@ -332,7 +438,42 @@ test('build-runs query API smoke', async (t) => {
 
       const compareResponse = await app.inject({
         method: 'GET',
-        url: `/compare-build-structures?leftId=${buildRunId}&rightId=${secondBuildRunId}`
+        url: `/compare-builds?leftId=${buildRunId}&rightId=${secondBuildRunId}`,
+        headers: ANALYSIS_HEADERS
+      });
+
+      assert.equal(compareResponse.statusCode, 200, compareResponse.body);
+
+      const compare = parseJson<{
+        left: { id: string };
+        right: { id: string };
+        commonSymbols: string[];
+        topDriftPairs: Array<{ left: string; right: string; delta: number }>;
+      }>(compareResponse.body);
+
+      assert.equal(compare.left.id, buildRunId);
+      assert.equal(compare.right.id, secondBuildRunId);
+      assert.ok(compare.commonSymbols.length > 0);
+      assert.ok(compare.topDriftPairs.length > 0);
+    });
+
+    await t.test('compare-build-structures reports drift summary between two builds', async () => {
+      if (!secondBuildRunId) {
+        const createResponse = await app.inject({
+          method: 'POST',
+          url: '/build-runs',
+          payload: BUILD_REQUEST
+        });
+
+        assert.equal(createResponse.statusCode, 202, createResponse.body);
+        secondBuildRunId = parseJson<BuildRunListItem>(createResponse.body).id;
+        await waitForSucceededBuild(app, secondBuildRunId);
+      }
+
+      const compareResponse = await app.inject({
+        method: 'GET',
+        url: `/compare-build-structures?leftId=${buildRunId}&rightId=${secondBuildRunId}`,
+        headers: ANALYSIS_HEADERS
       });
 
       assert.equal(compareResponse.statusCode, 200, compareResponse.body);
@@ -417,6 +558,40 @@ async function waitForSucceededBuild(
   }
 
   assert.fail(`Timed out waiting for build "${buildRunId}" to succeed.`);
+}
+
+async function waitForSucceededAnalysisRun(
+  app: FastifyInstance,
+  runId: string
+): Promise<AnalysisRunDetailResponse> {
+  const timeoutMs = 30_000;
+  const pollIntervalMs = 250;
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const response = await app.inject({
+      method: 'GET',
+      url: `/analysis-runs/${runId}`
+    });
+
+    assert.equal(response.statusCode, 200, response.body);
+
+    const detail = parseJson<AnalysisRunDetailResponse>(response.body);
+
+    if (detail.status === 'succeeded') {
+      return detail;
+    }
+
+    if (detail.status === 'failed') {
+      assert.fail(
+        `Analysis run "${runId}" failed during smoke test: ${detail.errorMessage ?? 'unknown error'}`
+      );
+    }
+
+    await sleep(pollIntervalMs);
+  }
+
+  assert.fail(`Timed out waiting for analysis run "${runId}" to succeed.`);
 }
 
 function parseJson<T>(text: string): T {

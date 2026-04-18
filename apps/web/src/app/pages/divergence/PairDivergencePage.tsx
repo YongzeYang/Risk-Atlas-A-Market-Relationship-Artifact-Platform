@@ -1,12 +1,26 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
+import { ActiveAnalysisRunPanel, RecentAnalysisRunsPanel } from '../../../components/analysis/AnalysisRunPanels';
 import Panel from '../../../components/ui/Panel';
 import SectionHeader from '../../../components/ui/SectionHeader';
-import { getPairDivergence } from '../../../features/builds/api';
-import { useBuildRunsData } from '../../../features/builds/hooks';
+import { createPairDivergenceAnalysisRun } from '../../../features/builds/api';
+import {
+  useAnalysisRunData,
+  useAnalysisRunListData,
+  useBuildDetailData,
+  useBuildRunsData,
+  useInviteCode
+} from '../../../features/builds/hooks';
 import { formatDateOnly, formatInteger, formatScore } from '../../../lib/format';
-import type { BuildRunListItem, PairDivergenceCandidate, PairDivergenceResponse } from '../../../types/api';
+import type {
+  AnalysisRunDetailResponse,
+  AnalysisRunListItem,
+  BuildRunDetailResponse,
+  BuildRunListItem,
+  PairDivergenceCandidate,
+  PairDivergenceResponse
+} from '../../../types/api';
 
 const DEFAULT_RECENT_WINDOW_DAYS = '20';
 const DEFAULT_LIMIT = '50';
@@ -16,6 +30,7 @@ const DEFAULT_MIN_CORR_DELTA_ABS = '0.12';
 export default function PairDivergencePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [buildId, setBuildId] = useState(searchParams.get('build') ?? '');
+  const [runId, setRunId] = useState(searchParams.get('run') ?? '');
   const [recentWindowDays, setRecentWindowDays] = useState(
     searchParams.get('recentWindowDays') ?? DEFAULT_RECENT_WINDOW_DAYS
   );
@@ -26,10 +41,17 @@ export default function PairDivergencePage() {
   const [minCorrDeltaAbs, setMinCorrDeltaAbs] = useState(
     searchParams.get('minCorrDeltaAbs') ?? DEFAULT_MIN_CORR_DELTA_ABS
   );
-  const [result, setResult] = useState<PairDivergenceResponse | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { inviteCode, setInviteCode } = useInviteCode();
   const { buildRuns, loading: buildRunsLoading } = useBuildRunsData(5000);
+  const { detail } = useBuildDetailData(buildId || undefined, 5000);
+  const { run, loading: runLoading, error: runError } = useAnalysisRunData(runId || undefined, 1500);
+  const { runs: recentRuns, loading: recentRunsLoading } = useAnalysisRunListData(
+    'pair_divergence',
+    buildId || undefined,
+    4000
+  );
 
   const comparableBuilds = useMemo(
     () => buildRuns.filter((item) => item.status === 'succeeded'),
@@ -52,9 +74,71 @@ export default function PairDivergencePage() {
     }
   }, [buildId, comparableBuilds, searchParams]);
 
+  useEffect(() => {
+    if (!run || run.kind !== 'pair_divergence') {
+      return;
+    }
+
+    setBuildId(run.buildRunId);
+    setRecentWindowDays(String(run.request.recentWindowDays));
+    setLimit(String(run.request.limit));
+    setMinLongCorrAbs(String(run.request.minLongCorrAbs));
+    setMinCorrDeltaAbs(String(run.request.minCorrDeltaAbs));
+  }, [run]);
+
   const selectedBuild = useMemo(
     () => comparableBuilds.find((item) => item.id === buildId) ?? null,
     [buildId, comparableBuilds]
+  );
+
+  const activeResult = run?.kind === 'pair_divergence' ? run.result : null;
+
+  const persistQuery = useCallback(
+    (next: {
+      buildId: string;
+      runId?: string;
+      recentWindowDays: number | string;
+      limit: number | string;
+      minLongCorrAbs: number | string;
+      minCorrDeltaAbs: number | string;
+    }) => {
+      const params = new URLSearchParams();
+      params.set('build', next.buildId);
+      params.set('recentWindowDays', String(next.recentWindowDays));
+      params.set('limit', String(next.limit));
+      params.set('minLongCorrAbs', String(next.minLongCorrAbs));
+      params.set('minCorrDeltaAbs', String(next.minCorrDeltaAbs));
+      if (next.runId) {
+        params.set('run', next.runId);
+      }
+      setSearchParams(params);
+    },
+    [setSearchParams]
+  );
+
+  const adoptRun = useCallback(
+    (nextRun: AnalysisRunDetailResponse | AnalysisRunListItem) => {
+      if (nextRun.kind !== 'pair_divergence') {
+        return;
+      }
+
+      setRunId(nextRun.id);
+      setBuildId(nextRun.buildRunId);
+      setRecentWindowDays(String(nextRun.request.recentWindowDays));
+      setLimit(String(nextRun.request.limit));
+      setMinLongCorrAbs(String(nextRun.request.minLongCorrAbs));
+      setMinCorrDeltaAbs(String(nextRun.request.minCorrDeltaAbs));
+
+      persistQuery({
+        buildId: nextRun.buildRunId,
+        runId: nextRun.id,
+        recentWindowDays: nextRun.request.recentWindowDays,
+        limit: nextRun.request.limit,
+        minLongCorrAbs: nextRun.request.minLongCorrAbs,
+        minCorrDeltaAbs: nextRun.request.minCorrDeltaAbs
+      });
+    },
+    [persistQuery]
   );
 
   const handleAnalyze = useCallback(
@@ -62,8 +146,12 @@ export default function PairDivergencePage() {
       event.preventDefault();
 
       if (!buildId) {
-        setError('Select a succeeded build before running divergence analysis.');
-        setResult(null);
+        setError('Select a succeeded build before queueing divergence analysis.');
+        return;
+      }
+
+      if (!inviteCode) {
+        setError('Invite code is required before queueing divergence analysis.');
         return;
       }
 
@@ -79,37 +167,40 @@ export default function PairDivergencePage() {
         !Number.isFinite(parsedMinCorrDeltaAbs)
       ) {
         setError('All divergence controls must have valid numeric values.');
-        setResult(null);
         return;
       }
 
-      setLoading(true);
+      setSubmitting(true);
       setError(null);
-      setResult(null);
 
       try {
-        const data = await getPairDivergence(buildId, {
-          recentWindowDays: parsedRecentWindowDays,
-          limit: parsedLimit,
-          minLongCorrAbs: parsedMinLongCorrAbs,
-          minCorrDeltaAbs: parsedMinCorrDeltaAbs
-        });
+        const queued = await createPairDivergenceAnalysisRun(
+          {
+            buildRunId: buildId,
+            recentWindowDays: parsedRecentWindowDays,
+            limit: parsedLimit,
+            minLongCorrAbs: parsedMinLongCorrAbs,
+            minCorrDeltaAbs: parsedMinCorrDeltaAbs
+          },
+          inviteCode
+        );
 
-        setResult(data);
-        setSearchParams({
-          build: buildId,
-          recentWindowDays: String(parsedRecentWindowDays),
-          limit: String(parsedLimit),
-          minLongCorrAbs: String(parsedMinLongCorrAbs),
-          minCorrDeltaAbs: String(parsedMinCorrDeltaAbs)
-        });
+        adoptRun(queued);
       } catch (nextError) {
-        setError(nextError instanceof Error ? nextError.message : 'Divergence analysis failed.');
+        setError(nextError instanceof Error ? nextError.message : 'Failed to queue divergence analysis.');
       } finally {
-        setLoading(false);
+        setSubmitting(false);
       }
     },
-    [buildId, limit, minCorrDeltaAbs, minLongCorrAbs, recentWindowDays, setSearchParams]
+    [
+      adoptRun,
+      buildId,
+      inviteCode,
+      limit,
+      minCorrDeltaAbs,
+      minLongCorrAbs,
+      recentWindowDays
+    ]
   );
 
   return (
@@ -119,8 +210,8 @@ export default function PairDivergencePage() {
           <div className="workspace-hero__eyebrow">Pair divergence</div>
           <h1 className="workspace-hero__title">Rank relationship breaks before they disappear inside a full matrix.</h1>
           <p className="workspace-hero__description">
-            Screen one build for pairs where recent co-movement and recent return dislocation now
-            disagree with the longer-window structure that defined the original artifact.
+            Queue a persisted screen, let the worker compute it in the background, and reopen the
+            run later by id instead of holding one long blocking request open.
           </p>
           <div className="workspace-hero__actions">
             <Link to="/compare" className="button button--secondary">
@@ -146,7 +237,7 @@ export default function PairDivergencePage() {
             <div className="workspace-hero__stat-label">Long window</div>
           </article>
           <article className="workspace-hero__stat-card">
-            <div className="workspace-hero__stat-value mono">{buildRunsLoading ? '…' : formatInteger(result?.candidateCount ?? 0)}</div>
+            <div className="workspace-hero__stat-value mono">{formatInteger(activeResult?.candidateCount ?? 0)}</div>
             <div className="workspace-hero__stat-label">Candidates</div>
           </article>
         </div>
@@ -157,7 +248,7 @@ export default function PairDivergencePage() {
           <Panel variant="primary">
             <SectionHeader
               title="Screen settings"
-              subtitle="Use correlation persistence and recent dislocation together so the output is a candidate list, not just a mechanical delta dump."
+              subtitle="Queue a persisted screen instead of waiting on one synchronous request. The result stays available under its run id."
             />
 
             {comparableBuilds.length === 0 && !buildRunsLoading ? (
@@ -173,7 +264,7 @@ export default function PairDivergencePage() {
                   className="field__control mono"
                   value={buildId}
                   onChange={(event) => setBuildId(event.target.value)}
-                  disabled={loading || buildRunsLoading || comparableBuilds.length === 0}
+                  disabled={submitting || buildRunsLoading || comparableBuilds.length === 0}
                 >
                   {comparableBuilds.map((buildRun) => (
                     <option key={buildRun.id} value={buildRun.id}>
@@ -232,36 +323,96 @@ export default function PairDivergencePage() {
                   <option value="25">25</option>
                   <option value="50">50</option>
                   <option value="100">100</option>
+                  <option value="200">200</option>
                 </select>
+              </label>
+
+              <label className="field">
+                <span className="field__label">Invite code</span>
+                <input
+                  className="field__control mono"
+                  type="text"
+                  placeholder="Required for queueing analysis"
+                  value={inviteCode}
+                  onChange={(event) => setInviteCode(event.target.value)}
+                  autoComplete="off"
+                  disabled={submitting}
+                />
               </label>
 
               <div className="query-form__action query-form__action--stack">
                 <button
                   type="submit"
                   className="button button--primary"
-                  disabled={loading || !buildId || comparableBuilds.length === 0}
+                  disabled={submitting || !buildId || !inviteCode || comparableBuilds.length === 0}
                 >
-                  {loading ? 'Screening…' : 'Run screen'}
+                  {submitting ? 'Queueing…' : 'Queue screen'}
                 </button>
               </div>
             </form>
 
             <div className="filter-summary-row">
+              <span className="filter-summary-row__item">Browsing build metadata stays open; only queue creation requires an invite code.</span>
               <span className="filter-summary-row__item">Long correlation comes from the stored build artifact.</span>
-              <span className="filter-summary-row__item">Recent metrics are recomputed from the shorter aligned price window ending at the build as-of date.</span>
+              <span className="filter-summary-row__item">Recent metrics are recomputed by the worker and persisted under the returned run id.</span>
             </div>
           </Panel>
 
-          {error ? (
-            <Panel variant="primary">
-              <div className="state-note state-note--error">{error}</div>
-            </Panel>
-          ) : null}
+          <Panel variant="utility">
+            <SectionHeader
+              title="Run preview"
+              subtitle="This is a workload preview, not a paragraph. Use it to judge scope before you queue the screen."
+            />
+            <DivergencePreview
+              detail={detail}
+              selectedBuild={selectedBuild}
+              recentWindowDays={recentWindowDays}
+              limit={limit}
+              minLongCorrAbs={minLongCorrAbs}
+              minCorrDeltaAbs={minCorrDeltaAbs}
+            />
+          </Panel>
 
-          {result ? <PairDivergenceResult data={result} /> : null}
+          <Panel variant="primary">
+            <SectionHeader
+              title="Active run"
+              subtitle="Runs are persisted. You can reload the page later and reopen the same id."
+            />
+            <ActiveAnalysisRunPanel
+              run={run}
+              loading={runLoading}
+              idleTitle="No active divergence run selected"
+              idleDescription="Queue one run above or reopen a recent run from the side rail."
+              formatSummary={formatDivergenceRunSummary}
+            />
+            {runError ? <div className="state-note state-note--error">{runError}</div> : null}
+            {error ? <div className="state-note state-note--error">{error}</div> : null}
+          </Panel>
+
+          {activeResult ? <PairDivergenceResult data={activeResult} /> : null}
         </div>
 
         <div className="workspace-layout__side">
+          <Panel variant="utility">
+            <SectionHeader
+              title="Recent runs"
+              subtitle="Reopen queued or finished screens without rerunning them."
+            />
+            <RecentAnalysisRunsPanel
+              runs={recentRuns}
+              loading={recentRunsLoading}
+              activeRunId={runId}
+              emptyCopy="No divergence runs yet for the selected build."
+              formatSummary={formatDivergenceRunSummary}
+              onSelect={(nextRunId) => {
+                const next = recentRuns.find((item) => item.id === nextRunId);
+                if (next) {
+                  adoptRun(next);
+                }
+              }}
+            />
+          </Panel>
+
           <Panel variant="utility">
             <SectionHeader
               title="How to read it"
@@ -275,24 +426,94 @@ export default function PairDivergencePage() {
               <div className="workspace-note-list__item">Sector labels help separate intra-sector unwind from broader cross-sector regime changes.</div>
             </div>
           </Panel>
-
-          <Panel variant="utility">
-            <SectionHeader
-              title="Current focus"
-              subtitle="This first release prioritizes useful ranking and interpretation over chart complexity."
-            />
-
-            <div className="workspace-note-list">
-              <div className="workspace-note-list__item">Long-window corr</div>
-              <div className="workspace-note-list__item">Recent corr</div>
-              <div className="workspace-note-list__item">Corr delta</div>
-              <div className="workspace-note-list__item">Recent relative-return gap</div>
-              <div className="workspace-note-list__item">Spread z-score</div>
-            </div>
-          </Panel>
         </div>
       </div>
     </div>
+  );
+}
+
+function DivergencePreview({
+  detail,
+  selectedBuild,
+  recentWindowDays,
+  limit,
+  minLongCorrAbs,
+  minCorrDeltaAbs
+}: {
+  detail: BuildRunDetailResponse | null;
+  selectedBuild: BuildRunListItem | null;
+  recentWindowDays: string;
+  limit: string;
+  minLongCorrAbs: string;
+  minCorrDeltaAbs: string;
+}) {
+  if (!selectedBuild) {
+    return <div className="state-note">Select one succeeded build to preview this screen.</div>;
+  }
+
+  const symbolCount = detail?.symbolOrder.length ?? 0;
+  const pairScanCount = symbolCount > 1 ? (symbolCount * (symbolCount - 1)) / 2 : 0;
+  const topPairs = detail?.topPairs.slice(0, 4) ?? [];
+
+  return (
+    <>
+      <div className="stat-grid">
+        <div className="stat-card">
+          <div className="stat-card__label">Build scope</div>
+          <div className="stat-card__value mono">{selectedBuild.universeId}</div>
+          <div className="stat-card__helper">{formatDateOnly(selectedBuild.asOfDate)} · {selectedBuild.windowDays}d</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-card__label">Universe size</div>
+          <div className="stat-card__value mono">{formatInteger(symbolCount)}</div>
+          <div className="stat-card__helper">Stored artifact snapshot</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-card__label">Pair scan load</div>
+          <div className="stat-card__value mono">{formatInteger(pairScanCount)}</div>
+          <div className="stat-card__helper">$n(n-1)/2$ candidate pairs</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-card__label">Threshold pack</div>
+          <div className="stat-card__value mono">{recentWindowDays}d / {limit}</div>
+          <div className="stat-card__helper">|long| ≥ {minLongCorrAbs} · |delta| ≥ {minCorrDeltaAbs}</div>
+        </div>
+      </div>
+
+      <div className="filter-summary-row" style={{ marginTop: '1rem' }}>
+        <span className="filter-summary-row__item">The worker will reuse the stored long-window matrix and only recompute the short-window layer.</span>
+        <span className="filter-summary-row__item">The queued result persists under a run id, so you can leave and reopen it later.</span>
+      </div>
+
+      {topPairs.length > 0 ? (
+        <div className="rank-list" style={{ marginTop: '1rem' }}>
+          {topPairs.map((pair, index) => (
+            <article key={`${pair.left}-${pair.right}`} className={`rank-list__item${index === 0 ? ' rank-list__item--top' : ''}`}>
+              <span className="rank-list__index">{index + 1}</span>
+              <div className="rank-list__body">
+                <div className="rank-list__pair">
+                  <span className="mono">{pair.left}</span>
+                  <span className="rank-list__pair-sep">↔</span>
+                  <span className="mono">{pair.right}</span>
+                </div>
+                <div className="rank-list__meta">Stored long-window anchor pair from the artifact preview.</div>
+              </div>
+              <span className="score-pill score-pill--neutral">{formatScore(pair.score, 3)}</span>
+            </article>
+          ))}
+        </div>
+      ) : null}
+
+      {detail?.symbolOrder.length ? (
+        <div className="coverage-token-list" style={{ marginTop: '1rem' }}>
+          {detail.symbolOrder.slice(0, 10).map((symbol) => (
+            <span key={symbol} className="coverage-token mono">
+              {symbol}
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </>
   );
 }
 
@@ -352,9 +573,7 @@ function PairDivergenceResult({ data }: { data: PairDivergenceResponse }) {
                 <div className="rank-list__meta">
                   Long {formatScore(candidate.longWindowCorr, 3)} · Recent {formatScore(candidate.recentCorr, 3)} · Gap {formatPercent(candidate.recentRelativeReturnGap)} · Spread z {formatNullableScore(candidate.spreadZScore)}
                 </div>
-                <div className="rank-list__meta">
-                  {formatSectorLine(candidate)}
-                </div>
+                <div className="rank-list__meta">{formatSectorLine(candidate)}</div>
               </div>
               <span className={`score-pill ${scorePillClassName(candidate.corrDelta)}`}>
                 Δ {candidate.corrDelta > 0 ? '+' : ''}{formatScore(candidate.corrDelta, 3)}
@@ -386,6 +605,14 @@ function formatSectorLine(candidate: PairDivergenceCandidate): string {
   const rightSector = candidate.rightSector ?? 'unclassified';
   const overlay = candidate.sameSector ? 'same-sector move' : 'cross-sector move';
   return `Sectors ${leftSector} vs ${rightSector} · ${overlay}`;
+}
+
+function formatDivergenceRunSummary(run: AnalysisRunListItem | AnalysisRunDetailResponse): string {
+  if (run.kind !== 'pair_divergence') {
+    return 'Unsupported run kind.';
+  }
+
+  return `${run.buildRunId.slice(0, 8)} · recent ${run.request.recentWindowDays}d · limit ${run.request.limit} · |long| ≥ ${formatScore(run.request.minLongCorrAbs, 2)} · |delta| ≥ ${formatScore(run.request.minCorrDeltaAbs, 2)}`;
 }
 
 function scorePillClassName(corrDelta: number): string {

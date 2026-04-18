@@ -18,7 +18,8 @@ import {
 
 const CSV_HEADER_V1 = 'tradeDate,symbol,adjClose';
 const CSV_HEADER_V2 = 'tradeDate,symbol,adjClose,volume';
-const BATCH_SIZE = 1000;
+const BATCH_SIZE = 5000;
+const DEFAULT_IMPORT_TRANSACTION_TIMEOUT_MS = 300_000;
 
 type ImportRow = {
   datasetId: string;
@@ -34,6 +35,7 @@ export type ImportEodCsvOptions = {
   csvPath: string;
   replaceExisting?: boolean;
   prismaClient?: typeof prisma;
+  transactionTimeoutMs?: number;
 };
 
 export type ImportEodCsvSummary = {
@@ -174,45 +176,53 @@ async function readImportRows(csvPath: string, datasetId: string) {
 export async function importEodCsv(options: ImportEodCsvOptions): Promise<ImportEodCsvSummary> {
   const client = options.prismaClient ?? prisma;
   const replaceExisting = options.replaceExisting ?? true;
+  const transactionTimeoutMs =
+    options.transactionTimeoutMs ?? DEFAULT_IMPORT_TRANSACTION_TIMEOUT_MS;
 
   const { rows, symbolCount, minTradeDate, maxTradeDate } = await readImportRows(
     options.csvPath,
     options.datasetId
   );
 
-  await client.$transaction(async (tx: any) => {
-    await tx.dataset.upsert({
-      where: {
-        id: options.datasetId
-      },
-      update: {
-        name: options.datasetName,
-        source: 'curated_csv',
-        market: 'HK'
-      },
-      create: {
-        id: options.datasetId,
-        name: options.datasetName,
-        source: 'curated_csv',
-        market: 'HK'
-      }
-    });
-
-    if (replaceExisting) {
-      await tx.eodPrice.deleteMany({
+  await client.$transaction(
+    async (tx: any) => {
+      await tx.dataset.upsert({
         where: {
-          datasetId: options.datasetId
+          id: options.datasetId
+        },
+        update: {
+          name: options.datasetName,
+          source: 'curated_csv',
+          market: 'HK'
+        },
+        create: {
+          id: options.datasetId,
+          name: options.datasetName,
+          source: 'curated_csv',
+          market: 'HK'
         }
       });
-    }
 
-    for (let offset = 0; offset < rows.length; offset += BATCH_SIZE) {
-      const batch = rows.slice(offset, offset + BATCH_SIZE);
-      await tx.eodPrice.createMany({
-        data: batch
-      });
+      if (replaceExisting) {
+        await tx.eodPrice.deleteMany({
+          where: {
+            datasetId: options.datasetId
+          }
+        });
+      }
+
+      for (let offset = 0; offset < rows.length; offset += BATCH_SIZE) {
+        const batch = rows.slice(offset, offset + BATCH_SIZE);
+        await tx.eodPrice.createMany({
+          data: batch
+        });
+      }
+    },
+    {
+      timeout: transactionTimeoutMs,
+      maxWait: 30_000
     }
-  });
+  );
 
   return {
     datasetId: options.datasetId,

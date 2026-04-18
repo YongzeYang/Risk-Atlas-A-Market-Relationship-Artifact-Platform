@@ -10,6 +10,8 @@ export type BuildSeriesStatus =
   | 'succeeded'
   | 'partially_failed'
   | 'failed';
+export type AnalysisRunKind = 'pair_divergence' | 'exposure' | 'structure';
+export type AnalysisRunStatus = 'pending' | 'running' | 'succeeded' | 'failed';
 
 export type DatasetListItem = {
   id: string;
@@ -31,6 +33,7 @@ export type UniverseListItem = {
   symbols: string[];
   definitionKind: string;
   definitionParams?: unknown;
+  supportedDatasetIds: string[] | null;
   createdAt: string;
 };
 
@@ -254,6 +257,25 @@ export type PairDivergenceResponse = {
   candidates: PairDivergenceCandidate[];
 };
 
+export type PairDivergenceAnalysisRunRequest = {
+  buildRunId: string;
+  recentWindowDays: number;
+  limit: number;
+  minLongCorrAbs: number;
+  minCorrDeltaAbs: number;
+};
+
+export type ExposureAnalysisRunRequest = {
+  buildRunId: string;
+  symbol: string;
+  k: number;
+};
+
+export type StructureAnalysisRunRequest = {
+  buildRunId: string;
+  heatmapSize: number;
+};
+
 export type StructureClusterSectorSummary = {
   sector: string | null;
   count: number;
@@ -305,3 +327,51 @@ export type CompareBuildStructuresResponse = {
   clusterMatches: StructureClusterMatch[];
   movedSymbols: StructureMovedSymbol[];
 };
+
+type AnalysisRunBase = {
+  id: string;
+  kind: AnalysisRunKind;
+  buildRunId: string;
+  status: AnalysisRunStatus;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  errorMessage: string | null;
+};
+
+export type PairDivergenceAnalysisRunListItem = AnalysisRunBase & {
+  kind: 'pair_divergence';
+  request: PairDivergenceAnalysisRunRequest;
+};
+
+export type ExposureAnalysisRunListItem = AnalysisRunBase & {
+  kind: 'exposure';
+  request: ExposureAnalysisRunRequest;
+};
+
+export type StructureAnalysisRunListItem = AnalysisRunBase & {
+  kind: 'structure';
+  request: StructureAnalysisRunRequest;
+};
+
+export type AnalysisRunListItem =
+  | PairDivergenceAnalysisRunListItem
+  | ExposureAnalysisRunListItem
+  | StructureAnalysisRunListItem;
+
+export type PairDivergenceAnalysisRunDetailResponse = PairDivergenceAnalysisRunListItem & {
+  result: PairDivergenceResponse | null;
+};
+
+export type ExposureAnalysisRunDetailResponse = ExposureAnalysisRunListItem & {
+  result: ExposureResponse | null;
+};
+
+export type StructureAnalysisRunDetailResponse = StructureAnalysisRunListItem & {
+  result: StructureResponse | null;
+};
+
+export type AnalysisRunDetailResponse =
+  | PairDivergenceAnalysisRunDetailResponse
+  | ExposureAnalysisRunDetailResponse
+  | StructureAnalysisRunDetailResponse;

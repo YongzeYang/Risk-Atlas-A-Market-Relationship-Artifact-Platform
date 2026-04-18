@@ -60,9 +60,27 @@ const universeItemSchema = {
     },
     definitionKind: { type: 'string' },
     definitionParams: {},
+    supportedDatasetIds: {
+      anyOf: [
+        {
+          type: 'array',
+          items: { type: 'string' }
+        },
+        { type: 'null' }
+      ]
+    },
     createdAt: { type: 'string', format: 'date-time' }
   },
-  required: ['id', 'name', 'market', 'symbolCount', 'symbols', 'definitionKind', 'createdAt']
+  required: [
+    'id',
+    'name',
+    'market',
+    'symbolCount',
+    'symbols',
+    'definitionKind',
+    'supportedDatasetIds',
+    'createdAt'
+  ]
 } as const;
 
 const securityMasterItemSchema = {

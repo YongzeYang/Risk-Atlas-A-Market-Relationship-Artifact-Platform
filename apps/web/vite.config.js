@@ -10,7 +10,9 @@ export default defineConfig({
             '/security-master': 'http://localhost:3000',
             '/build-runs': 'http://localhost:3000',
             '/build-series': 'http://localhost:3000',
+            '/analysis-runs': 'http://localhost:3000',
             '/compare-builds': 'http://localhost:3000',
+            '/compare-build-structures': 'http://localhost:3000',
             '/docs': 'http://localhost:3000',
             '/health': 'http://localhost:3000'
         }

@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 
 import {
+  analysisInviteHeadersSchema,
   compareBuildStructuresResponseSchema,
   compareBuildsQuerystringSchema,
   type CompareBuildsQuerystring,
@@ -10,6 +11,7 @@ import {
 import { ServiceError } from '../lib/service-error.js';
 import { readPreviewArtifact } from '../services/local-artifact-store.js';
 import { prisma } from '../lib/prisma.js';
+import { requireInviteCodeHeader } from '../services/invite-code-service.js';
 import { compareBuildStructures } from '../services/structure-service.js';
 
 export const compareRoutes: FastifyPluginAsync = async (app) => {
@@ -19,11 +21,13 @@ export const compareRoutes: FastifyPluginAsync = async (app) => {
       schema: {
         tags: ['compare'],
         summary: 'Compare two build runs by their top drift pairs',
+        headers: analysisInviteHeadersSchema,
         querystring: compareBuildsQuerystringSchema
       }
     },
     async (request, reply) => {
       try {
+        await requireInviteCodeHeader(request.headers);
         const result = await compareBuilds(request.query.leftId, request.query.rightId);
         return result;
       } catch (error) {
@@ -41,6 +45,7 @@ export const compareRoutes: FastifyPluginAsync = async (app) => {
       schema: {
         tags: ['compare'],
         summary: 'Compare clustered structure drift between two build runs',
+        headers: analysisInviteHeadersSchema,
         querystring: compareBuildsQuerystringSchema,
         response: {
           200: compareBuildStructuresResponseSchema
@@ -49,6 +54,7 @@ export const compareRoutes: FastifyPluginAsync = async (app) => {
     },
     async (request, reply) => {
       try {
+        await requireInviteCodeHeader(request.headers);
         return await compareBuildStructures(request.query.leftId, request.query.rightId);
       } catch (error) {
         if (error instanceof ServiceError) {

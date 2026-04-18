@@ -51,16 +51,43 @@ export default function BuildFormPanel({
     }
   }, [datasetId, datasets]);
 
-  useEffect(() => {
-    if (!universeId && universes.length > 0) {
-      setUniverseId(universes[0].id);
-    }
-  }, [universeId, universes]);
-
   const selectedDataset = useMemo(
     () => datasets.find((dataset) => dataset.id === datasetId) ?? null,
     [datasetId, datasets]
   );
+
+  const compatibleUniverses = useMemo(
+    () =>
+      universes.filter((universe) => {
+        if (!selectedDataset) {
+          return true;
+        }
+
+        if (universe.market !== selectedDataset.market) {
+          return false;
+        }
+
+        if (universe.supportedDatasetIds === null) {
+          return true;
+        }
+
+        return universe.supportedDatasetIds.includes(selectedDataset.id);
+      }),
+    [selectedDataset, universes]
+  );
+
+  useEffect(() => {
+    if (compatibleUniverses.length === 0) {
+      if (universeId) {
+        setUniverseId('');
+      }
+      return;
+    }
+
+    if (!universeId || !compatibleUniverses.some((universe) => universe.id === universeId)) {
+      setUniverseId(compatibleUniverses[0].id);
+    }
+  }, [compatibleUniverses, universeId]);
 
   useEffect(() => {
     if (selectedDataset?.maxTradeDate) {
@@ -154,9 +181,9 @@ export default function BuildFormPanel({
             className="field__control mono"
             value={universeId}
             onChange={(event) => setUniverseId(event.target.value)}
-            disabled={loading || submitting || universes.length === 0}
+            disabled={loading || submitting || compatibleUniverses.length === 0}
           >
-            {universes.map((universe) => (
+            {compatibleUniverses.map((universe) => (
               <option key={universe.id} value={universe.id}>
                 {universe.id}
               </option>
@@ -165,7 +192,7 @@ export default function BuildFormPanel({
 
           <span className="field__hint">
             {(() => {
-              const u = universes.find((item) => item.id === universeId);
+              const u = compatibleUniverses.find((item) => item.id === universeId);
               if (!u) return 'Select one universe.';
               const kind = u.definitionKind === 'static' ? 'static' : 'dynamic';
               const count = u.symbolCount != null ? `${u.symbolCount} symbols` : 'resolved at build time';
@@ -214,6 +241,12 @@ export default function BuildFormPanel({
           </div>
         </div>
 
+        {compatibleUniverses.length === 0 ? (
+          <div className="state-note state-note--error">
+            No compatible universes are available for dataset "{selectedDataset?.id ?? datasetId}".
+          </div>
+        ) : null}
+
         {submitError ? <div className="state-note state-note--error">{submitError}</div> : null}
 
         <label className="field">
@@ -234,7 +267,15 @@ export default function BuildFormPanel({
           <button
             type="submit"
             className="button button--primary"
-            disabled={loading || submitting || !datasetId || !universeId || !asOfDate || !inviteCode}
+            disabled={
+              loading ||
+              submitting ||
+              !datasetId ||
+              !universeId ||
+              !asOfDate ||
+              !inviteCode ||
+              compatibleUniverses.length === 0
+            }
           >
             {submitting ? 'Starting build…' : 'Start build'}
           </button>

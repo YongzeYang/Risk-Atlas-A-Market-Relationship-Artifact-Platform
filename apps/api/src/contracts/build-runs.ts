@@ -26,7 +26,7 @@ export const ARTIFACT_OBJECT_PREFIX_ROOT = 'build-runs' as const;
 export const MATRIX_ARTIFACT_MEDIA_TYPE = 'application/octet-stream' as const;
 
 export const MIN_BUILD_UNIVERSE_SIZE = 2;
-export const MAX_BUILD_UNIVERSE_SIZE = 500;
+export const MAX_BUILD_UNIVERSE_SIZE = 1000;
 
 export const DEFAULT_NEIGHBOR_K = 10;
 export const MAX_NEIGHBOR_K = 20;
@@ -64,6 +64,7 @@ export type BuildSeriesStatus = (typeof BUILD_SERIES_STATUSES)[number];
 
 export const ISO_DATE_PATTERN_SOURCE = '^\\d{4}-\\d{2}-\\d{2}$';
 export const HK_SYMBOL_PATTERN_SOURCE = '^\\d{4}\\.HK$';
+export const ANALYSIS_INVITE_HEADER_NAME = 'x-invite-code' as const;
 
 export function isBuildRunScoreMethod(value: string): value is BuildRunScoreMethod {
   return (BUILD_RUN_SCORE_METHODS as readonly string[]).includes(value);
@@ -1154,4 +1155,15 @@ export const compareBuildStructuresResponseSchema = {
     'clusterMatches',
     'movedSymbols'
   ]
+} as const;
+
+export const analysisInviteHeadersSchema = {
+  type: 'object',
+  properties: {
+    [ANALYSIS_INVITE_HEADER_NAME]: {
+      type: 'string',
+      minLength: 1
+    }
+  },
+  required: [ANALYSIS_INVITE_HEADER_NAME]
 } as const;

@@ -1,0 +1,3902 @@
+[
+  {
+    "symbol": "0001.HK",
+    "name": "CK Hutchison Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0002.HK",
+    "name": "CLP Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0003.HK",
+    "name": "The Hong Kong and China Gas Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0004.HK",
+    "name": "The Wharf (Holdings) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0005.HK",
+    "name": "HSBC Holdings plc",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0006.HK",
+    "name": "Power Assets Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0008.HK",
+    "name": "PCCW Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0010.HK",
+    "name": "Hang Lung Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0012.HK",
+    "name": "Henderson Land Development Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0013.HK",
+    "name": "HUTCHMED (China) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0014.HK",
+    "name": "Hysan Development Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0016.HK",
+    "name": "Sun Hung Kai Properties Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0017.HK",
+    "name": "New World Development Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0018.HK",
+    "name": "Oriental Media Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0019.HK",
+    "name": "Swire Pacific Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0020.HK",
+    "name": "SenseTime Group Inc.",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0021.HK",
+    "name": "Great China Holdings (Hong Kong) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0022.HK",
+    "name": "Mexan Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0023.HK",
+    "name": "The Bank of East Asia, Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0025.HK",
+    "name": "Chevalier International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0026.HK",
+    "name": "China Motor Bus Company, Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0027.HK",
+    "name": "Galaxy Entertainment Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0028.HK",
+    "name": "Tian An China Investments Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0029.HK",
+    "name": "Dynamic Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0030.HK",
+    "name": "YNBY International Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0031.HK",
+    "name": "China Aerospace International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0032.HK",
+    "name": "The Cross-Harbour (Holdings) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0033.HK",
+    "name": "International Genius Company",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0034.HK",
+    "name": "Kowloon Development Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0035.HK",
+    "name": "Far East Consortium International Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0036.HK",
+    "name": "Far East Holdings International Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0037.HK",
+    "name": "Far East Hotels and Entertainment Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0038.HK",
+    "name": "First Tractor Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0039.HK",
+    "name": "China Beidahuang Industry Group Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0040.HK",
+    "name": "Gold Peak Technology Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0041.HK",
+    "name": "Great Eagle Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0042.HK",
+    "name": "Northeast Electric Development Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0045.HK",
+    "name": "The Hongkong and Shanghai Hotels, Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0046.HK",
+    "name": "Computer And Technologies Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0048.HK",
+    "name": "China Automotive Interior Decoration Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0050.HK",
+    "name": "Hong Kong Ferry (Holdings) Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0051.HK",
+    "name": "Harbour Centre Development Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0052.HK",
+    "name": "Fairwood Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0053.HK",
+    "name": "Guoco Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0055.HK",
+    "name": "Neway Group Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0057.HK",
+    "name": "Chen Hsong Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0058.HK",
+    "name": "Sunway International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0059.HK",
+    "name": "Skyfame Realty (Holdings) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0060.HK",
+    "name": "Hong Kong Food Investment Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0061.HK",
+    "name": "Green Leader Holdings Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0062.HK",
+    "name": "Transport International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0063.HK",
+    "name": "China Asia Valley Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0064.HK",
+    "name": "Get Nice Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0065.HK",
+    "name": "Grand Ocean Advanced Resources Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0066.HK",
+    "name": "MTR Corporation Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0069.HK",
+    "name": "Shangri-La Asia Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0070.HK",
+    "name": "Rich Goldman Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0071.HK",
+    "name": "Miramar Hotel and Investment Company, Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0072.HK",
+    "name": "Meta Media Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0073.HK",
+    "name": "Asian Citrus Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0075.HK",
+    "name": "Y. T. Realty Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0076.HK",
+    "name": "Elate Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0077.HK",
+    "name": "AMS Public Transport Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0078.HK",
+    "name": "Regal Hotels International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0079.HK",
+    "name": "Century Legend (Holdings) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0080.HK",
+    "name": "CAI Corp",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0081.HK",
+    "name": "China Overseas Grand Oceans Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0082.HK",
+    "name": "Crazy Sports Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0083.HK",
+    "name": "Sino Land Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0084.HK",
+    "name": "Stelux Holdings International Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0085.HK",
+    "name": "China Electronics Huada Technology Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0086.HK",
+    "name": "Sun Hung Kai & Co. Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0087.HK",
+    "name": "Swire Pacific Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0088.HK",
+    "name": "Tai Cheung Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0089.HK",
+    "name": "Tai Sang Land Development Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0090.HK",
+    "name": "Puxing Energy Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0092.HK",
+    "name": "Champion Technology Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0093.HK",
+    "name": "Zero Fintech Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0094.HK",
+    "name": "Greenheart Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0095.HK",
+    "name": "LVGEM (China) Real Estate Investment Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0096.HK",
+    "name": "Yusei Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0097.HK",
+    "name": "Henderson Investment Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0098.HK",
+    "name": "Xingfa Aluminium Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0099.HK",
+    "name": "Wong's International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0101.HK",
+    "name": "Hang Lung Properties Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0103.HK",
+    "name": "Shougang Century Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0104.HK",
+    "name": "Asia Commercial Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0105.HK",
+    "name": "Associated International Hotels Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0106.HK",
+    "name": "Landsea Green Management Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0107.HK",
+    "name": "Sichuan Expressway Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0108.HK",
+    "name": "GR Life Style Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0110.HK",
+    "name": "China Fortune Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0111.HK",
+    "name": "Cinda International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0113.HK",
+    "name": "Dickson Concepts (International) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0114.HK",
+    "name": "Herald Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0115.HK",
+    "name": "Grand Field Group Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0116.HK",
+    "name": "Chow Sang Sang Holdings International Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0117.HK",
+    "name": "Tianli Holdings Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0118.HK",
+    "name": "Cosmos Machinery Enterprises Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0119.HK",
+    "name": "Poly Property Group Co., Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0120.HK",
+    "name": "Cosmopolitan International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0122.HK",
+    "name": "Crocodile Garments Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0123.HK",
+    "name": "Yuexiu Property Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0124.HK",
+    "name": "Guangdong Land Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0125.HK",
+    "name": "Sun Hing Vision Group Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0126.HK",
+    "name": "Carrianna Group Holdings Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0127.HK",
+    "name": "Chinese Estates Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0128.HK",
+    "name": "ENM Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 558
+  },
+  {
+    "symbol": "0129.HK",
+    "name": "Asia Standard International Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0130.HK",
+    "name": "Moiselle International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0131.HK",
+    "name": "Cheuk Nang (Holdings) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0132.HK",
+    "name": "Hing Yip Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0133.HK",
+    "name": "China Merchants China Direct Investments Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0135.HK",
+    "name": "Kunlun Energy Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0136.HK",
+    "name": "China Ruyi Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0137.HK",
+    "name": "Jinhui Holdings Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0138.HK",
+    "name": "CCT Fortis Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0139.HK",
+    "name": "Smart Fish Wealthlink Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0142.HK",
+    "name": "First Pacific Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0144.HK",
+    "name": "China Merchants Port Holdings Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0145.HK",
+    "name": "CCIAM Future Energy Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0146.HK",
+    "name": "Tai Ping Carpets International Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0147.HK",
+    "name": "International Business Settlement Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0148.HK",
+    "name": "Kingboard Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0149.HK",
+    "name": "China Agri-Products Exchange Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0150.HK",
+    "name": "Hypebeast Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0151.HK",
+    "name": "Want Want China Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0152.HK",
+    "name": "Shenzhen International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0154.HK",
+    "name": "Beijing Enterprises Environment Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0156.HK",
+    "name": "Lippo China Resources Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0157.HK",
+    "name": "Natural Beauty Bio-Technology Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0158.HK",
+    "name": "Melbourne Enterprises Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0159.HK",
+    "name": "Brockman Mining Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0160.HK",
+    "name": "Hon Kwok Land Investment Company, Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0162.HK",
+    "name": "Century Ginwa Retail Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0163.HK",
+    "name": "Emperor International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0164.HK",
+    "name": "China Baoli Technologies Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0165.HK",
+    "name": "China Everbright Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0166.HK",
+    "name": "New Times Corporation Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0167.HK",
+    "name": "IDT International Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0168.HK",
+    "name": "Tsingtao Brewery Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0169.HK",
+    "name": "Wanda Hotel Development Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0171.HK",
+    "name": "Silver Grant International Holdings Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0173.HK",
+    "name": "K. Wah International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0174.HK",
+    "name": "Gemini Investments (Holdings) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0175.HK",
+    "name": "Geely Automobile Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0176.HK",
+    "name": "Superactive Group Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0177.HK",
+    "name": "Jiangsu Expressway Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0178.HK",
+    "name": "Sa Sa International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0179.HK",
+    "name": "Johnson Electric Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0180.HK",
+    "name": "Kader Holdings Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0181.HK",
+    "name": "Fujian Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0182.HK",
+    "name": "Concord New Energy Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0183.HK",
+    "name": "Winfull Group Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0184.HK",
+    "name": "Keck Seng Investments (Hong Kong) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0185.HK",
+    "name": "Zensun Enterprises Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0186.HK",
+    "name": "Nimble Holdings Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0187.HK",
+    "name": "Beijing Jingcheng Machinery Electric Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0188.HK",
+    "name": "Sunwah Kingsway Capital Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0189.HK",
+    "name": "Dongyue Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0191.HK",
+    "name": "Lai Sun Garment (International) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0193.HK",
+    "name": "Capital Estate Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0194.HK",
+    "name": "Liu Chong Hing Investment Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0195.HK",
+    "name": "Greentech Technology International Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0196.HK",
+    "name": "Honghua Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0197.HK",
+    "name": "Heng Tai Consumables Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0199.HK",
+    "name": "ITC Properties Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0200.HK",
+    "name": "Melco International Development Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0201.HK",
+    "name": "Magnificent Hotel Investments Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0202.HK",
+    "name": "EverChina Int'l Holdings Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0204.HK",
+    "name": "Capital Realm Financial Holdings Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0205.HK",
+    "name": "BFB Health Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0206.HK",
+    "name": "CM Energy Tech Co., Ltd.",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0209.HK",
+    "name": "Poly Xverse Intelligent Technology Co. Ltd",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0210.HK",
+    "name": "Daphne International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0211.HK",
+    "name": "Styland Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0212.HK",
+    "name": "Nanyang Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0213.HK",
+    "name": "National Electronics Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0214.HK",
+    "name": "Asia Orient Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0215.HK",
+    "name": "Hutchison Telecommunications Hong Kong Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0216.HK",
+    "name": "Chinney Investments, Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0217.HK",
+    "name": "China Chengtong Development Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0218.HK",
+    "name": "Shenwan Hongyuan (H.K.) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0219.HK",
+    "name": "Shun Ho Property Investments Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0220.HK",
+    "name": "Uni-President China Holdings Ltd",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0222.HK",
+    "name": "Min Xin Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0223.HK",
+    "name": "Elife Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0224.HK",
+    "name": "Pioneer Global Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0225.HK",
+    "name": "Pokfulam Development Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0227.HK",
+    "name": "First Shanghai Investments Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0228.HK",
+    "name": "China Energy Development Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0229.HK",
+    "name": "Raymond Industrial Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0232.HK",
+    "name": "Continental Aerospace Technologies Holding Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0234.HK",
+    "name": "New Century Group Hong Kong Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0235.HK",
+    "name": "CSC Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0236.HK",
+    "name": "San Miguel Brewery Hong Kong Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0237.HK",
+    "name": "Safety Godown Company, Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0239.HK",
+    "name": "Pak Fah Yeow International Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0240.HK",
+    "name": "Build King Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0241.HK",
+    "name": "Alibaba Health Information Technology Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0242.HK",
+    "name": "Shun Tak Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0243.HK",
+    "name": "QPL International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0244.HK",
+    "name": "The Sincere Company, Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0245.HK",
+    "name": "China Vered Financial Holding Corporation Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0247.HK",
+    "name": "Tsim Sha Tsui Properties Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0248.HK",
+    "name": "HKC International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0251.HK",
+    "name": "S E A Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0252.HK",
+    "name": "Southeast Asia Properties & Finance Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0253.HK",
+    "name": "Shun Ho Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0254.HK",
+    "name": "National United Resources Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0255.HK",
+    "name": "Lung Kee Group Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0256.HK",
+    "name": "Citychamp Watch & Jewellery Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0257.HK",
+    "name": "China Everbright Environment Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0258.HK",
+    "name": "Tomson Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0259.HK",
+    "name": "Yeebo (International Holdings) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0261.HK",
+    "name": "GBA Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0262.HK",
+    "name": "Deson Development International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0264.HK",
+    "name": "China International Development Corporation Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0265.HK",
+    "name": "Gangyu Smart Urban Services Holding Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0266.HK",
+    "name": "Tian Teck Land Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0267.HK",
+    "name": "CITIC Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0268.HK",
+    "name": "Kingdee International Software Group Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0269.HK",
+    "name": "China Resources and Transportation Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0270.HK",
+    "name": "Guangdong Investment Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0271.HK",
+    "name": "Asiasec Properties Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0272.HK",
+    "name": "Shui On Land Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0274.HK",
+    "name": "Renaissance Asia Silk Road Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0276.HK",
+    "name": "Mongolia Energy Corporation Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0277.HK",
+    "name": "Tern Properties Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0279.HK",
+    "name": "Arta TechFin Corporation Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0280.HK",
+    "name": "King Fook Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0285.HK",
+    "name": "BYD Electronic (International) Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0286.HK",
+    "name": "Aidigong Maternal & Child Health Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0287.HK",
+    "name": "Winfair Investment Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0288.HK",
+    "name": "WH Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0289.HK",
+    "name": "Wing On Company International Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0290.HK",
+    "name": "GoFintech Quantum Innovation Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0291.HK",
+    "name": "China Resources Beer (Holdings) Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0293.HK",
+    "name": "Cathay Pacific Airways Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0294.HK",
+    "name": "Yangtzekiang Garment Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0295.HK",
+    "name": "Kong Sun Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0296.HK",
+    "name": "Emperor Entertainment Hotel Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0297.HK",
+    "name": "Sinofert Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0298.HK",
+    "name": "Chuang's China Investments Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0299.HK",
+    "name": "Glory Sun Land Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0300.HK",
+    "name": "Midea Group Co., Ltd.",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 379
+  },
+  {
+    "symbol": "0301.HK",
+    "name": "SANVO Fine Chemicals Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0302.HK",
+    "name": "CMGE Technology Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0303.HK",
+    "name": "Vtech Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0305.HK",
+    "name": "Wuling Motors Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0306.HK",
+    "name": "Kwoon Chung Bus Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0308.HK",
+    "name": "China Travel International Investment Hong Kong Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0309.HK",
+    "name": "Xinhua News Media Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0310.HK",
+    "name": "Prosperity Investment Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0311.HK",
+    "name": "Luen Thai Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0312.HK",
+    "name": "Shirble Department Store Holdings (China) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0313.HK",
+    "name": "Richly Field China Development Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0314.HK",
+    "name": "Sipai Health Technology Co., Ltd.",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 558
+  },
+  {
+    "symbol": "0315.HK",
+    "name": "SmarTone Telecommunications Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0316.HK",
+    "name": "Orient Overseas (International) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0317.HK",
+    "name": "CSSC Offshore & Marine Engineering (Group) Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0318.HK",
+    "name": "Vongroup Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0320.HK",
+    "name": "Computime Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0321.HK",
+    "name": "Texwinca Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0322.HK",
+    "name": "Tingyi (Cayman Islands) Holding Corp.",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0323.HK",
+    "name": "Maanshan Iron & Steel Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0325.HK",
+    "name": "Bloks Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 310
+  },
+  {
+    "symbol": "0326.HK",
+    "name": "China Star Entertainment Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0327.HK",
+    "name": "PAX Global Technology Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0328.HK",
+    "name": "Alco Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0329.HK",
+    "name": "OCI International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0330.HK",
+    "name": "Esprit Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0331.HK",
+    "name": "FSE Lifestyle Services Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0332.HK",
+    "name": "Yuan Heng Gas Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0333.HK",
+    "name": "Top Form International Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0334.HK",
+    "name": "China Display Optoelectronics Technology Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0335.HK",
+    "name": "Upbest Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0336.HK",
+    "name": "Huabao International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0337.HK",
+    "name": "Greenland Hong Kong Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0338.HK",
+    "name": "Sinopec Shanghai Petrochemical Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0339.HK",
+    "name": "China Sci-Tech Industrial Investment Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0340.HK",
+    "name": "Tongguan Gold Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0341.HK",
+    "name": "Café de Coral Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0343.HK",
+    "name": "Culturecom Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0345.HK",
+    "name": "Vitasoy International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0346.HK",
+    "name": "Yanchang Petroleum International Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0347.HK",
+    "name": "Angang Steel Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0348.HK",
+    "name": "China Healthwise Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0351.HK",
+    "name": "Asia Energy Logistics Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0352.HK",
+    "name": "Fortune Sun (China) Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0353.HK",
+    "name": "Energy International Investments Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0354.HK",
+    "name": "Chinasoft International Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0355.HK",
+    "name": "Century City International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0356.HK",
+    "name": "DT Capital Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0357.HK",
+    "name": "Hainan Meilan International Airport Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0358.HK",
+    "name": "Jiangxi Copper Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0360.HK",
+    "name": "New Focus Auto Tech Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0361.HK",
+    "name": "Hanfort Development Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0362.HK",
+    "name": "China Zenith Chemical Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0363.HK",
+    "name": "Shanghai Industrial Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0365.HK",
+    "name": "Sino ICT Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0366.HK",
+    "name": "Luks Group (Vietnam Holdings) Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0367.HK",
+    "name": "Chuang's Consortium International Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0368.HK",
+    "name": "Superland Group Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0369.HK",
+    "name": "Wing Tai Properties Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0370.HK",
+    "name": "Hong Kong Robotics Group Holding Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0371.HK",
+    "name": "Beijing Enterprises Water Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0372.HK",
+    "name": "PT International Development Corporation Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0373.HK",
+    "name": "Allied Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0374.HK",
+    "name": "Four Seas Mercantile Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0375.HK",
+    "name": "YGM Trading Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0376.HK",
+    "name": "Yunfeng Financial Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0377.HK",
+    "name": "China Huajun Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0379.HK",
+    "name": "China Ever Grand Financial Leasing Group Co., Ltd.",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0380.HK",
+    "name": "China Pipe Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0381.HK",
+    "name": "AOM International Group Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0382.HK",
+    "name": "Edvantage Group Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0383.HK",
+    "name": "Tian An Medicare Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0384.HK",
+    "name": "China Gas Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0385.HK",
+    "name": "Chinney Alliance Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0386.HK",
+    "name": "China Petroleum & Chemical Corporation",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0387.HK",
+    "name": "Leeport (Holdings) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0388.HK",
+    "name": "Hong Kong Exchanges and Clearing Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0389.HK",
+    "name": "China Tontine Wines Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0390.HK",
+    "name": "China Railway Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0391.HK",
+    "name": "Mei Ah Entertainment Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0392.HK",
+    "name": "Beijing Enterprises Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0393.HK",
+    "name": "Glorious Sun Enterprises Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0396.HK",
+    "name": "Hing Lee (HK) Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0397.HK",
+    "name": "Minerva Group Holding Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0398.HK",
+    "name": "Oriental Watch Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0399.HK",
+    "name": "Starcoin Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0400.HK",
+    "name": "Ingdan, Inc.",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0401.HK",
+    "name": "Wanjia Group Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0403.HK",
+    "name": "Starlite Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0405.HK",
+    "name": "Yuexiu Real Estate Investment Trust",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0406.HK",
+    "name": "Yau Lee Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0408.HK",
+    "name": "Yip's Chemical Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0410.HK",
+    "name": "SOHO China Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0411.HK",
+    "name": "Lam Soon (Hong Kong) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0412.HK",
+    "name": "Shandong Hi-Speed Holdings Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0413.HK",
+    "name": "South China Holdings Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0417.HK",
+    "name": "Tse Sui Luen Jewellery (International) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0418.HK",
+    "name": "Founder Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0419.HK",
+    "name": "Hony Media Group",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0420.HK",
+    "name": "Fountain Set (Holdings) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0422.HK",
+    "name": "Vietnam Manufacturing and Export Processing (Holdings) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0423.HK",
+    "name": "Hong Kong Economic Times Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0425.HK",
+    "name": "Minth Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0426.HK",
+    "name": "One Media Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0428.HK",
+    "name": "Cocoon Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0430.HK",
+    "name": "Oriental Explorer Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0431.HK",
+    "name": "Greater China Financial Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0432.HK",
+    "name": "Pacific Century Premium Developments Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0433.HK",
+    "name": "North Mining Shares Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0434.HK",
+    "name": "Boyaa Interactive International Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0435.HK",
+    "name": "Sunlight Real Estate Investment Trust",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0436.HK",
+    "name": "New Universe Environmental Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0438.HK",
+    "name": "IRICO Group New Energy Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0439.HK",
+    "name": "Genesis Scale Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0440.HK",
+    "name": "Dah Sing Financial Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0442.HK",
+    "name": "Domaine Power Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0444.HK",
+    "name": "Sincere Watch (Hong Kong) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0450.HK",
+    "name": "Hung Hing Printing Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0451.HK",
+    "name": "GCL New Energy Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0455.HK",
+    "name": "Tianda Pharmaceuticals Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0456.HK",
+    "name": "New City Development Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0458.HK",
+    "name": "Tristate Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0460.HK",
+    "name": "Sihuan Pharmaceutical Holdings Group Ltd.",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0464.HK",
+    "name": "China In-Tech Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0465.HK",
+    "name": "Futong Technology Development Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0467.HK",
+    "name": "United Energy Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0468.HK",
+    "name": "Greatview Aseptic Packaging Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0471.HK",
+    "name": "Silkwave Inc",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0472.HK",
+    "name": "New Silkroad Culturaltainment Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0474.HK",
+    "name": "Aceso Life Science Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0475.HK",
+    "name": "Central Development Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0476.HK",
+    "name": "Ev Dynamics (Holdings) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0480.HK",
+    "name": "HKR International Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0482.HK",
+    "name": "Sandmartin International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0483.HK",
+    "name": "Bauhaus International (Holdings) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0484.HK",
+    "name": "Forgame Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0485.HK",
+    "name": "China Sinostar Group Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0486.HK",
+    "name": "United Company RUSAL, International Public Joint-Stock Company",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0487.HK",
+    "name": "Success Universe Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0488.HK",
+    "name": "Lai Sun Development Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0491.HK",
+    "name": "Emperor Culture Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0493.HK",
+    "name": "GOME Retail Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0495.HK",
+    "name": "Paladin Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0496.HK",
+    "name": "Kasen International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0497.HK",
+    "name": "CSI Properties Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0498.HK",
+    "name": "Blue River Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0499.HK",
+    "name": "Qingdao Holdings International Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0500.HK",
+    "name": "Frontier Services Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0505.HK",
+    "name": "Xingye Alloy Materials Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0506.HK",
+    "name": "China Foods Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0508.HK",
+    "name": "Dingyi Group Investment Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0509.HK",
+    "name": "Century Sunshine Group Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0510.HK",
+    "name": "CASH Financial Services Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0511.HK",
+    "name": "Television Broadcasts Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0512.HK",
+    "name": "Grand Pharmaceutical Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0513.HK",
+    "name": "Continental Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0515.HK",
+    "name": "China Silver Technology Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0517.HK",
+    "name": "COSCO SHIPPING International (Hong Kong) Co., Ltd.",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0518.HK",
+    "name": "Tungtex (Holdings) Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0519.HK",
+    "name": "Novautek Technologies Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0520.HK",
+    "name": "Xiabuxiabu Catering Management (China) Holdings Co., Ltd.",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0521.HK",
+    "name": "CWT International Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0522.HK",
+    "name": "ASMPT Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0524.HK",
+    "name": "Great Wall Terroir Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0525.HK",
+    "name": "Guangshen Railway Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0526.HK",
+    "name": "Lisi Group (Holdings) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0527.HK",
+    "name": "China Ruifeng Renewable Energy Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0528.HK",
+    "name": "Kingdom Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0529.HK",
+    "name": "SiS International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0532.HK",
+    "name": "Wong's Kong King International (Holdings) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0533.HK",
+    "name": "Goldlion Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 560
+  },
+  {
+    "symbol": "0535.HK",
+    "name": "Gemdale Properties and Investment Corporation Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0536.HK",
+    "name": "Tradelink Electronic Commerce Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0538.HK",
+    "name": "Ajisen (China) Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0540.HK",
+    "name": "Speedy Global Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0542.HK",
+    "name": "China Cultural Tourism and Agriculture Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0543.HK",
+    "name": "Pacific Online Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0544.HK",
+    "name": "Daido Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0546.HK",
+    "name": "Fufeng Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0547.HK",
+    "name": "Digital Domain Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0548.HK",
+    "name": "Shenzhen Expressway Corporation Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0550.HK",
+    "name": "Allegro Culture Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0551.HK",
+    "name": "Yue Yuen Industrial (Holdings) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0552.HK",
+    "name": "China Communications Services Corporation Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0553.HK",
+    "name": "Nanjing Panda Electronics Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0554.HK",
+    "name": "Hans Group Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0556.HK",
+    "name": "Pan Asia Environmental Protection Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0557.HK",
+    "name": "China Tian Yuan Healthcare Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0558.HK",
+    "name": "L.K. Technology Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0559.HK",
+    "name": "DeTai New Energy Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0560.HK",
+    "name": "Chu Kong Shipping Enterprises (Group) Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0563.HK",
+    "name": "Shanghai Industrial Urban Development Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0564.HK",
+    "name": "ZCZL Industrial Technology Group Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0565.HK",
+    "name": "Art Group Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0567.HK",
+    "name": "Daisho Microline Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0568.HK",
+    "name": "Shandong Molong Petroleum Machinery Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0570.HK",
+    "name": "China Traditional Chinese Medicine Holdings Co. Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0571.HK",
+    "name": "eSun Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0572.HK",
+    "name": "Future World Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0573.HK",
+    "name": "Tao Heung Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0574.HK",
+    "name": "Pa Shun International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0575.HK",
+    "name": "Regent Pacific Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0576.HK",
+    "name": "Zhejiang Expressway Co., Ltd.",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0579.HK",
+    "name": "Beijing Jingneng Clean Energy Co., Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0580.HK",
+    "name": "Sun.King Technology Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0581.HK",
+    "name": "China Oriental Group Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0582.HK",
+    "name": "Shin Hwa World Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0583.HK",
+    "name": "Great Wall Pan Asia Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0585.HK",
+    "name": "Imagi International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0586.HK",
+    "name": "China Conch Venture Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0587.HK",
+    "name": "China Conch Environment Protection Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0588.HK",
+    "name": "Beijing North Star Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0590.HK",
+    "name": "Luk Fook Holdings (International) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0591.HK",
+    "name": "China High Precision Automation Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0595.HK",
+    "name": "AV Concept Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0596.HK",
+    "name": "Inspur Digital Enterprise Technology Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0598.HK",
+    "name": "Sinotrans Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0599.HK",
+    "name": "E. Bon Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0601.HK",
+    "name": "Rare Earth Magnesium Technology Group Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0602.HK",
+    "name": "Jiahua Stores Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0603.HK",
+    "name": "China Oil And Gas Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0604.HK",
+    "name": "Shenzhen Investment Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0605.HK",
+    "name": "China Financial Services Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0606.HK",
+    "name": "SCE Intelligent Commercial Management Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0607.HK",
+    "name": "Fullshare Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 561
+  },
+  {
+    "symbol": "0608.HK",
+    "name": "High Fashion International Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0609.HK",
+    "name": "Tiande Chemical Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0610.HK",
+    "name": "Wai Kee Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0611.HK",
+    "name": "China Nuclear Energy Technology Corporation Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0612.HK",
+    "name": "Carmen Century Investment Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0613.HK",
+    "name": "Planetree International Development Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0616.HK",
+    "name": "Asset Chain Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0617.HK",
+    "name": "Paliburg Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0618.HK",
+    "name": "Peking University Resources (Holdings) Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0619.HK",
+    "name": "South China Financial Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0620.HK",
+    "name": "DTXS Silk Road Investment Holdings Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0621.HK",
+    "name": "Taung Gold International Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0622.HK",
+    "name": "Oshidori International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0623.HK",
+    "name": "SinoMedia Holding Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0626.HK",
+    "name": "Public Financial Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0627.HK",
+    "name": "Vision Synergy Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0628.HK",
+    "name": "Tong Tong AI Social Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0629.HK",
+    "name": "Yue Da International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0630.HK",
+    "name": "AMCO United Holding Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0631.HK",
+    "name": "Sany Heavy Equipment International Holdings Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0632.HK",
+    "name": "CHK Oil Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0635.HK",
+    "name": "Playmates Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0636.HK",
+    "name": "KLN Logistics Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0637.HK",
+    "name": "Lee Kee Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0639.HK",
+    "name": "Shougang Fushan Resources Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0640.HK",
+    "name": "Infinity Development Holdings Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0641.HK",
+    "name": "CHTC Fong's International Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0643.HK",
+    "name": "Carry Wealth Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0645.HK",
+    "name": "Ares Asia Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0646.HK",
+    "name": "China Environmental Technology Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0648.HK",
+    "name": "SoftMedx Healthcare Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0650.HK",
+    "name": "Productive Technologies Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0653.HK",
+    "name": "Bonjour Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0655.HK",
+    "name": "Hongkong Chinese Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0656.HK",
+    "name": "Fosun International Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0657.HK",
+    "name": "G-Vision International (Holdings) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0658.HK",
+    "name": "China High Speed Transmission Equipment Group Co., Ltd.",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0659.HK",
+    "name": "CTF Services Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0660.HK",
+    "name": "Wai Chun Bio-Technology Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0661.HK",
+    "name": "China Daye Non-Ferrous Metals Mining Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0662.HK",
+    "name": "Asia Financial Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0666.HK",
+    "name": "REPT BATTERO Energy Co., Ltd.",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0667.HK",
+    "name": "China East Education Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0669.HK",
+    "name": "Techtronic Industries Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0670.HK",
+    "name": "China Eastern Airlines Corporation Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0672.HK",
+    "name": "Zhong An Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0673.HK",
+    "name": "China Health Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0674.HK",
+    "name": "China Tangshang Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0675.HK",
+    "name": "K & P International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0676.HK",
+    "name": "Pegasus International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0677.HK",
+    "name": "Golden Resources Development International Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0679.HK",
+    "name": "Asia Tele-Net and Technology Corporation Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0681.HK",
+    "name": "Chinese People Holdings Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0682.HK",
+    "name": "Chaoda Modern Agriculture (Holdings) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0683.HK",
+    "name": "Kerry Properties Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0684.HK",
+    "name": "Allan International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0685.HK",
+    "name": "Media Chinese International Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0686.HK",
+    "name": "Beijing Energy International Holding Co., Ltd.",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0687.HK",
+    "name": "Tysan Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0688.HK",
+    "name": "China Overseas Land & Investment Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0689.HK",
+    "name": "EPI (Holdings) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0690.HK",
+    "name": "Uni-Bio Science Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0691.HK",
+    "name": "China Shanshui Cement Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0693.HK",
+    "name": "Tan Chong International Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0694.HK",
+    "name": "Beijing Capital International Airport Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0695.HK",
+    "name": "Dongwu Cement International Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0696.HK",
+    "name": "TravelSky Technology Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0697.HK",
+    "name": "Shoucheng Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0698.HK",
+    "name": "Tongda Group Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0700.HK",
+    "name": "Tencent Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0701.HK",
+    "name": "CNT Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0702.HK",
+    "name": "Sino Oil and Gas Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0703.HK",
+    "name": "Future Bright Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0704.HK",
+    "name": "Huscoke Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0707.HK",
+    "name": "Asia Television Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0708.HK",
+    "name": "China Evergrande New Energy Vehicle Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0709.HK",
+    "name": "Giordano International Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0710.HK",
+    "name": "BOE Varitronix Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0711.HK",
+    "name": "Asia Allied Infrastructure Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0712.HK",
+    "name": "Comtec Solar Systems Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0713.HK",
+    "name": "World Houseware (Holdings) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0716.HK",
+    "name": "Singamas Container Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0717.HK",
+    "name": "Emperor Capital Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0718.HK",
+    "name": "Tai United Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0719.HK",
+    "name": "Shandong Xinhua Pharmaceutical Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0720.HK",
+    "name": "Auto Italia Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0721.HK",
+    "name": "China Financial International Investments Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0722.HK",
+    "name": "UMP Healthcare Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0723.HK",
+    "name": "Reliance Global Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0724.HK",
+    "name": "Ruixin International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0725.HK",
+    "name": "Perennial International Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0726.HK",
+    "name": "DIT Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0727.HK",
+    "name": "Crown International Corporation Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0728.HK",
+    "name": "China Telecom Corporation Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0730.HK",
+    "name": "Capital Industrial Financial Services Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0731.HK",
+    "name": "C&D Newin Paper & Pulp Corporation Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0732.HK",
+    "name": "Truly International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0733.HK",
+    "name": "Hopefluent Group Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0736.HK",
+    "name": "China Properties Investment Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0737.HK",
+    "name": "Shenzhen Investment Holdings Bay Area Development Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0738.HK",
+    "name": "Le Saunda Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0743.HK",
+    "name": "Asia Cement (China) Holdings Corporation",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0745.HK",
+    "name": "China National Culture Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0746.HK",
+    "name": "Lee & Man Chemical Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0747.HK",
+    "name": "Shenyang Public Utility Holdings Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0750.HK",
+    "name": "China Shuifa Singyes Energy Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0751.HK",
+    "name": "Skyworth Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0752.HK",
+    "name": "Pico Far East Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0753.HK",
+    "name": "Air China Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0754.HK",
+    "name": "Hopson Development Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0755.HK",
+    "name": "DevGreat Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0756.HK",
+    "name": "Summi (Group) Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0757.HK",
+    "name": "Solargiga Energy Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0759.HK",
+    "name": "CEC International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0760.HK",
+    "name": "Talent Property Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0762.HK",
+    "name": "China Unicom (Hong Kong) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0763.HK",
+    "name": "ZTE Corporation",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0764.HK",
+    "name": "Eternity Investment Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0765.HK",
+    "name": "Perfectech International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0767.HK",
+    "name": "Zhong Ji Longevity Science Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0768.HK",
+    "name": "UBA Investments Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0769.HK",
+    "name": "China Rare Earth Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0770.HK",
+    "name": "Shanghai Growth Investment Ord",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0771.HK",
+    "name": "Automated Systems Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0772.HK",
+    "name": "China Literature Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0775.HK",
+    "name": "CK Life Sciences Int'l., (Holdings) Inc.",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0776.HK",
+    "name": "Imperium Technology Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0777.HK",
+    "name": "NetDragon Websoft Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0778.HK",
+    "name": "Fortune Real Estate Investment Trust",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0780.HK",
+    "name": "Tongcheng Travel Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0784.HK",
+    "name": "Ling Yui Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0788.HK",
+    "name": "China Tower Corporation Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0789.HK",
+    "name": "Artini Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0794.HK",
+    "name": "Come Sure Group (Holdings) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0797.HK",
+    "name": "7Road Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0798.HK",
+    "name": "China Electronics Optics Valley Union Holding Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0799.HK",
+    "name": "IGG Inc",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0804.HK",
+    "name": "Pinestone Capital Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0805.HK",
+    "name": "New Gonow Recreational Vehicles Inc.",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 309
+  },
+  {
+    "symbol": "0806.HK",
+    "name": "Value Partners Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0807.HK",
+    "name": "SIIC Environment Holdings Ltd.",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0808.HK",
+    "name": "Prosperity Real Estate Investment Trust",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0809.HK",
+    "name": "Global Bio-chem Technology Group Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0810.HK",
+    "name": "China Castson 81 Finance Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0811.HK",
+    "name": "Xinhua Winshare Publishing and Media Co., Ltd.",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0813.HK",
+    "name": "Shimao Group Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0814.HK",
+    "name": "Beijing Jingkelong Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0815.HK",
+    "name": "China Silver Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0816.HK",
+    "name": "Jinmao Property Services Co., Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0817.HK",
+    "name": "China Jinmao Holdings Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0818.HK",
+    "name": "Hi Sun Technology (China) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0819.HK",
+    "name": "Tianneng Power International Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0821.HK",
+    "name": "Value Convergence Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0822.HK",
+    "name": "Ka Shui International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0823.HK",
+    "name": "Link Real Estate Investment Trust",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0825.HK",
+    "name": "New World Department Store China Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0826.HK",
+    "name": "Tiangong International Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0827.HK",
+    "name": "Ko Yo Chemical (Group) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0828.HK",
+    "name": "Dynasty Fine Wines Group Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0829.HK",
+    "name": "Shenguan Holdings (Group) Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0830.HK",
+    "name": "China State Construction Development Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0831.HK",
+    "name": "Convenience Retail Asia Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0832.HK",
+    "name": "Central China Real Estate Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0833.HK",
+    "name": "Alltronics Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0834.HK",
+    "name": "China Kangda Food Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0836.HK",
+    "name": "China Resources Power Holdings Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0837.HK",
+    "name": "Carpenter Tan Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0838.HK",
+    "name": "EVA Precision Industrial Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0839.HK",
+    "name": "China Education Group Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0840.HK",
+    "name": "Xinjiang Tianye Water Saving Irrigation System Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0841.HK",
+    "name": "Asia Cassava Resources Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0842.HK",
+    "name": "Leoch International Technology Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0844.HK",
+    "name": "Greatime International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0845.HK",
+    "name": "Glorious Property Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0846.HK",
+    "name": "Mingfa Group (International) Company Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0848.HK",
+    "name": "Maoye International Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0851.HK",
+    "name": "Sheng Yuan Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0852.HK",
+    "name": "Strong Petrochemical Holdings Limited",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  },
+  {
+    "symbol": "0853.HK",
+    "name": "MicroPort Scientific Corporation",
+    "lastTradeDate": "2026-04-17",
+    "rowCount": 562
+  }
+]

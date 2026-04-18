@@ -13,6 +13,7 @@ import {
   type BuildRunWindowDays,
   type CreateBuildSeriesRequestBody
 } from '../contracts/build-runs.js';
+import { validateBuildRequestCoverage } from './build-request-validation-service.js';
 import { validateInviteCode } from './invite-code-service.js';
 import { scheduleBuildRun } from './build-run-runner.js';
 
@@ -36,12 +37,31 @@ export async function createBuildSeries(
   }
 
   const [dataset, universe] = await Promise.all([
-    prisma.dataset.findUnique({ where: { id: input.datasetId }, select: { id: true } }),
-    prisma.universe.findUnique({ where: { id: input.universeId }, select: { id: true } })
+    prisma.dataset.findUnique({
+      where: { id: input.datasetId },
+      select: { id: true, market: true }
+    }),
+    prisma.universe.findUnique({
+      where: { id: input.universeId },
+      select: {
+        id: true,
+        market: true,
+        definitionKind: true,
+        symbolsJson: true,
+        definitionParams: true
+      }
+    })
   ]);
 
   if (!dataset) throw new ServiceError(404, `Dataset "${input.datasetId}" not found.`);
   if (!universe) throw new ServiceError(404, `Universe "${input.universeId}" not found.`);
+
+  if (dataset.market !== universe.market) {
+    throw new ServiceError(
+      400,
+      `Dataset "${dataset.id}" and universe "${universe.id}" must belong to the same market.`
+    );
+  }
 
   if (input.startDate >= input.endDate) {
     throw new ServiceError(400, 'startDate must be before endDate.');
@@ -51,6 +71,13 @@ export async function createBuildSeries(
   if (asOfDates.length === 0) {
     throw new ServiceError(400, 'No build dates in the given range.');
   }
+
+  await validateBuildRequestCoverage({
+    datasetId: input.datasetId,
+    universe,
+    asOfDate: asOfDates[asOfDates.length - 1]!,
+    windowDays: input.windowDays
+  });
 
   const series = await prisma.buildSeries.create({
     data: {

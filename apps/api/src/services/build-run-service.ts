@@ -16,6 +16,7 @@ import {
   type CreateBuildRunRequestBody,
   type TopPairItem
 } from '../contracts/build-runs.js';
+import { validateBuildRequestCoverage } from './build-request-validation-service.js';
 import { readPreviewArtifact } from './local-artifact-store.js';
 import { validateInviteCode } from './invite-code-service.js';
 
@@ -89,7 +90,10 @@ export async function createBuildRun(
       },
       select: {
         id: true,
-        market: true
+        market: true,
+        definitionKind: true,
+        symbolsJson: true,
+        definitionParams: true
       }
     })
   ]);
@@ -108,6 +112,13 @@ export async function createBuildRun(
       `Dataset "${dataset.id}" and universe "${universe.id}" must belong to the same market.`
     );
   }
+
+  await validateBuildRequestCoverage({
+    datasetId: input.datasetId,
+    universe,
+    asOfDate: input.asOfDate,
+    windowDays: input.windowDays
+  });
 
   const buildRun = await prisma.buildRun.create({
     data: {

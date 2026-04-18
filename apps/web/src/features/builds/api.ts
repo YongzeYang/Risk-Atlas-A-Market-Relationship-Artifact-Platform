@@ -1,6 +1,9 @@
 // apps/web/src/features/builds/api.ts
 import { apiRequest } from '../../lib/http';
 import type {
+  AnalysisRunDetailResponse,
+  AnalysisRunKind,
+  AnalysisRunListItem,
   BuildRunDetailResponse,
   BuildRunListItem,
   BuildSeriesDetailResponse,
@@ -9,13 +12,24 @@ import type {
   CompareBuildStructuresResponse,
   CreateBuildRunInput,
   CreateBuildSeriesInput,
+  ExposureAnalysisRunListItem,
   ExposureResponse,
   HeatmapSubsetResponse,
   NeighborsResponse,
+  PairDivergenceAnalysisRunListItem,
+  PairDivergenceAnalysisRunRequest,
   PairDivergenceResponse,
   PairScoreResponse,
+  StructureAnalysisRunListItem,
+  StructureAnalysisRunRequest,
   StructureResponse
 } from '../../types/api';
+
+function analysisHeaders(inviteCode: string): HeadersInit {
+  return {
+    'x-invite-code': inviteCode
+  };
+}
 
 export async function createBuildRun(input: CreateBuildRunInput): Promise<BuildRunListItem> {
   return apiRequest<BuildRunListItem>('/build-runs', {
@@ -85,12 +99,73 @@ export async function getBuildSeriesDetail(id: string): Promise<BuildSeriesDetai
   return apiRequest<BuildSeriesDetailResponse>(`/build-series/${id}`);
 }
 
+export async function createPairDivergenceAnalysisRun(
+  input: PairDivergenceAnalysisRunRequest,
+  inviteCode: string
+): Promise<PairDivergenceAnalysisRunListItem> {
+  return apiRequest<PairDivergenceAnalysisRunListItem>('/analysis-runs/pair-divergence', {
+    method: 'POST',
+    headers: analysisHeaders(inviteCode),
+    body: JSON.stringify(input)
+  });
+}
+
+export async function createExposureAnalysisRun(
+  input: { buildRunId: string; symbol: string; k: number },
+  inviteCode: string
+): Promise<ExposureAnalysisRunListItem> {
+  return apiRequest<ExposureAnalysisRunListItem>('/analysis-runs/exposure', {
+    method: 'POST',
+    headers: analysisHeaders(inviteCode),
+    body: JSON.stringify(input)
+  });
+}
+
+export async function createStructureAnalysisRun(
+  input: StructureAnalysisRunRequest,
+  inviteCode: string
+): Promise<StructureAnalysisRunListItem> {
+  return apiRequest<StructureAnalysisRunListItem>('/analysis-runs/structure', {
+    method: 'POST',
+    headers: analysisHeaders(inviteCode),
+    body: JSON.stringify(input)
+  });
+}
+
+export async function listAnalysisRuns(params: {
+  kind?: AnalysisRunKind;
+  buildRunId?: string;
+  limit?: number;
+}): Promise<AnalysisRunListItem[]> {
+  const search = new URLSearchParams();
+
+  if (params.kind) {
+    search.set('kind', params.kind);
+  }
+  if (params.buildRunId) {
+    search.set('buildRunId', params.buildRunId);
+  }
+  if (params.limit != null) {
+    search.set('limit', String(params.limit));
+  }
+
+  const query = search.toString();
+  return apiRequest<AnalysisRunListItem[]>(query ? `/analysis-runs?${query}` : '/analysis-runs');
+}
+
+export async function getAnalysisRun(id: string): Promise<AnalysisRunDetailResponse> {
+  return apiRequest<AnalysisRunDetailResponse>(`/analysis-runs/${id}`);
+}
+
 export async function compareBuilds(
   leftId: string,
-  rightId: string
+  rightId: string,
+  inviteCode: string
 ): Promise<CompareBuildsResponse> {
   const search = new URLSearchParams({ leftId, rightId });
-  return apiRequest<CompareBuildsResponse>(`/compare-builds?${search.toString()}`);
+  return apiRequest<CompareBuildsResponse>(`/compare-builds?${search.toString()}`, {
+    headers: analysisHeaders(inviteCode)
+  });
 }
 
 export async function getPairDivergence(
@@ -100,7 +175,8 @@ export async function getPairDivergence(
     limit: number;
     minLongCorrAbs: number;
     minCorrDeltaAbs: number;
-  }
+  },
+  inviteCode: string
 ): Promise<PairDivergenceResponse> {
   const search = new URLSearchParams({
     recentWindowDays: String(params.recentWindowDays),
@@ -110,39 +186,52 @@ export async function getPairDivergence(
   });
 
   return apiRequest<PairDivergenceResponse>(
-    `/build-runs/${id}/pair-divergence?${search.toString()}`
+    `/build-runs/${id}/pair-divergence?${search.toString()}`,
+    {
+      headers: analysisHeaders(inviteCode)
+    }
   );
 }
 
 export async function getBuildRunExposure(
   id: string,
-  params: { symbol: string; k: number }
+  params: { symbol: string; k: number },
+  inviteCode: string
 ): Promise<ExposureResponse> {
   const search = new URLSearchParams({
     symbol: params.symbol,
     k: String(params.k)
   });
 
-  return apiRequest<ExposureResponse>(`/build-runs/${id}/exposure?${search.toString()}`);
+  return apiRequest<ExposureResponse>(`/build-runs/${id}/exposure?${search.toString()}`, {
+    headers: analysisHeaders(inviteCode)
+  });
 }
 
 export async function getBuildRunStructure(
   id: string,
-  params: { heatmapSize: number }
+  params: { heatmapSize: number },
+  inviteCode: string
 ): Promise<StructureResponse> {
   const search = new URLSearchParams({
     heatmapSize: String(params.heatmapSize)
   });
 
-  return apiRequest<StructureResponse>(`/build-runs/${id}/structure?${search.toString()}`);
+  return apiRequest<StructureResponse>(`/build-runs/${id}/structure?${search.toString()}`, {
+    headers: analysisHeaders(inviteCode)
+  });
 }
 
 export async function compareBuildStructures(
   leftId: string,
-  rightId: string
+  rightId: string,
+  inviteCode: string
 ): Promise<CompareBuildStructuresResponse> {
   const search = new URLSearchParams({ leftId, rightId });
   return apiRequest<CompareBuildStructuresResponse>(
-    `/compare-build-structures?${search.toString()}`
+    `/compare-build-structures?${search.toString()}`,
+    {
+      headers: analysisHeaders(inviteCode)
+    }
   );
 }

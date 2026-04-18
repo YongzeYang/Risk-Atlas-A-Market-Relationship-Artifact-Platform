@@ -1,11 +1,11 @@
 // apps/web/src/components/ui/StatusBadge.tsx
-import type { BuildRunStatus, BuildSeriesStatus } from '../../types/api';
+import type { AnalysisRunStatus, BuildRunStatus, BuildSeriesStatus } from '../../types/api';
 
 type StatusBadgeProps = {
-  status: BuildRunStatus | BuildSeriesStatus;
+  status: BuildRunStatus | BuildSeriesStatus | AnalysisRunStatus;
 };
 
-const STATUS_LABELS: Record<BuildRunStatus | BuildSeriesStatus, string> = {
+const STATUS_LABELS: Record<BuildRunStatus | BuildSeriesStatus | AnalysisRunStatus, string> = {
   pending: 'Queued',
   running: 'Running',
   succeeded: 'Ready',

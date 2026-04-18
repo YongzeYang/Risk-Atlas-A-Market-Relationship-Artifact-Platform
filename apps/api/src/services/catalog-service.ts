@@ -2,6 +2,7 @@
 import type { Prisma } from '@prisma/client';
 
 import { prisma } from '../lib/prisma.js';
+import { BUILD_RUN_WINDOW_DAYS } from '../contracts/build-runs.js';
 
 function asStringArray(value: Prisma.JsonValue): string[] {
   if (value === null || value === undefined) return [];
@@ -32,6 +33,7 @@ export type UniverseListItem = {
   symbols: string[];
   definitionKind: string;
   definitionParams: Prisma.JsonValue;
+  supportedDatasetIds: string[] | null;
   createdAt: string;
 };
 
@@ -112,16 +114,68 @@ export async function listUniverses(): Promise<UniverseListItem[]> {
     orderBy: [{ symbolCount: { sort: 'desc', nulls: 'last' } }, { id: 'asc' }]
   });
 
-  return universes.map((universe) => ({
-    id: universe.id,
-    name: universe.name,
-    market: universe.market,
-    symbolCount: universe.symbolCount,
-    symbols: asStringArray(universe.symbolsJson),
-    definitionKind: universe.definitionKind,
-    definitionParams: universe.definitionParams,
-    createdAt: universe.createdAt.toISOString()
-  }));
+  const datasets = await prisma.dataset.findMany({
+    select: {
+      id: true,
+      market: true
+    }
+  });
+
+  const minRequiredRows = Math.max(...BUILD_RUN_WINDOW_DAYS) + 1;
+
+  return Promise.all(
+    universes.map(async (universe) => {
+      const symbols = asStringArray(universe.symbolsJson);
+      let supportedDatasetIds: string[] | null = null;
+
+      if (universe.definitionKind === 'static' && symbols.length > 0) {
+        supportedDatasetIds = [];
+
+        for (const dataset of datasets) {
+          if (dataset.market !== universe.market) {
+            continue;
+          }
+
+          const coverage = await prisma.eodPrice.groupBy({
+            by: ['symbol'],
+            where: {
+              datasetId: dataset.id,
+              symbol: {
+                in: symbols
+              }
+            },
+            _count: {
+              _all: true
+            }
+          });
+
+          const countsBySymbol = new Map(
+            coverage.map((entry) => [entry.symbol, entry._count._all] as const)
+          );
+
+          const fullyCovered = symbols.every(
+            (symbol) => (countsBySymbol.get(symbol) ?? 0) >= minRequiredRows
+          );
+
+          if (fullyCovered) {
+            supportedDatasetIds.push(dataset.id);
+          }
+        }
+      }
+
+      return {
+        id: universe.id,
+        name: universe.name,
+        market: universe.market,
+        symbolCount: universe.symbolCount,
+        symbols,
+        definitionKind: universe.definitionKind,
+        definitionParams: universe.definitionParams,
+        supportedDatasetIds,
+        createdAt: universe.createdAt.toISOString()
+      };
+    })
+  );
 }
 
 export async function listSecurityMaster(): Promise<SecurityMasterItem[]> {

@@ -40,13 +40,28 @@ export default function BuildSeriesPage() {
     if (!datasetId && datasets.length > 0) setDatasetId(datasets[0].id);
   }, [datasetId, datasets]);
 
-  useEffect(() => {
-    if (!universeId && universes.length > 0) setUniverseId(universes[0].id);
-  }, [universeId, universes]);
-
   const selectedDataset = useMemo(
     () => datasets.find((d) => d.id === datasetId) ?? null,
     [datasetId, datasets]
+  );
+  const compatibleUniverses = useMemo(
+    () =>
+      universes.filter((universe) => {
+        if (!selectedDataset) {
+          return true;
+        }
+
+        if (universe.market !== selectedDataset.market) {
+          return false;
+        }
+
+        if (universe.supportedDatasetIds === null) {
+          return true;
+        }
+
+        return universe.supportedDatasetIds.includes(selectedDataset.id);
+      }),
+    [selectedDataset, universes]
   );
   const activeSeries = useMemo(
     () => series.filter((item) => item.status === 'pending' || item.status === 'running'),
@@ -67,6 +82,19 @@ export default function BuildSeriesPage() {
       if (!startDate) setStartDate(selectedDataset.minTradeDate ?? '');
     }
   }, [selectedDataset?.id]);
+
+  useEffect(() => {
+    if (compatibleUniverses.length === 0) {
+      if (universeId) {
+        setUniverseId('');
+      }
+      return;
+    }
+
+    if (!universeId || !compatibleUniverses.some((universe) => universe.id === universeId)) {
+      setUniverseId(compatibleUniverses[0].id);
+    }
+  }, [compatibleUniverses, universeId]);
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -215,14 +243,20 @@ export default function BuildSeriesPage() {
                   className="field__control mono"
                   value={universeId}
                   onChange={(e) => setUniverseId(e.target.value)}
-                  disabled={catalogLoading || submitting}
+                  disabled={catalogLoading || submitting || compatibleUniverses.length === 0}
                 >
-                  {universes.map((u) => (
+                  {compatibleUniverses.map((u) => (
                     <option key={u.id} value={u.id}>{u.id}</option>
                   ))}
                 </select>
               </label>
             </div>
+
+            {compatibleUniverses.length === 0 ? (
+              <div className="state-note state-note--error">
+                No compatible universes are available for dataset "{selectedDataset?.id ?? datasetId}".
+              </div>
+            ) : null}
 
             <div className="form-grid__inline">
               <label className="field">
@@ -298,7 +332,15 @@ export default function BuildSeriesPage() {
               <button
                 type="submit"
                 className="button button--primary"
-                disabled={submitting || !datasetId || !universeId || !startDate || !endDate || !inviteCode}
+                disabled={
+                  submitting ||
+                  !datasetId ||
+                  !universeId ||
+                  !startDate ||
+                  !endDate ||
+                  !inviteCode ||
+                  compatibleUniverses.length === 0
+                }
               >
                 {submitting ? 'Creating…' : 'Create series'}
               </button>
