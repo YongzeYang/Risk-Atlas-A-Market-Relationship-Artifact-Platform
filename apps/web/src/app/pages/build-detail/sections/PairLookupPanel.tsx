@@ -66,7 +66,10 @@ export default function PairLookupPanel({
 
   return (
     <Panel variant="utility">
-      <SectionHeader title="Check a pair" />
+      <SectionHeader
+        title="Pair lookup"
+        subtitle="Inspect one explicit relationship before moving into broader divergence analysis."
+      />
 
       {symbols.length === 0 ? (
         <div className="state-note">No symbols are available for this build.</div>
@@ -122,7 +125,7 @@ export default function PairLookupPanel({
               </div>
 
               <div className="query-result__hint">
-                Ordered input is preserved in the result.
+                Ordered input is preserved in the result so the lookup can feed future compare workflows.
               </div>
             </div>
           ) : !error ? (

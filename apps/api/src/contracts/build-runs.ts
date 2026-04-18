@@ -26,7 +26,7 @@ export const ARTIFACT_OBJECT_PREFIX_ROOT = 'build-runs' as const;
 export const MATRIX_ARTIFACT_MEDIA_TYPE = 'application/octet-stream' as const;
 
 export const MIN_BUILD_UNIVERSE_SIZE = 2;
-export const MAX_BUILD_UNIVERSE_SIZE = 50;
+export const MAX_BUILD_UNIVERSE_SIZE = 500;
 
 export const DEFAULT_NEIGHBOR_K = 10;
 export const MAX_NEIGHBOR_K = 20;
@@ -35,6 +35,18 @@ export const MIN_HEATMAP_SUBSET_SIZE = 2;
 export const MAX_HEATMAP_SUBSET_SIZE = 12;
 
 export const TOP_PAIR_LIMIT = 20;
+
+export const BUILD_SERIES_FREQUENCIES = ['daily', 'weekly', 'monthly'] as const;
+export type BuildSeriesFrequency = (typeof BUILD_SERIES_FREQUENCIES)[number];
+
+export const BUILD_SERIES_STATUSES = [
+  'pending',
+  'running',
+  'succeeded',
+  'partially_failed',
+  'failed'
+] as const;
+export type BuildSeriesStatus = (typeof BUILD_SERIES_STATUSES)[number];
 
 export const ISO_DATE_PATTERN_SOURCE = '^\\d{4}-\\d{2}-\\d{2}$';
 export const HK_SYMBOL_PATTERN_SOURCE = '^\\d{4}\\.HK$';
@@ -61,6 +73,72 @@ export type CreateBuildRunRequestBody = {
   asOfDate: string;
   windowDays: BuildRunWindowDays;
   scoreMethod: BuildRunScoreMethod;
+  inviteCode?: string;
+};
+
+export type CreateBuildSeriesRequestBody = {
+  name: string;
+  datasetId: string;
+  universeId: string;
+  windowDays: BuildRunWindowDays;
+  scoreMethod: BuildRunScoreMethod;
+  startDate: string;
+  endDate: string;
+  frequency: BuildSeriesFrequency;
+  inviteCode?: string;
+};
+
+export type BuildSeriesListItem = {
+  id: string;
+  name: string;
+  datasetId: string;
+  universeId: string;
+  windowDays: BuildRunWindowDays;
+  scoreMethod: BuildRunScoreMethod;
+  startDate: string;
+  endDate: string;
+  frequency: BuildSeriesFrequency;
+  status: BuildSeriesStatus;
+  totalRunCount: number;
+  completedRunCount: number;
+  failedRunCount: number;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+};
+
+export type BuildSeriesRunItem = {
+  id: string;
+  asOfDate: string;
+  status: BuildRunStatus;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  errorMessage: string | null;
+};
+
+export type BuildSeriesDetailResponse = BuildSeriesListItem & {
+  runs: BuildSeriesRunItem[];
+};
+
+export type CompareBuildsQuerystring = {
+  leftId: string;
+  rightId: string;
+};
+
+export type CompareDriftEntry = {
+  left: string;
+  right: string;
+  leftScore: number;
+  rightScore: number;
+  delta: number;
+};
+
+export type CompareBuildsResponse = {
+  left: { id: string; asOfDate: string; symbolCount: number };
+  right: { id: string; asOfDate: string; symbolCount: number };
+  commonSymbols: string[];
+  topDriftPairs: CompareDriftEntry[];
 };
 
 export type BuildRunListItem = {
@@ -231,9 +309,90 @@ export const createBuildRunBodySchema = {
     universeId: { type: 'string', minLength: 1 },
     asOfDate: { type: 'string', pattern: ISO_DATE_PATTERN_SOURCE },
     windowDays: { type: 'integer', enum: [...BUILD_RUN_WINDOW_DAYS] },
-    scoreMethod: { type: 'string', enum: [...BUILD_RUN_SCORE_METHODS] }
+    scoreMethod: { type: 'string', enum: [...BUILD_RUN_SCORE_METHODS] },
+    inviteCode: { type: 'string', minLength: 1 }
   },
-  required: ['datasetId', 'universeId', 'asOfDate', 'windowDays', 'scoreMethod']
+  required: ['datasetId', 'universeId', 'asOfDate', 'windowDays', 'scoreMethod', 'inviteCode']
+} as const;
+
+export const createBuildSeriesBodySchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    name: { type: 'string', minLength: 1 },
+    datasetId: { type: 'string', minLength: 1 },
+    universeId: { type: 'string', minLength: 1 },
+    windowDays: { type: 'integer', enum: [...BUILD_RUN_WINDOW_DAYS] },
+    scoreMethod: { type: 'string', enum: [...BUILD_RUN_SCORE_METHODS] },
+    startDate: { type: 'string', pattern: ISO_DATE_PATTERN_SOURCE },
+    endDate: { type: 'string', pattern: ISO_DATE_PATTERN_SOURCE },
+    frequency: { type: 'string', enum: [...BUILD_SERIES_FREQUENCIES] },
+    inviteCode: { type: 'string', minLength: 1 }
+  },
+  required: ['name', 'datasetId', 'universeId', 'windowDays', 'scoreMethod', 'startDate', 'endDate', 'frequency', 'inviteCode']
+} as const;
+
+export const buildSeriesListItemSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    id: { type: 'string' },
+    name: { type: 'string' },
+    datasetId: { type: 'string' },
+    universeId: { type: 'string' },
+    windowDays: { type: 'integer', enum: [...BUILD_RUN_WINDOW_DAYS] },
+    scoreMethod: { type: 'string', enum: [...BUILD_RUN_SCORE_METHODS] },
+    startDate: { type: 'string', pattern: ISO_DATE_PATTERN_SOURCE },
+    endDate: { type: 'string', pattern: ISO_DATE_PATTERN_SOURCE },
+    frequency: { type: 'string', enum: [...BUILD_SERIES_FREQUENCIES] },
+    status: { type: 'string', enum: [...BUILD_SERIES_STATUSES] },
+    totalRunCount: { type: 'integer' },
+    completedRunCount: { type: 'integer' },
+    failedRunCount: { type: 'integer' },
+    createdAt: { type: 'string', format: 'date-time' },
+    startedAt: nullableDateTimeSchema,
+    finishedAt: nullableDateTimeSchema
+  },
+  required: [
+    'id', 'name', 'datasetId', 'universeId', 'windowDays', 'scoreMethod',
+    'startDate', 'endDate', 'frequency', 'status', 'totalRunCount',
+    'completedRunCount', 'failedRunCount', 'createdAt', 'startedAt', 'finishedAt'
+  ]
+} as const;
+
+export const buildSeriesRunItemSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    id: { type: 'string' },
+    asOfDate: { type: 'string', pattern: ISO_DATE_PATTERN_SOURCE },
+    status: { type: 'string', enum: [...BUILD_RUN_STATUSES] },
+    createdAt: { type: 'string', format: 'date-time' },
+    startedAt: nullableDateTimeSchema,
+    finishedAt: nullableDateTimeSchema,
+    errorMessage: { type: ['string', 'null'] }
+  },
+  required: ['id', 'asOfDate', 'status', 'createdAt', 'startedAt', 'finishedAt', 'errorMessage']
+} as const;
+
+export const buildSeriesDetailResponseSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    ...buildSeriesListItemSchema.properties,
+    runs: { type: 'array', items: buildSeriesRunItemSchema }
+  },
+  required: [...buildSeriesListItemSchema.required, 'runs']
+} as const;
+
+export const compareBuildsQuerystringSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    leftId: { type: 'string', minLength: 1 },
+    rightId: { type: 'string', minLength: 1 }
+  },
+  required: ['leftId', 'rightId']
 } as const;
 
 export const buildRunListItemSchema = {

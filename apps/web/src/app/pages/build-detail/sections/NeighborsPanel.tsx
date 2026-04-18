@@ -72,7 +72,10 @@ export default function NeighborsPanel({
 
   return (
     <Panel variant="utility">
-      <SectionHeader title="Related symbols" />
+      <SectionHeader
+        title="Co-movement exposure"
+        subtitle="Inspect the strongest neighbors for one symbol inside this build."
+      />
 
       {symbols.length === 0 ? (
         <div className="state-note">No symbols are available for this build.</div>
@@ -121,7 +124,7 @@ export default function NeighborsPanel({
 
                   <div className="neighbor-list__body">
                     <div className="neighbor-list__symbol mono">{entry.symbol}</div>
-                    <div className="neighbor-list__meta">Top positive score for {result.symbol}</div>
+                    <div className="neighbor-list__meta">Nearest co-movement candidate for {result.symbol}</div>
                   </div>
 
                   <ScorePill score={entry.score} digits={3} />

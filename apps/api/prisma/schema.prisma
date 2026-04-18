@@ -30,6 +30,59 @@ enum Market {
   HK
 }
 
+enum SecurityType {
+  common_equity
+  etf
+  reit
+  warrant
+  cbbc
+  stapled_security
+}
+
+enum Sector {
+  financials
+  property
+  tech
+  telecom
+  industrial
+  utilities
+  energy
+  consumer
+}
+
+enum UniverseDefinitionKind {
+  static
+  liquidity_top_n
+  sector_filter
+  all_common_equity
+}
+
+enum SeriesFrequency {
+  daily
+  weekly
+  monthly
+}
+
+enum BuildSeriesStatus {
+  pending
+  running
+  succeeded
+  partially_failed
+  failed
+}
+
+model SecurityMaster {
+  symbol       String       @id
+  name         String
+  shortName    String?
+  securityType SecurityType
+  sector       Sector?
+  market       Market
+  createdAt    DateTime     @default(now())
+
+  @@map("security_master")
+}
+
 model Dataset {
   id        String          @id @default(cuid())
   name      String
@@ -37,21 +90,25 @@ model Dataset {
   market    Market
   createdAt DateTime        @default(now())
 
-  eodPrices EodPrice[]
-  buildRuns BuildRun[]
+  eodPrices   EodPrice[]
+  buildRuns   BuildRun[]
+  buildSeries BuildSeries[]
 
   @@map("datasets")
 }
 
 model Universe {
-  id          String     @id @default(cuid())
-  name        String
-  market      Market
-  symbolsJson Json
-  symbolCount Int
-  createdAt   DateTime   @default(now())
+  id               String                 @id @default(cuid())
+  name             String
+  market           Market
+  symbolsJson      Json?
+  symbolCount      Int?
+  definitionKind   UniverseDefinitionKind @default(static)
+  definitionParams Json?
+  createdAt        DateTime               @default(now())
 
-  buildRuns   BuildRun[]
+  buildRuns        BuildRun[]
+  buildSeries      BuildSeries[]
 
   @@map("universes")
 }
@@ -62,6 +119,7 @@ model EodPrice {
   tradeDate String   @db.VarChar(10)
   symbol    String
   adjClose  Float
+  volume    BigInt?
 
   dataset   Dataset  @relation(fields: [datasetId], references: [id], onDelete: Cascade)
 
@@ -71,25 +129,29 @@ model EodPrice {
 }
 
 model BuildRun {
-  id           String       @id @default(cuid())
-  datasetId    String
-  universeId   String
-  asOfDate     String       @db.VarChar(10) // ISO 8601 calendar date: YYYY-MM-DD
-  windowDays   Int
-  scoreMethod  ScoreMethod
-  status       BuildStatus  @default(pending)
-  createdAt    DateTime     @default(now())
-  startedAt    DateTime?
-  finishedAt   DateTime?
-  errorMessage String?      @db.Text
+  id                  String       @id @default(cuid())
+  datasetId           String
+  universeId          String
+  seriesId            String?
+  asOfDate            String       @db.VarChar(10)
+  windowDays          Int
+  scoreMethod         ScoreMethod
+  status              BuildStatus  @default(pending)
+  resolvedSymbolsJson Json?
+  createdAt           DateTime     @default(now())
+  startedAt           DateTime?
+  finishedAt          DateTime?
+  errorMessage        String?      @db.Text
 
-  dataset      Dataset      @relation(fields: [datasetId], references: [id], onDelete: Restrict)
-  universe     Universe     @relation(fields: [universeId], references: [id], onDelete: Restrict)
-  artifact     Artifact?
+  dataset             Dataset      @relation(fields: [datasetId], references: [id], onDelete: Restrict)
+  universe            Universe     @relation(fields: [universeId], references: [id], onDelete: Restrict)
+  series              BuildSeries? @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  artifact            Artifact?
 
   @@index([status, createdAt])
   @@index([datasetId, asOfDate])
   @@index([universeId, asOfDate])
+  @@index([seriesId, asOfDate])
   @@map("build_runs")
 }
 
@@ -106,10 +168,49 @@ model Artifact {
   symbolCount      Int
   minScore         Float?
   maxScore         Float?
+  previewStrategy  String              @default("dense_json")
+  topPairsJson     Json?
   createdAt        DateTime            @default(now())
 
   buildRun         BuildRun            @relation(fields: [buildRunId], references: [id], onDelete: Cascade)
 
   @@index([storageKind, createdAt])
   @@map("artifacts")
+}
+
+model BuildSeries {
+  id                String            @id @default(cuid())
+  name              String
+  datasetId         String
+  universeId        String
+  windowDays        Int
+  scoreMethod       ScoreMethod
+  startDate         String            @db.VarChar(10)
+  endDate           String            @db.VarChar(10)
+  frequency         SeriesFrequency
+  status            BuildSeriesStatus @default(pending)
+  totalRunCount     Int               @default(0)
+  completedRunCount Int               @default(0)
+  failedRunCount    Int               @default(0)
+  createdAt         DateTime          @default(now())
+  startedAt         DateTime?
+  finishedAt        DateTime?
+
+  dataset           Dataset           @relation(fields: [datasetId], references: [id], onDelete: Restrict)
+  universe          Universe          @relation(fields: [universeId], references: [id], onDelete: Restrict)
+  buildRuns         BuildRun[]
+
+  @@index([status, createdAt])
+  @@map("build_series")
+}
+
+model InviteCode {
+  id        String   @id @default(cuid())
+  codeHash  String   @unique
+  label     String?
+  usesLeft  Int?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@map("invite_codes")
 }

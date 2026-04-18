@@ -50,8 +50,21 @@ target_link_libraries(risk_atlas_bsm_writer
 
 target_compile_features(risk_atlas_bsm_writer PRIVATE cxx_std_20)
 
-if (MSVC)
-  target_compile_options(risk_atlas_bsm_writer PRIVATE /W4 /permissive-)
-else()
-  target_compile_options(risk_atlas_bsm_writer PRIVATE -Wall -Wextra -Wpedantic)
-endif()
+add_executable(risk_atlas_bsm_query
+  tools/risk_atlas_bsm_query.cpp
+)
+
+target_link_libraries(risk_atlas_bsm_query
+  PRIVATE
+    bsm::bsm
+)
+
+target_compile_features(risk_atlas_bsm_query PRIVATE cxx_std_20)
+
+foreach(tgt risk_atlas_bsm_writer risk_atlas_bsm_query)
+  if (MSVC)
+    target_compile_options(${tgt} PRIVATE /W4 /permissive-)
+  else()
+    target_compile_options(${tgt} PRIVATE -Wall -Wextra -Wpedantic)
+  endif()
+endforeach()

@@ -2,8 +2,10 @@
 import { useParams } from 'react-router-dom';
 
 import Panel from '../../../components/ui/Panel';
+import SectionHeader from '../../../components/ui/SectionHeader';
+import StatCard from '../../../components/ui/StatCard';
 import { useBuildDetailData } from '../../../features/builds/hooks';
-import { formatDateTime } from '../../../lib/format';
+import { formatDateTime, formatInteger, formatScore, formatScoreRange } from '../../../lib/format';
 import BuildMetaHeader from './sections/BuildMetaHeader';
 import HeatmapPanel from './sections/HeatmapPanel';
 import NeighborsPanel from './sections/NeighborsPanel';
@@ -65,6 +67,10 @@ export default function BuildDetailPage() {
     detail?.status === 'succeeded' &&
     detail.symbolOrder.length > 0 &&
     detail.artifact !== null;
+  const pairCount = detail?.symbolOrder.length
+    ? (detail.symbolOrder.length * (detail.symbolOrder.length - 1)) / 2
+    : null;
+  const strongestPair = detail?.topPairs[0] ?? null;
 
   return (
     <div className="page page--detail">
@@ -78,18 +84,64 @@ export default function BuildDetailPage() {
 
       {ready ? (
         <>
-          <HeatmapPanel
-            buildRunId={id}
-            symbolOrder={detail.symbolOrder}
-            topPairs={detail.topPairs}
-          />
+          <Panel variant="secondary">
+            <SectionHeader
+              title="Analysis workspace"
+              subtitle="Separate matrix context, strongest pairs, and neighbor queries so this page reads like a research surface rather than a raw artifact dump."
+            />
 
-          <div className="detail-grid">
-            <div className="detail-grid__main">
-              <TopPairsPanel topPairs={detail.topPairs} />
+            <div className="analysis-overview-grid">
+              <StatCard
+                label="Resolved symbols"
+                value={formatInteger(detail.symbolOrder.length)}
+                helper="Actual build scope after universe rules are resolved."
+                mono
+              />
+              <StatCard
+                label="Unique pairs"
+                value={pairCount !== null ? formatInteger(pairCount) : '—'}
+                helper="Potential pair relationships inside this snapshot."
+                mono
+              />
+              <StatCard
+                label="Strongest pair"
+                value={strongestPair ? `${strongestPair.left} ↔ ${strongestPair.right}` : '—'}
+                helper={strongestPair ? `Score ${formatScore(strongestPair.score, 3)}` : 'No pair summary available.'}
+              />
+              <StatCard
+                label="Score band"
+                value={formatScoreRange(detail.minScore, detail.maxScore)}
+                helper="Use together with the matrix subset stats below to judge concentration versus dispersion."
+                mono
+              />
+            </div>
+          </Panel>
+
+          <div className="analysis-workspace">
+            <div className="analysis-workspace__main">
+              <HeatmapPanel
+                buildRunId={id}
+                symbolOrder={detail.symbolOrder}
+                topPairs={detail.topPairs}
+              />
+
+              <TopPairsPanel topPairs={detail.topPairs} symbolCount={detail.symbolOrder.length} />
             </div>
 
-            <div className="detail-grid__side">
+            <div className="analysis-workspace__side">
+              <Panel variant="utility">
+                <SectionHeader
+                  title="Research prompts"
+                  subtitle="Use these tools as starting points for deeper pair divergence and exposure analysis."
+                />
+
+                <div className="workspace-note-list">
+                  <div className="workspace-note-list__item">Start with the matrix when you want distribution context and subset structure.</div>
+                  <div className="workspace-note-list__item">Use Pairs when you need the strongest relationships worth comparing across time or window choices.</div>
+                  <div className="workspace-note-list__item">Use Co-movement exposure when the question starts from one anchor symbol rather than one anchor pair.</div>
+                </div>
+              </Panel>
+
               <PairLookupPanel
                 buildRunId={id}
                 symbols={detail.symbolOrder}

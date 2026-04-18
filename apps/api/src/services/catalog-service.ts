@@ -4,6 +4,7 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 
 function asStringArray(value: Prisma.JsonValue): string[] {
+  if (value === null || value === undefined) return [];
   if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
     throw new Error('Expected JSON string array.');
   }
@@ -27,9 +28,20 @@ export type UniverseListItem = {
   id: string;
   name: string;
   market: string;
-  symbolCount: number;
+  symbolCount: number | null;
   symbols: string[];
+  definitionKind: string;
+  definitionParams: Prisma.JsonValue;
   createdAt: string;
+};
+
+export type SecurityMasterItem = {
+  symbol: string;
+  name: string;
+  shortName: string | null;
+  securityType: string;
+  sector: string | null;
+  market: string;
 };
 
 export async function listDatasets(): Promise<DatasetListItem[]> {
@@ -97,7 +109,7 @@ export async function listDatasets(): Promise<DatasetListItem[]> {
 
 export async function listUniverses(): Promise<UniverseListItem[]> {
   const universes = await prisma.universe.findMany({
-    orderBy: [{ symbolCount: 'desc' }, { id: 'asc' }]
+    orderBy: [{ symbolCount: { sort: 'desc', nulls: 'last' } }, { id: 'asc' }]
   });
 
   return universes.map((universe) => ({
@@ -106,6 +118,23 @@ export async function listUniverses(): Promise<UniverseListItem[]> {
     market: universe.market,
     symbolCount: universe.symbolCount,
     symbols: asStringArray(universe.symbolsJson),
+    definitionKind: universe.definitionKind,
+    definitionParams: universe.definitionParams,
     createdAt: universe.createdAt.toISOString()
+  }));
+}
+
+export async function listSecurityMaster(): Promise<SecurityMasterItem[]> {
+  const entries = await prisma.securityMaster.findMany({
+    orderBy: { symbol: 'asc' }
+  });
+
+  return entries.map((entry) => ({
+    symbol: entry.symbol,
+    name: entry.name,
+    shortName: entry.shortName,
+    securityType: entry.securityType,
+    sector: entry.sector,
+    market: entry.market
   }));
 }

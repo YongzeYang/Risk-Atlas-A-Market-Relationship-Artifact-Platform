@@ -10,6 +10,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@fastify/static':
+        specifier: ^9.1.1
+        version: 9.1.1
       '@fastify/swagger':
         specifier: ^9.7.0
         version: 9.7.0

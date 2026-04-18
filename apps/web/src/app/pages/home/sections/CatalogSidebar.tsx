@@ -75,22 +75,25 @@ export default function CatalogSidebar({
               </div>
 
               <div className="catalog-item__meta-row">
-                <span>{formatInteger(universe.symbolCount)} symbols</span>
+                <span>{universe.definitionKind === 'static' ? 'Static' : 'Dynamic'}</span>
+                <span>{universe.symbolCount != null ? `${formatInteger(universe.symbolCount)} symbols` : 'Resolved at build time'}</span>
               </div>
 
-              <div className="catalog-symbol-preview">
-                {universe.symbols.slice(0, 6).map((symbol) => (
-                  <span key={symbol} className="catalog-symbol-preview__token mono">
-                    {symbol}
-                  </span>
-                ))}
+              {universe.symbols.length > 0 ? (
+                <div className="catalog-symbol-preview">
+                  {universe.symbols.slice(0, 6).map((symbol) => (
+                    <span key={symbol} className="catalog-symbol-preview__token mono">
+                      {symbol}
+                    </span>
+                  ))}
 
-                {universe.symbols.length > 6 ? (
-                  <span className="catalog-symbol-preview__token">
-                    +{universe.symbols.length - 6}
-                  </span>
-                ) : null}
-              </div>
+                  {universe.symbols.length > 6 ? (
+                    <span className="catalog-symbol-preview__token">
+                      +{universe.symbols.length - 6}
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
             </article>
           ))}
         </div>

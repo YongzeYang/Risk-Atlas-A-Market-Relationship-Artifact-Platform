@@ -1,6 +1,7 @@
 // apps/api/prisma/seed.ts
 import 'dotenv/config';
 
+import { scryptSync } from 'node:crypto';
 import { DatasetSource, Market, Prisma, PrismaClient } from '@prisma/client';
 import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
@@ -10,7 +11,11 @@ import {
   DEMO_DATASET_NAME,
   HK_SYMBOL_PATTERN,
   MIN_REQUIRED_PRICE_ROWS,
-  SEED_UNIVERSES
+  SEED_UNIVERSES,
+  SECURITY_MASTER,
+  SEED_INVITE_CODES,
+  SEED_INVITE_SALT,
+  type SeedUniverse
 } from './mvp-config.js';
 import { writeDeterministicHkEodDemoCsv, DEFAULT_DEMO_CSV_PATH } from './generate-sample-eod.js';
 import { importEodCsv } from './import-eod.js';
@@ -59,23 +64,36 @@ function asStringArray(value: unknown): string[] {
   return value as string[];
 }
 
-async function upsertUniverse(universe: { id: string; name: string; symbols: string[] }) {
-  const symbols = normalizeAndValidateSymbols(universe.symbols);
+async function upsertUniverse(universe: SeedUniverse) {
+  const isStatic = universe.definitionKind === 'static';
+
+  let symbols: string[] | null = null;
+  if (isStatic && universe.symbols) {
+    symbols = normalizeAndValidateSymbols(universe.symbols);
+  }
 
   await prisma.universe.upsert({
     where: { id: universe.id },
     update: {
       name: universe.name,
       market: Market.HK,
-      symbolsJson: symbols as Prisma.InputJsonValue,
-      symbolCount: symbols.length
+      symbolsJson: symbols ? (symbols as Prisma.InputJsonValue) : Prisma.JsonNull,
+      symbolCount: symbols ? symbols.length : null,
+      definitionKind: universe.definitionKind,
+      definitionParams: universe.definitionParams
+        ? (universe.definitionParams as Prisma.InputJsonValue)
+        : Prisma.JsonNull
     },
     create: {
       id: universe.id,
       name: universe.name,
       market: Market.HK,
-      symbolsJson: symbols as Prisma.InputJsonValue,
-      symbolCount: symbols.length
+      symbolsJson: symbols ? (symbols as Prisma.InputJsonValue) : Prisma.JsonNull,
+      symbolCount: symbols ? symbols.length : null,
+      definitionKind: universe.definitionKind,
+      definitionParams: universe.definitionParams
+        ? (universe.definitionParams as Prisma.InputJsonValue)
+        : Prisma.JsonNull
     }
   });
 }
@@ -101,6 +119,7 @@ async function upsertDataset() {
 
 async function validateDatasetCoverage(datasetId: string) {
   const universes = await prisma.universe.findMany({
+    where: { definitionKind: 'static' },
     orderBy: {
       id: 'asc'
     }
@@ -147,7 +166,58 @@ async function validateDatasetCoverage(datasetId: string) {
   }
 }
 
+async function seedSecurityMaster() {
+  for (const entry of SECURITY_MASTER) {
+    await prisma.securityMaster.upsert({
+      where: { symbol: entry.symbol },
+      update: {
+        name: entry.name,
+        shortName: entry.shortName ?? null,
+        securityType: entry.securityType,
+        sector: entry.sector ?? null,
+        market: Market.HK
+      },
+      create: {
+        symbol: entry.symbol,
+        name: entry.name,
+        shortName: entry.shortName ?? null,
+        securityType: entry.securityType,
+        sector: entry.sector ?? null,
+        market: Market.HK
+      }
+    });
+  }
+}
+
+function hashInviteCode(code: string): string {
+  const hash = scryptSync(code, SEED_INVITE_SALT, 64).toString('hex');
+  return `${SEED_INVITE_SALT}:${hash}`;
+}
+
+async function seedInviteCode() {
+  for (const entry of SEED_INVITE_CODES) {
+    const codeHash = hashInviteCode(entry.code);
+
+    await prisma.inviteCode.upsert({
+      where: { codeHash },
+      update: {
+        label: entry.label,
+        active: true
+      },
+      create: {
+        codeHash,
+        label: entry.label,
+        active: true,
+        usesLeft: null
+      }
+    });
+  }
+}
+
 async function main() {
+  await seedSecurityMaster();
+  console.log(`Seeded ${SECURITY_MASTER.length} security master entries.`);
+
   for (const universe of SEED_UNIVERSES) {
     await upsertUniverse(universe);
   }
@@ -175,8 +245,14 @@ async function main() {
 
   await validateDatasetCoverage(DEMO_DATASET_ID);
 
+  await seedInviteCode();
+  console.log(`Seeded ${SEED_INVITE_CODES.length} invite codes.`);
+
+  const staticCount = SEED_UNIVERSES.filter((u) => u.definitionKind === 'static').length;
+  const dynamicCount = SEED_UNIVERSES.length - staticCount;
   console.log(
-    `Seed complete: ${SEED_UNIVERSES.length} universes, 1 dataset, coverage validated for all V1 universes.`
+    `Seed complete: ${SEED_UNIVERSES.length} universes (${staticCount} static, ${dynamicCount} dynamic), ` +
+      `1 dataset, coverage validated for static universes.`
   );
 }
 

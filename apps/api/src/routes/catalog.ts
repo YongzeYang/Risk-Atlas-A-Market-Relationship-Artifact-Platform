@@ -1,7 +1,7 @@
 // apps/api/src/routes/catalog.ts
 import type { FastifyPluginAsync } from 'fastify';
 
-import { listDatasets, listUniverses } from '../services/catalog-service.js';
+import { listDatasets, listUniverses, listSecurityMaster } from '../services/catalog-service.js';
 
 const nullableIsoDateSchema = {
   anyOf: [
@@ -41,22 +41,41 @@ const datasetItemSchema = {
   ]
 } as const;
 
+const nullableIntegerSchema = {
+  anyOf: [{ type: 'integer' }, { type: 'null' }]
+} as const;
+
 const universeItemSchema = {
   type: 'object',
   properties: {
     id: { type: 'string' },
     name: { type: 'string' },
     market: { type: 'string' },
-    symbolCount: { type: 'integer' },
+    symbolCount: nullableIntegerSchema,
     symbols: {
       type: 'array',
       items: {
         type: 'string'
       }
     },
+    definitionKind: { type: 'string' },
+    definitionParams: {},
     createdAt: { type: 'string', format: 'date-time' }
   },
-  required: ['id', 'name', 'market', 'symbolCount', 'symbols', 'createdAt']
+  required: ['id', 'name', 'market', 'symbolCount', 'symbols', 'definitionKind', 'createdAt']
+} as const;
+
+const securityMasterItemSchema = {
+  type: 'object',
+  properties: {
+    symbol: { type: 'string' },
+    name: { type: 'string' },
+    shortName: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    securityType: { type: 'string' },
+    sector: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    market: { type: 'string' }
+  },
+  required: ['symbol', 'name', 'securityType', 'market']
 } as const;
 
 export const catalogRoutes: FastifyPluginAsync = async (app) => {
@@ -95,6 +114,25 @@ export const catalogRoutes: FastifyPluginAsync = async (app) => {
     },
     async () => {
       return listUniverses();
+    }
+  );
+
+  app.get(
+    '/security-master',
+    {
+      schema: {
+        tags: ['catalog'],
+        summary: 'List security master entries',
+        response: {
+          200: {
+            type: 'array',
+            items: securityMasterItemSchema
+          }
+        }
+      }
+    },
+    async () => {
+      return listSecurityMaster();
     }
   );
 };

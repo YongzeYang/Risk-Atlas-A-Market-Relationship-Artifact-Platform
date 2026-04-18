@@ -1,4 +1,5 @@
 // apps/web/src/app/pages/home/sections/BuildRunsPanel.tsx
+import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 
 import Panel from '../../../../components/ui/Panel';
@@ -12,8 +13,12 @@ type BuildRunsPanelProps = {
   loading: boolean;
   refreshing: boolean;
   error: string | null;
-  lastCreatedBuildId: string | null;
+  lastCreatedBuildId?: string | null;
   onRefresh: () => void;
+  title?: string;
+  subtitle?: string;
+  emptyStateCopy?: string;
+  action?: ReactNode;
 };
 
 function formatBuildDuration(buildRun: BuildRunListItem): string {
@@ -39,25 +44,30 @@ export default function BuildRunsPanel({
   loading,
   refreshing,
   error,
-  lastCreatedBuildId,
-  onRefresh
+  lastCreatedBuildId = null,
+  onRefresh,
+  title = 'Recent builds',
+  subtitle,
+  emptyStateCopy = 'No builds yet. Start one from the build workspace.',
+  action
 }: BuildRunsPanelProps) {
   return (
     <Panel variant="primary">
       <SectionHeader
-        title="Recent builds"
-        action={
+        title={title}
+        subtitle={subtitle}
+        action={action ?? (
           <button type="button" className="button button--ghost button--sm" onClick={onRefresh}>
             {refreshing ? 'Refreshing…' : 'Refresh'}
           </button>
-        }
+        )}
       />
 
       {loading ? <div className="state-note">Loading builds…</div> : null}
       {error ? <div className="state-note state-note--error">{error}</div> : null}
 
       {!loading && buildRuns.length === 0 ? (
-        <div className="state-note">No builds yet. Start one from the left.</div>
+        <div className="state-note">{emptyStateCopy}</div>
       ) : null}
 
       {buildRuns.length > 0 ? (

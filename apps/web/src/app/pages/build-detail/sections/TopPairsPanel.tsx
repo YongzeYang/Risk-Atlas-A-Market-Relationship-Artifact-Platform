@@ -1,4 +1,5 @@
 // apps/web/src/app/pages/build-detail/sections/TopPairsPanel.tsx
+import { formatInteger } from '../../../../lib/format';
 import ScorePill from '../../../../components/data-display/ScorePill';
 import Panel from '../../../../components/ui/Panel';
 import SectionHeader from '../../../../components/ui/SectionHeader';
@@ -6,14 +7,19 @@ import type { TopPairItem } from '../../../../types/api';
 
 type TopPairsPanelProps = {
   topPairs: TopPairItem[];
+  symbolCount?: number;
 };
 
-export default function TopPairsPanel({ topPairs }: TopPairsPanelProps) {
+export default function TopPairsPanel({ topPairs, symbolCount }: TopPairsPanelProps) {
   return (
     <Panel variant="secondary">
       <SectionHeader
-        title="Strongest pairs"
-        subtitle="Highest absolute scores in this build."
+        title="Pairs"
+        subtitle={
+          symbolCount
+            ? `Top ${topPairs.length} candidates from ${formatInteger(symbolCount)} resolved symbols.`
+            : 'Highest absolute-score relationships in this build.'
+        }
       />
 
       {topPairs.length === 0 ? (
@@ -34,7 +40,7 @@ export default function TopPairsPanel({ topPairs }: TopPairsPanelProps) {
                   <span className="mono">{pair.right}</span>
                 </div>
 
-                <div className="rank-list__meta">Strongest relationship ranking</div>
+                <div className="rank-list__meta">Candidate pair for deeper drift or divergence follow-up</div>
               </div>
 
               <ScorePill score={pair.score} digits={3} />

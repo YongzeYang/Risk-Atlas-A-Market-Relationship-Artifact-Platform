@@ -188,13 +188,21 @@ export default function BuildMetaHeader({
     <section className="meta-header">
       <Panel variant="secondary" className="meta-header__panel">
         <div className="meta-header__top">
-          <Link to="/" className="button button--ghost button--sm">
+          <Link to="/builds" className="button button--ghost button--sm">
             Back to builds
           </Link>
 
-          <button type="button" className="button button--ghost button--sm" onClick={onRefresh}>
-            {refreshing ? 'Refreshing…' : 'Refresh'}
-          </button>
+          <div className="toolbar-inline">
+            {detail.status === 'succeeded' ? (
+              <Link to={`/compare?left=${detail.id}`} className="button button--ghost button--sm">
+                Compare build
+              </Link>
+            ) : null}
+
+            <button type="button" className="button button--ghost button--sm" onClick={onRefresh}>
+              {refreshing ? 'Refreshing…' : 'Refresh'}
+            </button>
+          </div>
         </div>
 
         <div className="meta-header__hero">

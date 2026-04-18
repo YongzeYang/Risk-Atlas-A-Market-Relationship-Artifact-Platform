@@ -3,7 +3,11 @@ import { apiRequest } from '../../lib/http';
 import type {
   BuildRunDetailResponse,
   BuildRunListItem,
+  BuildSeriesDetailResponse,
+  BuildSeriesListItem,
+  CompareBuildsResponse,
   CreateBuildRunInput,
+  CreateBuildSeriesInput,
   HeatmapSubsetResponse,
   NeighborsResponse,
   PairScoreResponse
@@ -58,4 +62,29 @@ export async function getHeatmapSubset(
       symbols
     })
   });
+}
+
+export async function createBuildSeries(
+  input: CreateBuildSeriesInput
+): Promise<BuildSeriesListItem> {
+  return apiRequest<BuildSeriesListItem>('/build-series', {
+    method: 'POST',
+    body: JSON.stringify(input)
+  });
+}
+
+export async function listBuildSeries(): Promise<BuildSeriesListItem[]> {
+  return apiRequest<BuildSeriesListItem[]>('/build-series');
+}
+
+export async function getBuildSeriesDetail(id: string): Promise<BuildSeriesDetailResponse> {
+  return apiRequest<BuildSeriesDetailResponse>(`/build-series/${id}`);
+}
+
+export async function compareBuilds(
+  leftId: string,
+  rightId: string
+): Promise<CompareBuildsResponse> {
+  const search = new URLSearchParams({ leftId, rightId });
+  return apiRequest<CompareBuildsResponse>(`/compare-builds?${search.toString()}`);
 }

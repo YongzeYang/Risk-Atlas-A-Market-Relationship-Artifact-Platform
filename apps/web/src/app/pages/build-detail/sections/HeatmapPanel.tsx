@@ -5,6 +5,7 @@ import HeatmapGrid from '../../../../components/data-display/HeatmapGrid';
 import Panel from '../../../../components/ui/Panel';
 import SectionHeader from '../../../../components/ui/SectionHeader';
 import { getHeatmapSubset } from '../../../../features/builds/api';
+import { formatInteger, formatScore } from '../../../../lib/format';
 import type { HeatmapSubsetResponse, TopPairItem } from '../../../../types/api';
 
 type HeatmapPanelProps = {
@@ -15,6 +16,16 @@ type HeatmapPanelProps = {
 
 const DESIRED_DEFAULT_SYMBOLS = 8;
 const MAX_SELECTABLE_SYMBOLS = 12;
+
+type SubsetStats = {
+  pairCount: number;
+  min: number;
+  max: number;
+  mean: number;
+  median: number;
+  stdDev: number;
+  positiveShare: number;
+};
 
 function buildDefaultSelection(symbolOrder: string[], topPairs: TopPairItem[]): string[] {
   const ordered: string[] = [];
@@ -46,6 +57,43 @@ function buildDefaultSelection(symbolOrder: string[], topPairs: TopPairItem[]): 
   return ordered.slice(0, Math.min(symbolOrder.length, DESIRED_DEFAULT_SYMBOLS));
 }
 
+function computeSubsetStats(scores: number[][]): SubsetStats | null {
+  const values: number[] = [];
+
+  for (let rowIndex = 0; rowIndex < scores.length; rowIndex += 1) {
+    for (let colIndex = rowIndex + 1; colIndex < (scores[rowIndex]?.length ?? 0); colIndex += 1) {
+      const value = scores[rowIndex]?.[colIndex];
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        values.push(value);
+      }
+    }
+  }
+
+  if (values.length === 0) {
+    return null;
+  }
+
+  const sorted = [...values].sort((left, right) => left - right);
+  const sum = values.reduce((total, value) => total + value, 0);
+  const mean = sum / values.length;
+  const variance = values.reduce((total, value) => total + (value - mean) ** 2, 0) / values.length;
+  const midpoint = Math.floor(sorted.length / 2);
+  const median =
+    sorted.length % 2 === 0
+      ? (sorted[midpoint - 1]! + sorted[midpoint]!) / 2
+      : sorted[midpoint]!;
+
+  return {
+    pairCount: values.length,
+    min: sorted[0]!,
+    max: sorted[sorted.length - 1]!,
+    mean,
+    median,
+    stdDev: Math.sqrt(variance),
+    positiveShare: values.filter((value) => value > 0).length / values.length
+  };
+}
+
 export default function HeatmapPanel({
   buildRunId,
   symbolOrder,
@@ -67,6 +115,11 @@ export default function HeatmapPanel({
   const availableSymbols = useMemo(
     () => symbolOrder.filter((symbol) => !selectedSet.has(symbol)),
     [selectedSet, symbolOrder]
+  );
+
+  const subsetStats = useMemo(
+    () => (subset ? computeSubsetStats(subset.scores) : null),
+    [subset]
   );
 
   useEffect(() => {
@@ -183,8 +236,8 @@ export default function HeatmapPanel({
   return (
     <Panel variant="primary">
       <SectionHeader
-        title="Matrix view"
-        subtitle="Inspect a selected symbol set."
+        title="Matrix"
+        subtitle="Inspect a selected symbol set with subset-aware contrast and statistical context."
         action={
           <div className="toolbar-inline">
             <button type="button" className="button button--ghost button--sm" onClick={resetPreset}>
@@ -212,11 +265,11 @@ export default function HeatmapPanel({
           </div>
 
           <div className="selection-summary__hint">
-            Default selection uses symbols from the strongest pairs.
+            Default selection uses symbols from the strongest pairs. Color contrast adapts to the visible subset instead of flattening into one broad tone.
           </div>
         </div>
 
-        <div className="selection-summary__meta">Selection order is preserved.</div>
+        <div className="selection-summary__meta">Selection order is preserved for repeatable inspection.</div>
       </div>
 
       <div className="selection-groups">
@@ -280,7 +333,38 @@ export default function HeatmapPanel({
       {loading && !subset ? <div className="state-note">Loading matrix…</div> : null}
 
       {subset ? (
-        <HeatmapGrid symbols={subset.symbolOrder} scores={subset.scores} />
+        <>
+          {subsetStats ? (
+            <div className="matrix-stats-grid">
+              <article className="matrix-stat-card">
+                <div className="matrix-stat-card__label">Visible pairs</div>
+                <div className="matrix-stat-card__value mono">{formatInteger(subsetStats.pairCount)}</div>
+              </article>
+
+              <article className="matrix-stat-card">
+                <div className="matrix-stat-card__label">Median score</div>
+                <div className="matrix-stat-card__value mono">{formatScore(subsetStats.median, 3)}</div>
+              </article>
+
+              <article className="matrix-stat-card">
+                <div className="matrix-stat-card__label">Std. deviation</div>
+                <div className="matrix-stat-card__value mono">{formatScore(subsetStats.stdDev, 3)}</div>
+              </article>
+
+              <article className="matrix-stat-card">
+                <div className="matrix-stat-card__label">Positive share</div>
+                <div className="matrix-stat-card__value mono">{formatScore(subsetStats.positiveShare * 100, 1)}%</div>
+              </article>
+            </div>
+          ) : null}
+
+          <div className="matrix-context-note">
+            Range {subsetStats ? `${formatScore(subsetStats.min, 3)} → ${formatScore(subsetStats.max, 3)}` : '—'} · mean {subsetStats ? formatScore(subsetStats.mean, 3) : '—'} · median {subsetStats ? formatScore(subsetStats.median, 3) : '—'}.
+            Use this summary to judge whether the visible grid is truly diverse or merely dense.
+          </div>
+
+          <HeatmapGrid symbols={subset.symbolOrder} scores={subset.scores} />
+        </>
       ) : !loading ? (
         <div className="state-note">Select at least two symbols.</div>
       ) : null}

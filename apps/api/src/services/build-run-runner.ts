@@ -1,7 +1,6 @@
-import { ArtifactStorageKind } from '@prisma/client';
+import { ArtifactStorageKind, BuildSeriesStatus } from '@prisma/client';
 
 import { prisma } from '../lib/prisma.js';
-import { parseUniverseSymbolsJson } from '../lib/universe-symbols.js';
 import {
   ARTIFACT_BUNDLE_VERSION,
   ARTIFACT_FILE_NAMES,
@@ -23,6 +22,7 @@ import {
   writeJsonFile,
   writeManifestJsonStable
 } from './local-artifact-store.js';
+import { resolveUniverseSymbols } from './universe-resolver.js';
 
 type PriceRow = {
   symbol: string;
@@ -107,7 +107,18 @@ async function runBuildInternal(buildRunId: string): Promise<void> {
     }
 
     const windowDays: BuildRunWindowDays = buildRun.windowDays;
-    const symbolOrder = parseUniverseSymbolsJson(buildRun.universe.symbolsJson);
+    const symbolOrder = await resolveUniverseSymbols(
+      buildRun.universe,
+      buildRun.datasetId,
+      buildRun.asOfDate
+    );
+
+    // Store the resolved symbols snapshot
+    await prisma.buildRun.update({
+      where: { id: buildRunId },
+      data: { resolvedSymbolsJson: symbolOrder }
+    });
+
     const prepared = await buildCorrelationArtifactData({
       datasetId: buildRun.datasetId,
       symbolOrder,
@@ -225,6 +236,11 @@ async function runBuildInternal(buildRunId: string): Promise<void> {
         }
       });
     });
+
+    // Update series progress AFTER the transaction commits so counts see committed data
+    if (buildRun.seriesId) {
+      await updateSeriesProgress(prisma, buildRun.seriesId);
+    }
   } catch (error) {
     await cleanupLocalArtifactBundle(buildRunId).catch(() => {
       // best effort cleanup only
@@ -246,6 +262,15 @@ async function runBuildInternal(buildRunId: string): Promise<void> {
       });
 
     console.error(`[build-run:${buildRunId}] failed`, error);
+
+    // Update series progress on failure too
+    const failedRun = await prisma.buildRun.findUnique({
+      where: { id: buildRunId },
+      select: { seriesId: true }
+    });
+    if (failedRun?.seriesId) {
+      await updateSeriesProgress(prisma, failedRun.seriesId).catch(() => {});
+    }
   } finally {
     queuedOrRunningBuildRunIds.delete(buildRunId);
   }
@@ -557,4 +582,38 @@ function toErrorMessage(error: unknown): string {
   }
 
   return 'Unknown build failure.';
+}
+
+async function updateSeriesProgress(
+  db: { buildRun: { count: typeof prisma.buildRun.count }; buildSeries: { update: typeof prisma.buildSeries.update } },
+  seriesId: string
+): Promise<void> {
+  const [completedCount, failedCount, totalCount] = await Promise.all([
+    db.buildRun.count({ where: { seriesId, status: 'succeeded' } }),
+    db.buildRun.count({ where: { seriesId, status: 'failed' } }),
+    db.buildRun.count({ where: { seriesId } })
+  ]);
+
+  const allDone = completedCount + failedCount >= totalCount;
+
+  let status: BuildSeriesStatus;
+  if (!allDone) {
+    status = 'running';
+  } else if (failedCount === 0) {
+    status = 'succeeded';
+  } else if (completedCount === 0) {
+    status = 'failed';
+  } else {
+    status = 'partially_failed';
+  }
+
+  await db.buildSeries.update({
+    where: { id: seriesId },
+    data: {
+      completedRunCount: completedCount,
+      failedRunCount: failedCount,
+      status,
+      finishedAt: allDone ? new Date() : null
+    }
+  });
 }

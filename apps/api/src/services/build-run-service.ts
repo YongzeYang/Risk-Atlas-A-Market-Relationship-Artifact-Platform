@@ -1,6 +1,5 @@
 import { prisma } from '../lib/prisma.js';
 import { ServiceError } from '../lib/service-error.js';
-import { parseUniverseSymbolsJson } from '../lib/universe-symbols.js';
 import {
   MATRIX_ARTIFACT_MEDIA_TYPE,
   isBuildRunScoreMethod,
@@ -18,6 +17,7 @@ import {
   type TopPairItem
 } from '../contracts/build-runs.js';
 import { readPreviewArtifact } from './local-artifact-store.js';
+import { validateInviteCode } from './invite-code-service.js';
 
 type BuildRunRow = {
   id: string;
@@ -57,6 +57,14 @@ export type BuildRunDownloadDescriptor = {
 export async function createBuildRun(
   input: CreateBuildRunRequestBody
 ): Promise<BuildRunListItem> {
+  if (!input.inviteCode) {
+    throw new ServiceError(403, 'Invite code is required.');
+  }
+  const validInvite = await validateInviteCode(input.inviteCode);
+  if (!validInvite) {
+    throw new ServiceError(403, 'Invalid invite code.');
+  }
+
   if (!isBuildRunWindowDays(input.windowDays)) {
     throw new ServiceError(400, `Unsupported windowDays "${input.windowDays}".`);
   }
@@ -81,8 +89,7 @@ export async function createBuildRun(
       },
       select: {
         id: true,
-        market: true,
-        symbolsJson: true
+        market: true
       }
     })
   ]);
@@ -101,8 +108,6 @@ export async function createBuildRun(
       `Dataset "${dataset.id}" and universe "${universe.id}" must belong to the same market.`
     );
   }
-
-  parseUniverseSymbolsJson(universe.symbolsJson);
 
   const buildRun = await prisma.buildRun.create({
     data: {

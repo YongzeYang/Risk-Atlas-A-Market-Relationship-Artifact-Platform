@@ -16,7 +16,8 @@ import {
   ISO_DATE_PATTERN
 } from './mvp-config.js';
 
-const CSV_HEADER = 'tradeDate,symbol,adjClose';
+const CSV_HEADER_V1 = 'tradeDate,symbol,adjClose';
+const CSV_HEADER_V2 = 'tradeDate,symbol,adjClose,volume';
 const BATCH_SIZE = 1000;
 
 type ImportRow = {
@@ -24,6 +25,7 @@ type ImportRow = {
   tradeDate: string;
   symbol: string;
   adjClose: number;
+  volume?: bigint;
 };
 
 export type ImportEodCsvOptions = {
@@ -44,14 +46,14 @@ export type ImportEodCsvSummary = {
   maxTradeDate: string;
 };
 
-function parseCsvLine(line: string, lineNumber: number): [string, string, string] {
+function parseCsvLine(line: string, lineNumber: number, columnCount: number): string[] {
   const parts = line.split(',');
 
-  if (parts.length !== 3) {
-    throw new Error(`Invalid CSV format at line ${lineNumber}. Expected exactly 3 columns.`);
+  if (parts.length !== columnCount) {
+    throw new Error(`Invalid CSV format at line ${lineNumber}. Expected exactly ${columnCount} columns.`);
   }
 
-  return [parts[0]!.trim(), parts[1]!.trim().toUpperCase(), parts[2]!.trim()];
+  return parts.map((p) => p.trim());
 }
 
 function validateImportRow(row: Omit<ImportRow, 'datasetId'>, lineNumber: number) {
@@ -85,6 +87,8 @@ async function readImportRows(csvPath: string, datasetId: string) {
 
   let lineNumber = 0;
   let seenHeader = false;
+  let columnCount = 3;
+  let hasVolume = false;
 
   const rows: ImportRow[] = [];
   const symbols = new Set<string>();
@@ -102,26 +106,44 @@ async function readImportRows(csvPath: string, datasetId: string) {
 
     if (!seenHeader) {
       const normalizedHeader = line.replace(/^\uFEFF/, '');
-      if (normalizedHeader !== CSV_HEADER) {
+      if (normalizedHeader === CSV_HEADER_V2) {
+        columnCount = 4;
+        hasVolume = true;
+      } else if (normalizedHeader === CSV_HEADER_V1) {
+        columnCount = 3;
+        hasVolume = false;
+      } else {
         throw new Error(
-          `Invalid CSV header. Expected "${CSV_HEADER}", got "${normalizedHeader}".`
+          `Invalid CSV header. Expected "${CSV_HEADER_V1}" or "${CSV_HEADER_V2}", got "${normalizedHeader}".`
         );
       }
       seenHeader = true;
       continue;
     }
 
-    const [tradeDate, symbol, adjCloseRaw] = parseCsvLine(line, lineNumber);
-    const adjClose = Number(adjCloseRaw);
+    const parts = parseCsvLine(line, lineNumber, columnCount);
+    const tradeDate = parts[0]!;
+    const symbol = parts[1]!.toUpperCase();
+    const adjClose = Number(parts[2]!);
 
     validateImportRow({ tradeDate, symbol, adjClose }, lineNumber);
 
-    rows.push({
+    const row: ImportRow = {
       datasetId,
       tradeDate,
       symbol,
       adjClose
-    });
+    };
+
+    if (hasVolume && parts[3]) {
+      const volumeNum = Number(parts[3]);
+      if (!Number.isFinite(volumeNum) || volumeNum < 0) {
+        throw new Error(`Invalid volume "${parts[3]}" at line ${lineNumber}.`);
+      }
+      row.volume = BigInt(Math.round(volumeNum));
+    }
+
+    rows.push(row);
 
     symbols.add(symbol);
     
