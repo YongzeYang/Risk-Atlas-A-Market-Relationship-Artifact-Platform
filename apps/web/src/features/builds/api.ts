@@ -10,6 +10,7 @@ import type {
   CreateBuildSeriesInput,
   HeatmapSubsetResponse,
   NeighborsResponse,
+  PairDivergenceResponse,
   PairScoreResponse
 } from '../../types/api';
 
@@ -87,4 +88,25 @@ export async function compareBuilds(
 ): Promise<CompareBuildsResponse> {
   const search = new URLSearchParams({ leftId, rightId });
   return apiRequest<CompareBuildsResponse>(`/compare-builds?${search.toString()}`);
+}
+
+export async function getPairDivergence(
+  id: string,
+  params: {
+    recentWindowDays: number;
+    limit: number;
+    minLongCorrAbs: number;
+    minCorrDeltaAbs: number;
+  }
+): Promise<PairDivergenceResponse> {
+  const search = new URLSearchParams({
+    recentWindowDays: String(params.recentWindowDays),
+    limit: String(params.limit),
+    minLongCorrAbs: String(params.minLongCorrAbs),
+    minCorrDeltaAbs: String(params.minCorrDeltaAbs)
+  });
+
+  return apiRequest<PairDivergenceResponse>(
+    `/build-runs/${id}/pair-divergence?${search.toString()}`
+  );
 }

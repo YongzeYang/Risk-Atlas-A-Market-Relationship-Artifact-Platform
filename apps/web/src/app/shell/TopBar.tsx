@@ -37,6 +37,10 @@ export default function TopBar() {
           <NavLink className={navClassName} to="/compare">
             Compare
           </NavLink>
+
+          <NavLink className={navClassName} to="/divergence">
+            Divergence
+          </NavLink>
         </nav>
 
         <div className="topbar__utility">

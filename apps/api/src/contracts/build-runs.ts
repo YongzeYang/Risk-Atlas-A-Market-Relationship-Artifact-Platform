@@ -34,6 +34,16 @@ export const MAX_NEIGHBOR_K = 20;
 export const MIN_HEATMAP_SUBSET_SIZE = 2;
 export const MAX_HEATMAP_SUBSET_SIZE = 12;
 
+export const DEFAULT_PAIR_DIVERGENCE_RECENT_WINDOW_DAYS = 20;
+export const MIN_PAIR_DIVERGENCE_RECENT_WINDOW_DAYS = 10;
+export const MAX_PAIR_DIVERGENCE_RECENT_WINDOW_DAYS = 60;
+
+export const DEFAULT_PAIR_DIVERGENCE_LIMIT = 50;
+export const MAX_PAIR_DIVERGENCE_LIMIT = 200;
+
+export const DEFAULT_PAIR_DIVERGENCE_MIN_LONG_CORR_ABS = 0.35;
+export const DEFAULT_PAIR_DIVERGENCE_MIN_CORR_DELTA_ABS = 0.12;
+
 export const TOP_PAIR_LIMIT = 20;
 
 export const BUILD_SERIES_FREQUENCIES = ['daily', 'weekly', 'monthly'] as const;
@@ -229,6 +239,39 @@ export type HeatmapSubsetResponse = {
   buildRunId: string;
   symbolOrder: string[];
   scores: number[][];
+};
+
+export type PairDivergenceQuerystring = {
+  recentWindowDays?: number;
+  limit?: number;
+  minLongCorrAbs?: number;
+  minCorrDeltaAbs?: number;
+};
+
+export type PairDivergenceCandidate = {
+  left: string;
+  right: string;
+  leftSector: string | null;
+  rightSector: string | null;
+  sameSector: boolean;
+  longWindowCorr: number;
+  recentCorr: number;
+  corrDelta: number;
+  recentRelativeReturnGap: number;
+  spreadZScore: number | null;
+};
+
+export type PairDivergenceResponse = {
+  buildRunId: string;
+  asOfDate: string;
+  symbolCount: number;
+  longWindowDays: BuildRunWindowDays;
+  recentWindowDays: number;
+  minLongCorrAbs: number;
+  minCorrDeltaAbs: number;
+  limit: number;
+  candidateCount: number;
+  candidates: PairDivergenceCandidate[];
 };
 
 export type PreviewV1 = {
@@ -635,4 +678,96 @@ export const heatmapSubsetResponseSchema = {
     }
   },
   required: ['buildRunId', 'symbolOrder', 'scores']
+} as const;
+
+export const pairDivergenceQuerystringSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    recentWindowDays: {
+      type: 'integer',
+      minimum: MIN_PAIR_DIVERGENCE_RECENT_WINDOW_DAYS,
+      maximum: MAX_PAIR_DIVERGENCE_RECENT_WINDOW_DAYS,
+      default: DEFAULT_PAIR_DIVERGENCE_RECENT_WINDOW_DAYS
+    },
+    limit: {
+      type: 'integer',
+      minimum: 1,
+      maximum: MAX_PAIR_DIVERGENCE_LIMIT,
+      default: DEFAULT_PAIR_DIVERGENCE_LIMIT
+    },
+    minLongCorrAbs: {
+      type: 'number',
+      minimum: 0,
+      maximum: 1,
+      default: DEFAULT_PAIR_DIVERGENCE_MIN_LONG_CORR_ABS
+    },
+    minCorrDeltaAbs: {
+      type: 'number',
+      minimum: 0,
+      maximum: 2,
+      default: DEFAULT_PAIR_DIVERGENCE_MIN_CORR_DELTA_ABS
+    }
+  }
+} as const;
+
+export const pairDivergenceCandidateSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    left: { type: 'string', pattern: HK_SYMBOL_PATTERN_SOURCE },
+    right: { type: 'string', pattern: HK_SYMBOL_PATTERN_SOURCE },
+    leftSector: nullableStringSchema,
+    rightSector: nullableStringSchema,
+    sameSector: { type: 'boolean' },
+    longWindowCorr: { type: 'number' },
+    recentCorr: { type: 'number' },
+    corrDelta: { type: 'number' },
+    recentRelativeReturnGap: { type: 'number' },
+    spreadZScore: nullableNumberSchema
+  },
+  required: [
+    'left',
+    'right',
+    'leftSector',
+    'rightSector',
+    'sameSector',
+    'longWindowCorr',
+    'recentCorr',
+    'corrDelta',
+    'recentRelativeReturnGap',
+    'spreadZScore'
+  ]
+} as const;
+
+export const pairDivergenceResponseSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    buildRunId: { type: 'string' },
+    asOfDate: { type: 'string', pattern: ISO_DATE_PATTERN_SOURCE },
+    symbolCount: { type: 'integer' },
+    longWindowDays: { type: 'integer', enum: [...BUILD_RUN_WINDOW_DAYS] },
+    recentWindowDays: { type: 'integer' },
+    minLongCorrAbs: { type: 'number' },
+    minCorrDeltaAbs: { type: 'number' },
+    limit: { type: 'integer' },
+    candidateCount: { type: 'integer' },
+    candidates: {
+      type: 'array',
+      items: pairDivergenceCandidateSchema
+    }
+  },
+  required: [
+    'buildRunId',
+    'asOfDate',
+    'symbolCount',
+    'longWindowDays',
+    'recentWindowDays',
+    'minLongCorrAbs',
+    'minCorrDeltaAbs',
+    'limit',
+    'candidateCount',
+    'candidates'
+  ]
 } as const;

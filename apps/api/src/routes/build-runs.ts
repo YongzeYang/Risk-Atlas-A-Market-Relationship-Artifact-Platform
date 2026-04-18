@@ -13,12 +13,15 @@ import {
   heatmapSubsetResponseSchema,
   neighborsQuerystringSchema,
   neighborsResponseSchema,
+  pairDivergenceQuerystringSchema,
+  pairDivergenceResponseSchema,
   pairScoreQuerystringSchema,
   pairScoreResponseSchema,
   type BuildRunIdParams,
   type CreateBuildRunRequestBody,
   type HeatmapSubsetRequestBody,
   type NeighborsQuerystring,
+  type PairDivergenceQuerystring,
   type PairScoreQuerystring
 } from '../contracts/build-runs.js';
 import { ServiceError } from '../lib/service-error.js';
@@ -33,6 +36,7 @@ import {
   getBuildRunNeighbors,
   getBuildRunPairScore
 } from '../services/build-run-query-service.js';
+import { getBuildRunPairDivergence } from '../services/pair-divergence-service.js';
 import { scheduleBuildRun } from '../services/build-run-runner.js';
 import { resolveLocalStorageFilePath } from '../services/local-artifact-store.js';
 
@@ -180,6 +184,34 @@ export const buildRunRoutes: FastifyPluginAsync = async (app) => {
     async (request, reply) => {
       try {
         return await getBuildRunHeatmapSubset(request.params.id, request.body);
+      } catch (error) {
+        if (error instanceof ServiceError) {
+          return reply.code(error.statusCode).send({
+            message: error.message
+          });
+        }
+
+        throw error;
+      }
+    }
+  );
+
+  app.get<{ Params: BuildRunIdParams; Querystring: PairDivergenceQuerystring }>(
+    '/build-runs/:id/pair-divergence',
+    {
+      schema: {
+        tags: ['build-runs'],
+        summary: 'Get pair divergence candidates for one succeeded build',
+        params: buildRunIdParamSchema,
+        querystring: pairDivergenceQuerystringSchema,
+        response: {
+          200: pairDivergenceResponseSchema
+        }
+      }
+    },
+    async (request, reply) => {
+      try {
+        return await getBuildRunPairDivergence(request.params.id, request.query);
       } catch (error) {
         if (error instanceof ServiceError) {
           return reply.code(error.statusCode).send({

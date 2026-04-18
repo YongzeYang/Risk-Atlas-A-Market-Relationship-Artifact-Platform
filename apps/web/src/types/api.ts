@@ -187,3 +187,29 @@ export type HeatmapSubsetResponse = {
   symbolOrder: string[];
   scores: number[][];
 };
+
+export type PairDivergenceCandidate = {
+  left: string;
+  right: string;
+  leftSector: string | null;
+  rightSector: string | null;
+  sameSector: boolean;
+  longWindowCorr: number;
+  recentCorr: number;
+  corrDelta: number;
+  recentRelativeReturnGap: number;
+  spreadZScore: number | null;
+};
+
+export type PairDivergenceResponse = {
+  buildRunId: string;
+  asOfDate: string;
+  symbolCount: number;
+  longWindowDays: BuildRunWindowDays;
+  recentWindowDays: number;
+  minLongCorrAbs: number;
+  minCorrDeltaAbs: number;
+  limit: number;
+  candidateCount: number;
+  candidates: PairDivergenceCandidate[];
+};

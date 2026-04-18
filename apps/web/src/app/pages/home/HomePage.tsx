@@ -86,6 +86,9 @@ export default function HomePage() {
             <Link to="/compare" className="button button--secondary button--sm">
               Open compare
             </Link>
+            <Link to="/divergence" className="button button--ghost button--sm">
+              Open divergence
+            </Link>
           </div>
         </article>
       </section>

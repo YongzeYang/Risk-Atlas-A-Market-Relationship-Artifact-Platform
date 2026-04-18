@@ -36,6 +36,10 @@ export default function HomeIntroBand({
           <Link to="/builds" className="button button--secondary">
             Explore builds
           </Link>
+
+          <Link to="/divergence" className="button button--ghost">
+            Open divergence
+          </Link>
         </div>
       </div>
 

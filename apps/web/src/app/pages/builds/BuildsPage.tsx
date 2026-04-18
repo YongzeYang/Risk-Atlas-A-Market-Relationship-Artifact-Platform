@@ -64,6 +64,9 @@ export default function BuildsPage() {
             <Link to="/compare" className="button button--secondary">
               Compare builds
             </Link>
+            <Link to="/divergence" className="button button--ghost">
+              Pair divergence
+            </Link>
           </div>
         </div>
 

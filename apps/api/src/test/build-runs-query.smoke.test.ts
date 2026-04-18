@@ -14,6 +14,7 @@ import type {
   BuildRunListItem,
   HeatmapSubsetResponse,
   NeighborsResponse,
+  PairDivergenceResponse,
   PairScoreResponse
 } from '../contracts/build-runs.js';
 import { buildApp } from '../app.js';
@@ -21,13 +22,15 @@ import { prisma } from '../lib/prisma.js';
 
 const repoRootDir = resolve(fileURLToPath(new URL('../../../../', import.meta.url)));
 const writerBinaryPath = resolve(repoRootDir, 'cpp', 'build', 'bin', 'risk_atlas_bsm_writer');
+const INVITE_CODE = 'risk-atlas-demo-2026';
 
 const BUILD_REQUEST = {
   datasetId: 'hk_eod_demo_v1',
   universeId: 'hk_top_20',
   asOfDate: '2026-04-15',
   windowDays: 252,
-  scoreMethod: 'pearson_corr'
+  scoreMethod: 'pearson_corr',
+  inviteCode: INVITE_CODE
 } as const;
 
 test('build-runs query API smoke', async (t) => {
@@ -222,6 +225,45 @@ test('build-runs query API smoke', async (t) => {
         for (let j = 0; j < subset.scores[i]!.length; j += 1) {
           assert.equal(subset.scores[i]![j], subset.scores[j]![i]);
         }
+      }
+    });
+
+    await t.test('pair-divergence returns ranked candidates with recent metrics', async () => {
+      const divergenceResponse = await app.inject({
+        method: 'GET',
+        url:
+          `/build-runs/${buildRunId}/pair-divergence?recentWindowDays=20&limit=10` +
+          `&minLongCorrAbs=0.15&minCorrDeltaAbs=0.05`
+      });
+
+      assert.equal(divergenceResponse.statusCode, 200, divergenceResponse.body);
+
+      const divergence = parseJson<PairDivergenceResponse>(divergenceResponse.body);
+
+      assert.equal(divergence.buildRunId, buildRunId);
+      assert.equal(divergence.asOfDate, BUILD_REQUEST.asOfDate);
+      assert.equal(divergence.longWindowDays, BUILD_REQUEST.windowDays);
+      assert.equal(divergence.recentWindowDays, 20);
+      assert.ok(divergence.candidateCount >= divergence.candidates.length);
+      assert.ok(divergence.candidates.length > 0);
+
+      for (const candidate of divergence.candidates) {
+        assert.ok(Number.isFinite(candidate.longWindowCorr));
+        assert.ok(Number.isFinite(candidate.recentCorr));
+        assert.ok(Number.isFinite(candidate.corrDelta));
+        assert.ok(Number.isFinite(candidate.recentRelativeReturnGap));
+
+        if (candidate.spreadZScore !== null) {
+          assert.ok(Number.isFinite(candidate.spreadZScore));
+        }
+      }
+
+      for (let i = 1; i < divergence.candidates.length; i += 1) {
+        assert.ok(
+          Math.abs(divergence.candidates[i - 1]!.corrDelta) >=
+            Math.abs(divergence.candidates[i]!.corrDelta),
+          'pair-divergence candidates must be sorted by absolute corr delta'
+        );
       }
     });
   } finally {
