@@ -9,6 +9,8 @@ import {
   buildRunListItemSchema,
   buildRunListResponseSchema,
   createBuildRunBodySchema,
+  exposureQuerystringSchema,
+  exposureResponseSchema,
   heatmapSubsetBodySchema,
   heatmapSubsetResponseSchema,
   neighborsQuerystringSchema,
@@ -17,12 +19,16 @@ import {
   pairDivergenceResponseSchema,
   pairScoreQuerystringSchema,
   pairScoreResponseSchema,
+  structureQuerystringSchema,
+  structureResponseSchema,
   type BuildRunIdParams,
   type CreateBuildRunRequestBody,
+  type ExposureQuerystring,
   type HeatmapSubsetRequestBody,
   type NeighborsQuerystring,
   type PairDivergenceQuerystring,
-  type PairScoreQuerystring
+  type PairScoreQuerystring,
+  type StructureQuerystring
 } from '../contracts/build-runs.js';
 import { ServiceError } from '../lib/service-error.js';
 import {
@@ -36,9 +42,11 @@ import {
   getBuildRunNeighbors,
   getBuildRunPairScore
 } from '../services/build-run-query-service.js';
+import { getBuildRunExposure } from '../services/exposure-service.js';
 import { getBuildRunPairDivergence } from '../services/pair-divergence-service.js';
 import { scheduleBuildRun } from '../services/build-run-runner.js';
 import { resolveLocalStorageFilePath } from '../services/local-artifact-store.js';
+import { getBuildRunStructure } from '../services/structure-service.js';
 
 export const buildRunRoutes: FastifyPluginAsync = async (app) => {
   app.post<{ Body: CreateBuildRunRequestBody }>(
@@ -117,7 +125,7 @@ export const buildRunRoutes: FastifyPluginAsync = async (app) => {
     {
       schema: {
         tags: ['build-runs'],
-        summary: 'Get one pair score from preview.json',
+        summary: 'Get one pair score from matrix.bsm',
         params: buildRunIdParamSchema,
         querystring: pairScoreQuerystringSchema,
         response: {
@@ -145,7 +153,7 @@ export const buildRunRoutes: FastifyPluginAsync = async (app) => {
     {
       schema: {
         tags: ['build-runs'],
-        summary: 'Get top-k neighbors for one symbol from preview.json',
+        summary: 'Get top-k neighbors for one symbol from matrix.bsm',
         params: buildRunIdParamSchema,
         querystring: neighborsQuerystringSchema,
         response: {
@@ -173,7 +181,7 @@ export const buildRunRoutes: FastifyPluginAsync = async (app) => {
     {
       schema: {
         tags: ['build-runs'],
-        summary: 'Get a small subset matrix for heatmap rendering from preview.json',
+        summary: 'Get a small subset matrix for heatmap rendering from matrix.bsm',
         params: buildRunIdParamSchema,
         body: heatmapSubsetBodySchema,
         response: {
@@ -212,6 +220,62 @@ export const buildRunRoutes: FastifyPluginAsync = async (app) => {
     async (request, reply) => {
       try {
         return await getBuildRunPairDivergence(request.params.id, request.query);
+      } catch (error) {
+        if (error instanceof ServiceError) {
+          return reply.code(error.statusCode).send({
+            message: error.message
+          });
+        }
+
+        throw error;
+      }
+    }
+  );
+
+  app.get<{ Params: BuildRunIdParams; Querystring: ExposureQuerystring }>(
+    '/build-runs/:id/exposure',
+    {
+      schema: {
+        tags: ['build-runs'],
+        summary: 'Get one-symbol co-movement exposure from matrix.bsm plus sector overlay',
+        params: buildRunIdParamSchema,
+        querystring: exposureQuerystringSchema,
+        response: {
+          200: exposureResponseSchema
+        }
+      }
+    },
+    async (request, reply) => {
+      try {
+        return await getBuildRunExposure(request.params.id, request.query);
+      } catch (error) {
+        if (error instanceof ServiceError) {
+          return reply.code(error.statusCode).send({
+            message: error.message
+          });
+        }
+
+        throw error;
+      }
+    }
+  );
+
+  app.get<{ Params: BuildRunIdParams; Querystring: StructureQuerystring }>(
+    '/build-runs/:id/structure',
+    {
+      schema: {
+        tags: ['build-runs'],
+        summary: 'Get clustered structure summary and ordered heatmap metadata for one build',
+        params: buildRunIdParamSchema,
+        querystring: structureQuerystringSchema,
+        response: {
+          200: structureResponseSchema
+        }
+      }
+    },
+    async (request, reply) => {
+      try {
+        return await getBuildRunStructure(request.params.id, request.query);
       } catch (error) {
         if (error instanceof ServiceError) {
           return reply.code(error.statusCode).send({

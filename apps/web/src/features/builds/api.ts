@@ -6,12 +6,15 @@ import type {
   BuildSeriesDetailResponse,
   BuildSeriesListItem,
   CompareBuildsResponse,
+  CompareBuildStructuresResponse,
   CreateBuildRunInput,
   CreateBuildSeriesInput,
+  ExposureResponse,
   HeatmapSubsetResponse,
   NeighborsResponse,
   PairDivergenceResponse,
-  PairScoreResponse
+  PairScoreResponse,
+  StructureResponse
 } from '../../types/api';
 
 export async function createBuildRun(input: CreateBuildRunInput): Promise<BuildRunListItem> {
@@ -108,5 +111,38 @@ export async function getPairDivergence(
 
   return apiRequest<PairDivergenceResponse>(
     `/build-runs/${id}/pair-divergence?${search.toString()}`
+  );
+}
+
+export async function getBuildRunExposure(
+  id: string,
+  params: { symbol: string; k: number }
+): Promise<ExposureResponse> {
+  const search = new URLSearchParams({
+    symbol: params.symbol,
+    k: String(params.k)
+  });
+
+  return apiRequest<ExposureResponse>(`/build-runs/${id}/exposure?${search.toString()}`);
+}
+
+export async function getBuildRunStructure(
+  id: string,
+  params: { heatmapSize: number }
+): Promise<StructureResponse> {
+  const search = new URLSearchParams({
+    heatmapSize: String(params.heatmapSize)
+  });
+
+  return apiRequest<StructureResponse>(`/build-runs/${id}/structure?${search.toString()}`);
+}
+
+export async function compareBuildStructures(
+  leftId: string,
+  rightId: string
+): Promise<CompareBuildStructuresResponse> {
+  const search = new URLSearchParams({ leftId, rightId });
+  return apiRequest<CompareBuildStructuresResponse>(
+    `/compare-build-structures?${search.toString()}`
   );
 }

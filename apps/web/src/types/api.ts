@@ -182,6 +182,46 @@ export type NeighborsResponse = {
   neighbors: NeighborEntry[];
 };
 
+export type ExposureStrengthBand = 'very_high' | 'high' | 'moderate' | 'low';
+
+export type ExposureNeighborEntry = {
+  symbol: string;
+  score: number;
+  sector: string | null;
+  securityType: string | null;
+  sameSector: boolean;
+  strengthBand: ExposureStrengthBand;
+};
+
+export type ExposureSectorSummary = {
+  sector: string | null;
+  count: number;
+  weightShare: number;
+  averageScore: number;
+};
+
+export type ExposureBandSummary = {
+  band: ExposureStrengthBand;
+  count: number;
+};
+
+export type ExposureResponse = {
+  buildRunId: string;
+  asOfDate: string;
+  symbol: string;
+  anchorSector: string | null;
+  k: number;
+  neighborCount: number;
+  averageNeighborScore: number;
+  concentrationIndex: number;
+  effectiveNeighborCount: number;
+  sameSectorCount: number;
+  sameSectorWeightShare: number;
+  sectors: ExposureSectorSummary[];
+  bands: ExposureBandSummary[];
+  neighbors: ExposureNeighborEntry[];
+};
+
 export type HeatmapSubsetResponse = {
   buildRunId: string;
   symbolOrder: string[];
@@ -212,4 +252,56 @@ export type PairDivergenceResponse = {
   limit: number;
   candidateCount: number;
   candidates: PairDivergenceCandidate[];
+};
+
+export type StructureClusterSectorSummary = {
+  sector: string | null;
+  count: number;
+};
+
+export type StructureClusterSummary = {
+  id: number;
+  size: number;
+  dominantSector: string | null;
+  averageInternalScore: number | null;
+  symbols: string[];
+  sectors: StructureClusterSectorSummary[];
+};
+
+export type StructureResponse = {
+  buildRunId: string;
+  asOfDate: string;
+  symbolCount: number;
+  clusterThreshold: number;
+  clusterCount: number;
+  orderedSymbols: string[];
+  heatmapSymbols: string[];
+  heatmapScores: number[][];
+  clusters: StructureClusterSummary[];
+};
+
+export type StructureClusterMatch = {
+  leftClusterId: number;
+  rightClusterId: number;
+  overlapCount: number;
+};
+
+export type StructureMovedSymbol = {
+  symbol: string;
+  leftClusterId: number;
+  rightClusterId: number;
+  leftClusterSize: number;
+  rightClusterSize: number;
+  leftDominantSector: string | null;
+  rightDominantSector: string | null;
+};
+
+export type CompareBuildStructuresResponse = {
+  left: { id: string; asOfDate: string; symbolCount: number; clusterCount: number };
+  right: { id: string; asOfDate: string; symbolCount: number; clusterCount: number };
+  commonSymbolCount: number;
+  stableSymbolCount: number;
+  changedSymbolCount: number;
+  clusterMatches: StructureClusterMatch[];
+  movedSymbols: StructureMovedSymbol[];
 };

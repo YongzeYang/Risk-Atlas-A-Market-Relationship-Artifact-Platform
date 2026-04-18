@@ -11,8 +11,7 @@ import {
   type BuildRunWindowDays,
   type PairDivergenceCandidate,
   type PairDivergenceQuerystring,
-  type PairDivergenceResponse,
-  type PreviewV1
+  type PairDivergenceResponse
 } from '../contracts/build-runs.js';
 import {
   buildAlignedPriceSeries,
@@ -24,38 +23,17 @@ import {
   type PriceRow,
   selectAlignedWindowDates
 } from './correlation-analytics.js';
-import { readPreviewArtifact } from './local-artifact-store.js';
+import { loadSucceededBuildRunArtifactContext } from './build-run-artifact-context.js';
+import { queryBsmPairScore } from './bsm-reader.js';
 
 export async function getBuildRunPairDivergence(
   buildRunId: string,
   query: PairDivergenceQuerystring
 ): Promise<PairDivergenceResponse> {
-  const buildRun = await prisma.buildRun.findUnique({
-    where: {
-      id: buildRunId
-    },
-    select: {
-      id: true,
-      datasetId: true,
-      asOfDate: true,
-      windowDays: true,
-      status: true,
-      artifact: {
-        select: {
-          storageKind: true,
-          storagePrefix: true
-        }
-      }
-    }
-  });
-
-  if (!buildRun) {
-    throw new ServiceError(404, `Build run "${buildRunId}" was not found.`);
-  }
-
-  if (buildRun.status !== 'succeeded' || !buildRun.artifact) {
-    throw new ServiceError(409, `Build run "${buildRunId}" is not ready for divergence analysis.`);
-  }
+  const context = await loadSucceededBuildRunArtifactContext(
+    buildRunId,
+    `Build run "${buildRunId}" is not ready for divergence analysis.`
+  );
 
   const recentWindowDays = query.recentWindowDays ?? DEFAULT_PAIR_DIVERGENCE_RECENT_WINDOW_DAYS;
   const limit = query.limit ?? DEFAULT_PAIR_DIVERGENCE_LIMIT;
@@ -88,31 +66,24 @@ export async function getBuildRunPairDivergence(
     throw new ServiceError(400, 'Query parameter "minCorrDeltaAbs" must be between 0 and 2.');
   }
 
-  if (recentWindowDays >= buildRun.windowDays) {
+  if (recentWindowDays >= context.windowDays) {
     throw new ServiceError(
       400,
-      `Query parameter "recentWindowDays" must be smaller than the build window ${buildRun.windowDays}.`
+      `Query parameter "recentWindowDays" must be smaller than the build window ${context.windowDays}.`
     );
   }
 
-  const preview = await readPreviewArtifact(
-    buildRun.artifact.storageKind,
-    buildRun.artifact.storagePrefix
-  );
-
-  validatePreviewShape(preview);
-
-  const symbolOrder = preview.symbolOrder;
+  const symbolOrder = context.preview.symbolOrder;
 
   const [priceRows, securityMasterEntries] = await Promise.all([
     prisma.eodPrice.findMany({
       where: {
-        datasetId: buildRun.datasetId,
+        datasetId: context.datasetId,
         symbol: {
           in: symbolOrder
         },
         tradeDate: {
-          lte: buildRun.asOfDate
+          lte: context.asOfDate
         }
       },
       orderBy: [
@@ -143,7 +114,7 @@ export async function getBuildRunPairDivergence(
   const recentDates = selectAlignedWindowDates(
     rowsBySymbol,
     symbolOrder,
-    buildRun.asOfDate,
+    context.asOfDate,
     recentWindowDays
   );
   const recentPriceSeriesBySymbol = buildAlignedPriceSeries(rowsBySymbol, symbolOrder, recentDates);
@@ -179,13 +150,7 @@ export async function getBuildRunPairDivergence(
 
     for (let j = i + 1; j < symbolOrder.length; j += 1) {
       const right = symbolOrder[j]!;
-      const longWindowCorr = preview.scores[i]?.[j];
-
-      if (!Number.isFinite(longWindowCorr)) {
-        throw new Error(
-          `Encountered non-finite long-window score at [${i}, ${j}] in preview artifact.`
-        );
-      }
+      const { score: longWindowCorr } = await queryBsmPairScore(context.matrixPath, i, j);
 
       if (Math.abs(longWindowCorr) < minLongCorrAbs) {
         continue;
@@ -259,10 +224,10 @@ export async function getBuildRunPairDivergence(
   });
 
   return {
-    buildRunId: buildRun.id,
-    asOfDate: buildRun.asOfDate,
+    buildRunId: context.buildRunId,
+    asOfDate: context.asOfDate,
     symbolCount: symbolOrder.length,
-    longWindowDays: buildRun.windowDays as BuildRunWindowDays,
+    longWindowDays: context.windowDays as BuildRunWindowDays,
     recentWindowDays,
     minLongCorrAbs,
     minCorrDeltaAbs,
@@ -270,21 +235,4 @@ export async function getBuildRunPairDivergence(
     candidateCount: candidates.length,
     candidates: candidates.slice(0, limit)
   };
-}
-
-function validatePreviewShape(preview: PreviewV1): void {
-  const n = preview.symbolOrder.length;
-
-  if (preview.scores.length !== n) {
-    throw new Error(
-      `Preview score matrix row count ${preview.scores.length} does not match symbol count ${n}.`
-    );
-  }
-
-  for (let i = 0; i < preview.scores.length; i += 1) {
-    const row = preview.scores[i];
-    if (row.length !== n) {
-      throw new Error(`Preview score matrix row ${i} has length ${row.length}, expected ${n}.`);
-    }
-  }
 }

@@ -34,6 +34,10 @@ export const MAX_NEIGHBOR_K = 20;
 export const MIN_HEATMAP_SUBSET_SIZE = 2;
 export const MAX_HEATMAP_SUBSET_SIZE = 12;
 
+export const DEFAULT_STRUCTURE_HEATMAP_SIZE = 12;
+export const MIN_STRUCTURE_HEATMAP_SIZE = 4;
+export const MAX_STRUCTURE_HEATMAP_SIZE = 12;
+
 export const DEFAULT_PAIR_DIVERGENCE_RECENT_WINDOW_DAYS = 20;
 export const MIN_PAIR_DIVERGENCE_RECENT_WINDOW_DAYS = 10;
 export const MAX_PAIR_DIVERGENCE_RECENT_WINDOW_DAYS = 60;
@@ -231,6 +235,57 @@ export type NeighborsResponse = {
   neighbors: NeighborEntry[];
 };
 
+export const EXPOSURE_STRENGTH_BANDS = [
+  'very_high',
+  'high',
+  'moderate',
+  'low'
+] as const;
+export type ExposureStrengthBand = (typeof EXPOSURE_STRENGTH_BANDS)[number];
+
+export type ExposureQuerystring = {
+  symbol: string;
+  k?: number;
+};
+
+export type ExposureNeighborEntry = {
+  symbol: string;
+  score: number;
+  sector: string | null;
+  securityType: string | null;
+  sameSector: boolean;
+  strengthBand: ExposureStrengthBand;
+};
+
+export type ExposureSectorSummary = {
+  sector: string | null;
+  count: number;
+  weightShare: number;
+  averageScore: number;
+};
+
+export type ExposureBandSummary = {
+  band: ExposureStrengthBand;
+  count: number;
+};
+
+export type ExposureResponse = {
+  buildRunId: string;
+  asOfDate: string;
+  symbol: string;
+  anchorSector: string | null;
+  k: number;
+  neighborCount: number;
+  averageNeighborScore: number;
+  concentrationIndex: number;
+  effectiveNeighborCount: number;
+  sameSectorCount: number;
+  sameSectorWeightShare: number;
+  sectors: ExposureSectorSummary[];
+  bands: ExposureBandSummary[];
+  neighbors: ExposureNeighborEntry[];
+};
+
 export type HeatmapSubsetRequestBody = {
   symbols: string[];
 };
@@ -274,6 +329,69 @@ export type PairDivergenceResponse = {
   candidates: PairDivergenceCandidate[];
 };
 
+export type StructureClusterSectorSummary = {
+  sector: string | null;
+  count: number;
+};
+
+export type StructureClusterSummary = {
+  id: number;
+  size: number;
+  dominantSector: string | null;
+  averageInternalScore: number | null;
+  symbols: string[];
+  sectors: StructureClusterSectorSummary[];
+};
+
+export type BuildRunStructureSummary = {
+  clusterThreshold: number;
+  orderedSymbols: string[];
+  clusterCount: number;
+  clusters: StructureClusterSummary[];
+};
+
+export type StructureQuerystring = {
+  heatmapSize?: number;
+};
+
+export type StructureResponse = {
+  buildRunId: string;
+  asOfDate: string;
+  symbolCount: number;
+  clusterThreshold: number;
+  clusterCount: number;
+  orderedSymbols: string[];
+  heatmapSymbols: string[];
+  heatmapScores: number[][];
+  clusters: StructureClusterSummary[];
+};
+
+export type StructureClusterMatch = {
+  leftClusterId: number;
+  rightClusterId: number;
+  overlapCount: number;
+};
+
+export type StructureMovedSymbol = {
+  symbol: string;
+  leftClusterId: number;
+  rightClusterId: number;
+  leftClusterSize: number;
+  rightClusterSize: number;
+  leftDominantSector: string | null;
+  rightDominantSector: string | null;
+};
+
+export type CompareBuildStructuresResponse = {
+  left: { id: string; asOfDate: string; symbolCount: number; clusterCount: number };
+  right: { id: string; asOfDate: string; symbolCount: number; clusterCount: number };
+  commonSymbolCount: number;
+  stableSymbolCount: number;
+  changedSymbolCount: number;
+  clusterMatches: StructureClusterMatch[];
+  movedSymbols: StructureMovedSymbol[];
+};
+
 export type PreviewV1 = {
   format: typeof PREVIEW_FORMAT;
   buildRunId: string;
@@ -287,6 +405,7 @@ export type PreviewV1 = {
   topPairs: TopPairItem[];
   minScore: number;
   maxScore: number;
+  structureSummary?: BuildRunStructureSummary | null;
 };
 
 export type ManifestFileEntry = {
@@ -646,6 +765,103 @@ export const neighborsResponseSchema = {
   required: ['buildRunId', 'symbol', 'k', 'neighbors']
 } as const;
 
+export const exposureQuerystringSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    symbol: { type: 'string', pattern: HK_SYMBOL_PATTERN_SOURCE },
+    k: {
+      type: 'integer',
+      minimum: 1,
+      maximum: MAX_NEIGHBOR_K,
+      default: DEFAULT_NEIGHBOR_K
+    }
+  },
+  required: ['symbol']
+} as const;
+
+export const exposureNeighborEntrySchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    symbol: { type: 'string', pattern: HK_SYMBOL_PATTERN_SOURCE },
+    score: { type: 'number' },
+    sector: nullableStringSchema,
+    securityType: nullableStringSchema,
+    sameSector: { type: 'boolean' },
+    strengthBand: { type: 'string', enum: [...EXPOSURE_STRENGTH_BANDS] }
+  },
+  required: ['symbol', 'score', 'sector', 'securityType', 'sameSector', 'strengthBand']
+} as const;
+
+export const exposureSectorSummarySchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    sector: nullableStringSchema,
+    count: { type: 'integer' },
+    weightShare: { type: 'number' },
+    averageScore: { type: 'number' }
+  },
+  required: ['sector', 'count', 'weightShare', 'averageScore']
+} as const;
+
+export const exposureBandSummarySchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    band: { type: 'string', enum: [...EXPOSURE_STRENGTH_BANDS] },
+    count: { type: 'integer' }
+  },
+  required: ['band', 'count']
+} as const;
+
+export const exposureResponseSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    buildRunId: { type: 'string' },
+    asOfDate: { type: 'string', pattern: ISO_DATE_PATTERN_SOURCE },
+    symbol: { type: 'string', pattern: HK_SYMBOL_PATTERN_SOURCE },
+    anchorSector: nullableStringSchema,
+    k: { type: 'integer' },
+    neighborCount: { type: 'integer' },
+    averageNeighborScore: { type: 'number' },
+    concentrationIndex: { type: 'number' },
+    effectiveNeighborCount: { type: 'number' },
+    sameSectorCount: { type: 'integer' },
+    sameSectorWeightShare: { type: 'number' },
+    sectors: {
+      type: 'array',
+      items: exposureSectorSummarySchema
+    },
+    bands: {
+      type: 'array',
+      items: exposureBandSummarySchema
+    },
+    neighbors: {
+      type: 'array',
+      items: exposureNeighborEntrySchema
+    }
+  },
+  required: [
+    'buildRunId',
+    'asOfDate',
+    'symbol',
+    'anchorSector',
+    'k',
+    'neighborCount',
+    'averageNeighborScore',
+    'concentrationIndex',
+    'effectiveNeighborCount',
+    'sameSectorCount',
+    'sameSectorWeightShare',
+    'sectors',
+    'bands',
+    'neighbors'
+  ]
+} as const;
+
 export const heatmapSubsetBodySchema = {
   type: 'object',
   additionalProperties: false,
@@ -769,5 +985,173 @@ export const pairDivergenceResponseSchema = {
     'limit',
     'candidateCount',
     'candidates'
+  ]
+} as const;
+
+export const structureQuerystringSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    heatmapSize: {
+      type: 'integer',
+      minimum: MIN_STRUCTURE_HEATMAP_SIZE,
+      maximum: MAX_STRUCTURE_HEATMAP_SIZE,
+      default: DEFAULT_STRUCTURE_HEATMAP_SIZE
+    }
+  }
+} as const;
+
+export const structureClusterSectorSummarySchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    sector: nullableStringSchema,
+    count: { type: 'integer' }
+  },
+  required: ['sector', 'count']
+} as const;
+
+export const structureClusterSummarySchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    id: { type: 'integer' },
+    size: { type: 'integer' },
+    dominantSector: nullableStringSchema,
+    averageInternalScore: nullableNumberSchema,
+    symbols: {
+      type: 'array',
+      items: { type: 'string', pattern: HK_SYMBOL_PATTERN_SOURCE }
+    },
+    sectors: {
+      type: 'array',
+      items: structureClusterSectorSummarySchema
+    }
+  },
+  required: ['id', 'size', 'dominantSector', 'averageInternalScore', 'symbols', 'sectors']
+} as const;
+
+export const structureResponseSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    buildRunId: { type: 'string' },
+    asOfDate: { type: 'string', pattern: ISO_DATE_PATTERN_SOURCE },
+    symbolCount: { type: 'integer' },
+    clusterThreshold: { type: 'number' },
+    clusterCount: { type: 'integer' },
+    orderedSymbols: {
+      type: 'array',
+      items: { type: 'string', pattern: HK_SYMBOL_PATTERN_SOURCE }
+    },
+    heatmapSymbols: {
+      type: 'array',
+      items: { type: 'string', pattern: HK_SYMBOL_PATTERN_SOURCE }
+    },
+    heatmapScores: {
+      type: 'array',
+      items: {
+        type: 'array',
+        items: { type: 'number' }
+      }
+    },
+    clusters: {
+      type: 'array',
+      items: structureClusterSummarySchema
+    }
+  },
+  required: [
+    'buildRunId',
+    'asOfDate',
+    'symbolCount',
+    'clusterThreshold',
+    'clusterCount',
+    'orderedSymbols',
+    'heatmapSymbols',
+    'heatmapScores',
+    'clusters'
+  ]
+} as const;
+
+export const structureClusterMatchSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    leftClusterId: { type: 'integer' },
+    rightClusterId: { type: 'integer' },
+    overlapCount: { type: 'integer' }
+  },
+  required: ['leftClusterId', 'rightClusterId', 'overlapCount']
+} as const;
+
+export const structureMovedSymbolSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    symbol: { type: 'string', pattern: HK_SYMBOL_PATTERN_SOURCE },
+    leftClusterId: { type: 'integer' },
+    rightClusterId: { type: 'integer' },
+    leftClusterSize: { type: 'integer' },
+    rightClusterSize: { type: 'integer' },
+    leftDominantSector: nullableStringSchema,
+    rightDominantSector: nullableStringSchema
+  },
+  required: [
+    'symbol',
+    'leftClusterId',
+    'rightClusterId',
+    'leftClusterSize',
+    'rightClusterSize',
+    'leftDominantSector',
+    'rightDominantSector'
+  ]
+} as const;
+
+export const compareBuildStructuresResponseSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    left: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        id: { type: 'string' },
+        asOfDate: { type: 'string', pattern: ISO_DATE_PATTERN_SOURCE },
+        symbolCount: { type: 'integer' },
+        clusterCount: { type: 'integer' }
+      },
+      required: ['id', 'asOfDate', 'symbolCount', 'clusterCount']
+    },
+    right: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        id: { type: 'string' },
+        asOfDate: { type: 'string', pattern: ISO_DATE_PATTERN_SOURCE },
+        symbolCount: { type: 'integer' },
+        clusterCount: { type: 'integer' }
+      },
+      required: ['id', 'asOfDate', 'symbolCount', 'clusterCount']
+    },
+    commonSymbolCount: { type: 'integer' },
+    stableSymbolCount: { type: 'integer' },
+    changedSymbolCount: { type: 'integer' },
+    clusterMatches: {
+      type: 'array',
+      items: structureClusterMatchSchema
+    },
+    movedSymbols: {
+      type: 'array',
+      items: structureMovedSymbolSchema
+    }
+  },
+  required: [
+    'left',
+    'right',
+    'commonSymbolCount',
+    'stableSymbolCount',
+    'changedSymbolCount',
+    'clusterMatches',
+    'movedSymbols'
   ]
 } as const;

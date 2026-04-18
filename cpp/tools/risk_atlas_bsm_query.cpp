@@ -65,11 +65,10 @@ static void print_row_topk(const BSM& matrix, index_type row, int k) {
     entries.push_back({j, matrix.value(row, j)});
   }
 
-  // Sort by absolute score descending, then by index ascending for stability
+  // Sort by score descending, then by index ascending for stability.
+  // This preserves the API contract used by the existing neighbors surface.
   std::sort(entries.begin(), entries.end(), [](const Entry& a, const Entry& b) {
-    double da = std::abs(a.score);
-    double db = std::abs(b.score);
-    if (da != db) return da > db;
+    if (a.score != b.score) return a.score > b.score;
     return a.index < b.index;
   });
 

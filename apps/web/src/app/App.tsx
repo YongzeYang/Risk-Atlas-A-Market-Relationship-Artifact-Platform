@@ -6,9 +6,11 @@ import BuildsPage from './pages/builds/BuildsPage';
 import NewBuildPage from './pages/builds/NewBuildPage';
 import ComparePage from './pages/compare/ComparePage';
 import PairDivergencePage from './pages/divergence/PairDivergencePage';
+import ExposurePage from './pages/exposure/ExposurePage';
 import HomePage from './pages/home/HomePage';
 import BuildSeriesPage from './pages/series/BuildSeriesPage';
 import BuildSeriesDetailPage from './pages/series-detail/BuildSeriesDetailPage';
+import StructurePage from './pages/structure/StructurePage';
 import AppShell from './shell/AppShell';
 
 export default function App() {
@@ -24,6 +26,8 @@ export default function App() {
           <Route path="/series/:id" element={<BuildSeriesDetailPage />} />
           <Route path="/compare" element={<ComparePage />} />
           <Route path="/divergence" element={<PairDivergencePage />} />
+          <Route path="/exposure" element={<ExposurePage />} />
+          <Route path="/structure" element={<StructurePage />} />
         </Routes>
       </AppShell>
     </BrowserRouter>

@@ -30,6 +30,7 @@ import {
   selectAlignedWindowDates,
   type PriceRow
 } from './correlation-analytics.js';
+import { computeBuildStructureSummary } from './structure-service.js';
 import { resolveUniverseSymbols } from './universe-resolver.js';
 
 type PreparedCorrelationBuild = {
@@ -128,6 +129,26 @@ async function runBuildInternal(buildRunId: string): Promise<void> {
       windowDays
     });
 
+    const securityMasterEntries = await prisma.securityMaster.findMany({
+      where: {
+        symbol: {
+          in: prepared.symbolOrder
+        }
+      },
+      select: {
+        symbol: true,
+        sector: true
+      }
+    });
+    const sectorBySymbol = new Map(
+      securityMasterEntries.map((entry) => [entry.symbol, entry.sector] as const)
+    );
+    const structureSummary = computeBuildStructureSummary({
+      symbolOrder: prepared.symbolOrder,
+      scores: prepared.scores,
+      sectorBySymbol
+    });
+
     const artifactPaths = await prepareLocalArtifactBundle(buildRunId);
 
     const preview: PreviewV1 = {
@@ -142,7 +163,8 @@ async function runBuildInternal(buildRunId: string): Promise<void> {
       scores: prepared.scores,
       topPairs: prepared.topPairs,
       minScore: prepared.minScore,
-      maxScore: prepared.maxScore
+      maxScore: prepared.maxScore,
+      structureSummary
     };
 
     const previewByteSize = await writeJsonFile(artifactPaths.previewPath, preview);

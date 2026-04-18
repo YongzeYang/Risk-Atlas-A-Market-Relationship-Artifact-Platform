@@ -41,6 +41,14 @@ export default function TopBar() {
           <NavLink className={navClassName} to="/divergence">
             Divergence
           </NavLink>
+
+          <NavLink className={navClassName} to="/exposure">
+            Exposure
+          </NavLink>
+
+          <NavLink className={navClassName} to="/structure">
+            Structure
+          </NavLink>
         </nav>
 
         <div className="topbar__utility">

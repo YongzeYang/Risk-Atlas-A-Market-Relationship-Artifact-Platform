@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 
 import {
+  compareBuildStructuresResponseSchema,
   compareBuildsQuerystringSchema,
   type CompareBuildsQuerystring,
   type CompareBuildsResponse,
@@ -9,6 +10,7 @@ import {
 import { ServiceError } from '../lib/service-error.js';
 import { readPreviewArtifact } from '../services/local-artifact-store.js';
 import { prisma } from '../lib/prisma.js';
+import { compareBuildStructures } from '../services/structure-service.js';
 
 export const compareRoutes: FastifyPluginAsync = async (app) => {
   app.get<{ Querystring: CompareBuildsQuerystring }>(
@@ -24,6 +26,30 @@ export const compareRoutes: FastifyPluginAsync = async (app) => {
       try {
         const result = await compareBuilds(request.query.leftId, request.query.rightId);
         return result;
+      } catch (error) {
+        if (error instanceof ServiceError) {
+          return reply.code(error.statusCode).send({ message: error.message });
+        }
+        throw error;
+      }
+    }
+  );
+
+  app.get<{ Querystring: CompareBuildsQuerystring }>(
+    '/compare-build-structures',
+    {
+      schema: {
+        tags: ['compare'],
+        summary: 'Compare clustered structure drift between two build runs',
+        querystring: compareBuildsQuerystringSchema,
+        response: {
+          200: compareBuildStructuresResponseSchema
+        }
+      }
+    },
+    async (request, reply) => {
+      try {
+        return await compareBuildStructures(request.query.leftId, request.query.rightId);
       } catch (error) {
         if (error instanceof ServiceError) {
           return reply.code(error.statusCode).send({ message: error.message });

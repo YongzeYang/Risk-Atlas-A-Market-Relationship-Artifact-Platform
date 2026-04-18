@@ -12,6 +12,8 @@ import type { FastifyInstance } from 'fastify';
 import type {
   BuildRunDetailResponse,
   BuildRunListItem,
+  CompareBuildStructuresResponse,
+  ExposureResponse,
   HeatmapSubsetResponse,
   NeighborsResponse,
   PairDivergenceResponse,
@@ -22,6 +24,7 @@ import { prisma } from '../lib/prisma.js';
 
 const repoRootDir = resolve(fileURLToPath(new URL('../../../../', import.meta.url)));
 const writerBinaryPath = resolve(repoRootDir, 'cpp', 'build', 'bin', 'risk_atlas_bsm_writer');
+const queryBinaryPath = resolve(repoRootDir, 'cpp', 'build', 'bin', 'risk_atlas_bsm_query');
 const INVITE_CODE = 'risk-atlas-demo-2026';
 
 const BUILD_REQUEST = {
@@ -41,6 +44,7 @@ test('build-runs query API smoke', async (t) => {
   try {
     let buildRunId = '';
     let detail: BuildRunDetailResponse | null = null;
+    let secondBuildRunId = '';
 
     await t.test('build creation succeeded', async () => {
       const createResponse = await app.inject({
@@ -266,6 +270,82 @@ test('build-runs query API smoke', async (t) => {
         );
       }
     });
+
+    await t.test('exposure returns sector aggregation and concentration metrics', async () => {
+      const exposureResponse = await app.inject({
+        method: 'GET',
+        url: `/build-runs/${buildRunId}/exposure?symbol=0700.HK&k=10`
+      });
+
+      assert.equal(exposureResponse.statusCode, 200, exposureResponse.body);
+
+      const exposure = parseJson<ExposureResponse>(exposureResponse.body);
+
+      assert.equal(exposure.buildRunId, buildRunId);
+      assert.equal(exposure.symbol, '0700.HK');
+      assert.ok(exposure.neighborCount > 0);
+      assert.ok(exposure.neighbors.length > 0);
+      assert.ok(exposure.sectors.length > 0);
+      assert.ok(exposure.concentrationIndex >= 0);
+      assert.ok(exposure.effectiveNeighborCount >= 0);
+
+      const weightShareSum = exposure.sectors.reduce((sum, entry) => sum + entry.weightShare, 0);
+      assert.ok(Math.abs(weightShareSum - 1) < 1e-6 || weightShareSum === 0);
+    });
+
+    await t.test('structure returns ordered heatmap metadata and cluster summaries', async () => {
+      const structureResponse = await app.inject({
+        method: 'GET',
+        url: `/build-runs/${buildRunId}/structure?heatmapSize=12`
+      });
+
+      assert.equal(structureResponse.statusCode, 200, structureResponse.body);
+
+      const structure = parseJson<{
+        buildRunId: string;
+        symbolCount: number;
+        clusterCount: number;
+        orderedSymbols: string[];
+        heatmapSymbols: string[];
+        heatmapScores: number[][];
+        clusters: Array<{ id: number; size: number; symbols: string[] }>;
+      }>(structureResponse.body);
+
+      assert.equal(structure.buildRunId, buildRunId);
+      assert.ok(structure.clusterCount > 0);
+      assert.equal(structure.orderedSymbols.length, structure.symbolCount);
+      assert.ok(structure.heatmapSymbols.length > 0);
+      assert.equal(structure.heatmapScores.length, structure.heatmapSymbols.length);
+      assert.ok(structure.clusters.length > 0);
+    });
+
+    await t.test('compare-build-structures reports drift summary between two builds', async () => {
+      const createResponse = await app.inject({
+        method: 'POST',
+        url: '/build-runs',
+        payload: BUILD_REQUEST
+      });
+
+      assert.equal(createResponse.statusCode, 202, createResponse.body);
+      secondBuildRunId = parseJson<BuildRunListItem>(createResponse.body).id;
+      await waitForSucceededBuild(app, secondBuildRunId);
+
+      const compareResponse = await app.inject({
+        method: 'GET',
+        url: `/compare-build-structures?leftId=${buildRunId}&rightId=${secondBuildRunId}`
+      });
+
+      assert.equal(compareResponse.statusCode, 200, compareResponse.body);
+
+      const compare = parseJson<CompareBuildStructuresResponse>(compareResponse.body);
+      assert.equal(compare.left.id, buildRunId);
+      assert.equal(compare.right.id, secondBuildRunId);
+      assert.ok(compare.commonSymbolCount > 0);
+      assert.equal(
+        compare.stableSymbolCount + compare.changedSymbolCount,
+        compare.commonSymbolCount
+      );
+    });
   } finally {
     await app.close();
     await prisma.$disconnect();
@@ -276,6 +356,13 @@ async function ensureSmokePrerequisites(): Promise<void> {
   await access(writerBinaryPath, constants.X_OK).catch(() => {
     throw new Error(
       `BSM writer binary not found or not executable at ${writerBinaryPath}. ` +
+        `Build it first from the repository root, then rerun the smoke test.`
+    );
+  });
+
+  await access(queryBinaryPath, constants.X_OK).catch(() => {
+    throw new Error(
+      `BSM query binary not found or not executable at ${queryBinaryPath}. ` +
         `Build it first from the repository root, then rerun the smoke test.`
     );
   });
