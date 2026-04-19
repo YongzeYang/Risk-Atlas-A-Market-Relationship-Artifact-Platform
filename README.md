@@ -100,6 +100,8 @@ Default local addresses after startup:
 - api: http://localhost:3000
 - swagger: http://localhost:3000/docs
 
+In local dev, the web app now uses relative API paths by default, so browser requests stay same-origin with Vite and flow through the configured proxy. Set an explicit absolute VITE_API_BASE_URL only when you intentionally want the browser to call the API directly.
+
 Stop the stack by pressing Ctrl+C in the terminal that is running quickstart or dev:stack.
 
 ### First-time bootstrap and daily start as separate commands
@@ -128,7 +130,8 @@ Important keys:
 - POSTGRES_PORT: host port mapped by docker compose
 - API_PORT: Fastify port
 - WEB_PORT: Vite dev port
-- VITE_API_BASE_URL: web-to-api base URL
+- VITE_API_BASE_URL: optional absolute web-to-api base URL; leave blank for default local proxy behavior
+- CORS_ALLOWED_ORIGINS: optional comma-separated origins allowed when the browser calls the API directly
 - RISK_ATLAS_INVITE_CODES: comma-separated invite code list used by seed
 - RISK_ATLAS_INVITE_SALT: salt used to hash invite codes into the database
 - RISK_ATLAS_BOOTSTRAP_REAL_HK: set to 1 if you want bootstrap:local to run the real-HK benchmark import immediately after seed
@@ -142,7 +145,8 @@ POSTGRES_PASSWORD=replace-this-password
 POSTGRES_PORT=5544
 API_PORT=3100
 WEB_PORT=5174
-VITE_API_BASE_URL=http://localhost:3100
+VITE_API_BASE_URL=
+CORS_ALLOWED_ORIGINS=http://localhost:5174
 RISK_ATLAS_INVITE_CODES=team-alpha-2026,team-beta-2026
 ```
 

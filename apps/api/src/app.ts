@@ -1,4 +1,5 @@
 import Fastify from 'fastify';
+import fastifyCors from '@fastify/cors';
 import fastifyStatic from '@fastify/static';
 import swagger from '@fastify/swagger';
 import { createRequire } from 'node:module';
@@ -49,8 +50,44 @@ const swaggerUiInitializerScript = `window.onload = function () {
   });
 };`;
 
+function buildAllowedCorsOrigins(): Set<string> {
+  const webPort = String(process.env.WEB_PORT ?? '5173').trim() || '5173';
+  const explicitOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  return new Set([
+    ...explicitOrigins,
+    `http://localhost:${webPort}`,
+    `http://127.0.0.1:${webPort}`
+  ]);
+}
+
+function isAllowedCorsOrigin(origin: string | undefined, allowedOrigins: Set<string>): boolean {
+  if (!origin) {
+    return true;
+  }
+
+  if (allowedOrigins.has(origin)) {
+    return true;
+  }
+
+  try {
+    const parsedOrigin = new URL(origin);
+
+    return (
+      (parsedOrigin.protocol === 'http:' || parsedOrigin.protocol === 'https:') &&
+      (parsedOrigin.hostname === 'localhost' || parsedOrigin.hostname === '127.0.0.1')
+    );
+  } catch {
+    return false;
+  }
+}
+
 export async function buildApp() {
   const usePrettyLogger = process.env.NODE_ENV !== 'production';
+  const allowedCorsOrigins = buildAllowedCorsOrigins();
 
   const app = Fastify({
     logger: usePrettyLogger
@@ -60,6 +97,17 @@ export async function buildApp() {
           }
         }
       : true
+  });
+
+  await app.register(fastifyCors, {
+    origin(origin, callback) {
+      if (isAllowedCorsOrigin(origin, allowedCorsOrigins)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error(`Origin "${origin}" is not allowed by CORS.`), false);
+    }
   });
 
   await app.register(swagger, {
