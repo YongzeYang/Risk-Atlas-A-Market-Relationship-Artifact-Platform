@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 
 import { ActiveAnalysisRunPanel, RecentAnalysisRunsPanel } from '../../../components/analysis/AnalysisRunPanels';
 import HeatmapGrid from '../../../components/data-display/HeatmapGrid';
+import BoundaryNote from '../../../components/ui/BoundaryNote';
 import Panel from '../../../components/ui/Panel';
 import Modal from '../../../components/ui/Modal';
 import SectionHeader from '../../../components/ui/SectionHeader';
@@ -19,6 +20,7 @@ import {
   useInviteCode
 } from '../../../features/builds/hooks';
 import { formatDateOnly, formatInteger, formatScore } from '../../../lib/format';
+import { formatLookbackLabel, formatSnapshotOptionLabel } from '../../../lib/snapshot-language';
 import type {
   AnalysisRunDetailResponse,
   AnalysisRunListItem,
@@ -233,12 +235,12 @@ export default function StructurePage() {
       event.preventDefault();
 
       if (!buildId) {
-        setError('Select a succeeded build before queueing structure analysis.');
+        setError('Select a ready snapshot before preparing groups analysis.');
         return;
       }
 
       if (!inviteCode) {
-        setError('Invite code is required before queueing structure analysis.');
+        setError('Invite code is required before preparing groups analysis.');
         return;
       }
 
@@ -262,7 +264,7 @@ export default function StructurePage() {
 
         adoptRun(queued);
       } catch (nextError) {
-        setError(nextError instanceof Error ? nextError.message : 'Failed to queue structure analysis.');
+        setError(nextError instanceof Error ? nextError.message : 'Failed to prepare groups analysis.');
       } finally {
         setSubmitting(false);
       }
@@ -275,7 +277,7 @@ export default function StructurePage() {
       event.preventDefault();
 
       if (!buildId || !compareRightId || buildId === compareRightId) {
-        setCompareError('Select two different succeeded builds before comparing structure drift.');
+        setCompareError('Select two different ready snapshots before comparing group drift.');
         setCompareResult(null);
         return;
       }
@@ -294,7 +296,7 @@ export default function StructurePage() {
           compareRightId
         });
       } catch (nextError) {
-        setCompareError(nextError instanceof Error ? nextError.message : 'Structure compare failed.');
+        setCompareError(nextError instanceof Error ? nextError.message : 'Groups compare failed.');
       } finally {
         setCompareLoading(false);
       }
@@ -306,18 +308,19 @@ export default function StructurePage() {
     <div className="page page--structure">
       <section className="workspace-hero">
         <div className="workspace-hero__copy">
-          <div className="workspace-hero__eyebrow">Clustered structure</div>
-          <h1 className="workspace-hero__title">Reorder the matrix into clusters so the market structure becomes readable at a glance.</h1>
+          <h1 className="workspace-hero__title">What hidden groups exist in this basket?</h1>
           <p className="workspace-hero__description">
-            Queue the structure run for one build, reopen the saved result later, and keep the
-            compare workflow ready for side-by-side drift inspection.
+            Reorder the basket into groups so the market structure becomes easier to read.
           </p>
+          <BoundaryNote variant="accent">
+            These groups reflect behavior in this snapshot, not permanent labels.
+          </BoundaryNote>
           <div className="workspace-hero__actions">
             <Link to="/exposure" className="button button--secondary">
-              Open exposure
+              Open spillover
             </Link>
             <Link to="/compare" className="button button--ghost">
-              Pair-drift compare
+              What changed
             </Link>
           </div>
         </div>
@@ -325,11 +328,11 @@ export default function StructurePage() {
         <div className="workspace-hero__stats">
           <article className="workspace-hero__stat-card">
             <div className="workspace-hero__stat-value mono">{formatInteger(comparableBuilds.length)}</div>
-            <div className="workspace-hero__stat-label">Succeeded builds</div>
+            <div className="workspace-hero__stat-label">Ready snapshots</div>
           </article>
           <article className="workspace-hero__stat-card">
             <div className="workspace-hero__stat-value mono">{selectedBuild ? formatDateOnly(selectedBuild.asOfDate) : '—'}</div>
-            <div className="workspace-hero__stat-label">Selected as-of</div>
+            <div className="workspace-hero__stat-label">Snapshot date</div>
           </article>
           <article className="workspace-hero__stat-card">
             <div className="workspace-hero__stat-value mono">{formatInteger(activeResult?.clusterCount ?? 0)}</div>
@@ -337,7 +340,7 @@ export default function StructurePage() {
           </article>
           <article className="workspace-hero__stat-card">
             <div className="workspace-hero__stat-value mono">{activeResult ? formatScore(activeResult.clusterThreshold, 2) : '—'}</div>
-            <div className="workspace-hero__stat-label">Threshold</div>
+            <div className="workspace-hero__stat-label">Group strictness</div>
           </article>
         </div>
       </section>
@@ -346,8 +349,8 @@ export default function StructurePage() {
         <div className="workspace-layout__main">
           <Panel variant="primary">
             <SectionHeader
-              title="Structure settings"
-              subtitle="Queue the ordered structure run first, then compare cluster drift only when you need the second pass."
+              title="Groups settings"
+              subtitle="Prepare the groups analysis, then revisit or compare later."
               action={
                 <button
                   type="button"
@@ -362,7 +365,7 @@ export default function StructurePage() {
 
             <form className="query-form query-form--wide" onSubmit={handleAnalyze}>
               <label className="field">
-                <span className="field__label">Build</span>
+                <span className="field__label">Snapshot</span>
                 <select
                   className="field__control mono"
                   value={buildId}
@@ -375,14 +378,14 @@ export default function StructurePage() {
                 >
                   {comparableBuilds.map((buildRun) => (
                     <option key={buildRun.id} value={buildRun.id}>
-                      {formatBuildOption(buildRun)}
+                      {formatSnapshotOptionLabel(buildRun)}
                     </option>
                   ))}
                 </select>
               </label>
 
               <label className="field">
-                <span className="field__label">Heatmap slice</span>
+                <span className="field__label">Preview slice</span>
                 <select
                   className="field__control mono"
                   value={heatmapSize}
@@ -400,7 +403,7 @@ export default function StructurePage() {
                 <input
                   className="field__control mono"
                   type="text"
-                  placeholder="Required for queueing analysis"
+                  placeholder="Needed to prepare analysis"
                   value={inviteCode}
                   onChange={(event) => setInviteCode(event.target.value)}
                   autoComplete="off"
@@ -414,7 +417,7 @@ export default function StructurePage() {
                   className="button button--primary"
                   disabled={submitting || !buildId || !inviteCode}
                 >
-                  {submitting ? 'Queueing…' : 'Queue structure'}
+                  {submitting ? 'Preparing…' : 'Prepare groups view'}
                 </button>
               </div>
             </form>
@@ -422,14 +425,14 @@ export default function StructurePage() {
 
           <Panel variant="primary">
             <SectionHeader
-              title="Active run"
-              subtitle="Queued structure runs survive reloads and can be reopened from recent history."
+              title="Current result"
+              subtitle="Results are saved and available after page reload."
             />
             <ActiveAnalysisRunPanel
               run={run}
               loading={runLoading}
-              idleTitle="No active structure run selected"
-              idleDescription="Queue one run above or reopen a recent run from the side rail."
+              idleTitle="No current result"
+              idleDescription="Prepare one analysis above or reopen a saved analysis from the side rail."
               formatSummary={formatStructureRunSummary}
             />
             {runError ? <div className="state-note state-note--error">{runError}</div> : null}
@@ -440,13 +443,13 @@ export default function StructurePage() {
 
           <Panel variant="primary">
             <SectionHeader
-              title="Cluster drift compare"
-              subtitle="This compare action stays direct and is best used after you already know both builds are worth comparing."
+              title="Group drift compare"
+              subtitle="Use this after you already know both snapshots are worth comparing."
             />
 
             <form className="query-form query-form--wide" onSubmit={handleCompare}>
               <label className="field">
-                <span className="field__label">Base build</span>
+                <span className="field__label">Left snapshot</span>
                 <select
                   className="field__control mono"
                   value={buildId}
@@ -459,14 +462,14 @@ export default function StructurePage() {
                 >
                   {comparableBuilds.map((buildRun) => (
                     <option key={buildRun.id} value={buildRun.id}>
-                      {formatBuildOption(buildRun)}
+                      {formatSnapshotOptionLabel(buildRun)}
                     </option>
                   ))}
                 </select>
               </label>
 
               <label className="field">
-                <span className="field__label">Comparison build</span>
+                <span className="field__label">Right snapshot</span>
                 <select
                   className="field__control mono"
                   value={compareRightId}
@@ -475,7 +478,7 @@ export default function StructurePage() {
                 >
                   {comparableBuilds.map((buildRun) => (
                     <option key={buildRun.id} value={buildRun.id}>
-                      {formatBuildOption(buildRun)}
+                      {formatSnapshotOptionLabel(buildRun)}
                     </option>
                   ))}
                 </select>
@@ -487,7 +490,7 @@ export default function StructurePage() {
                   className="button button--primary"
                   disabled={compareLoading || !buildId || !compareRightId || buildId === compareRightId}
                 >
-                  {compareLoading ? 'Comparing…' : 'Compare structure'}
+                  {compareLoading ? 'Comparing…' : 'Compare groups'}
                 </button>
               </div>
             </form>
@@ -500,8 +503,8 @@ export default function StructurePage() {
         <div className="workspace-layout__side">
           <Panel variant="utility">
             <SectionHeader
-              title="Recent runs"
-              subtitle="Reopen finished or still-running structure runs without queueing them again."
+              title="Saved analyses"
+              subtitle="Reopen finished results without rerunning them."
             />
             <RecentAnalysisRunsPanel
               runs={recentRuns}
@@ -509,8 +512,8 @@ export default function StructurePage() {
               activeRunId={runId}
               emptyCopy={
                 buildId
-                  ? 'No structure runs yet for the selected build.'
-                  : 'Select a build to load recent structure runs.'
+                  ? 'No saved analyses yet for the selected snapshot.'
+                  : 'Select a snapshot to load saved analyses.'
               }
               formatSummary={formatStructureRunSummary}
               onSelect={(nextRunId) => {
@@ -525,14 +528,13 @@ export default function StructurePage() {
           <Panel variant="utility">
             <SectionHeader
               title="Reading guide"
-              subtitle="The ordered heatmap is a structural summary, not a replacement for deeper drill-down."
+              subtitle="The ordered heatmap is a summary of hidden groups, not a replacement for deeper drill-down."
             />
 
             <div className="workspace-note-list">
-              <div className="workspace-note-list__item">Browsing and compare queries stay open; only queue creation requires an invite code.</div>
-              <div className="workspace-note-list__item">Use the ordered heatmap to see whether similar names now appear in block-like groups instead of a noisy matrix.</div>
-              <div className="workspace-note-list__item">Use cluster summaries to interpret size, dominant sector, and cohesion.</div>
-              <div className="workspace-note-list__item">Use cluster drift compare to identify which symbols moved across groups, not just which pairs drifted.</div>
+              <div className="workspace-note-list__item">Use this page to see whether names in your basket form distinct behavioural blocs.</div>
+              <div className="workspace-note-list__item">Single-name groups usually mean loose connections rather than hidden overlap.</div>
+              <div className="workspace-note-list__item">These groups reflect one snapshot period — compare two snapshots to see drift.</div>
             </div>
           </Panel>
         </div>
@@ -541,7 +543,7 @@ export default function StructurePage() {
       <Modal
         open={previewOpen}
         title="Run preview"
-        subtitle="Preview the clustered slice and comparison scope before you queue the heavier structure pass."
+        subtitle="Preview the grouped slice and comparison scope before you queue the heavier groups pass."
         onClose={() => setPreviewOpen(false)}
       >
         <StructurePreview
@@ -581,41 +583,41 @@ function StructurePreview({
   previewLoading: boolean;
 }) {
   if (!selectedBuild) {
-    return <div className="state-note">Select one succeeded build to preview this run.</div>;
+    return <div className="state-note">Select one ready snapshot to preview this run.</div>;
   }
 
   if (previewLoading && !previewHeatmap && leftSymbolCount === 0) {
-    return <div className="state-note">Loading structure preview…</div>;
+    return <div className="state-note">Loading groups preview…</div>;
   }
 
   return (
     <>
       <div className="stat-grid">
         <div className="stat-card">
-          <div className="stat-card__label">Primary build</div>
+          <div className="stat-card__label">Primary snapshot</div>
           <div className="stat-card__value mono">{selectedBuild.universeId}</div>
-          <div className="stat-card__helper">{formatDateOnly(selectedBuild.asOfDate)} · {selectedBuild.windowDays}d</div>
+          <div className="stat-card__helper">{formatDateOnly(selectedBuild.asOfDate)} · {formatLookbackLabel(selectedBuild.windowDays)}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-card__label">Primary symbols</div>
+          <div className="stat-card__label">Primary names</div>
           <div className="stat-card__value mono">{formatInteger(leftSymbolCount)}</div>
-          <div className="stat-card__helper">Stored artifact universe size</div>
+          <div className="stat-card__helper">Stored snapshot basket size</div>
         </div>
         <div className="stat-card">
-          <div className="stat-card__label">Heatmap request</div>
+          <div className="stat-card__label">Preview request</div>
           <div className="stat-card__value mono">{heatmapSize}</div>
           <div className="stat-card__helper">Requested ordered slice size</div>
         </div>
         <div className="stat-card">
           <div className="stat-card__label">Comparison target</div>
           <div className="stat-card__value mono">{compareRightId ? compareRightId.slice(0, 8) : '—'}</div>
-          <div className="stat-card__helper">{compareRightId ? `${formatInteger(rightSymbolCount)} symbols` : 'Optional second build'}</div>
+          <div className="stat-card__helper">{compareRightId ? `${formatInteger(rightSymbolCount)} names` : 'Optional second snapshot'}</div>
         </div>
       </div>
 
       <div className="filter-summary-row" style={{ marginTop: '1rem' }}>
-        <span className="filter-summary-row__item">The preview heatmap below is an open subset fetch from the current build.</span>
-        <span className="filter-summary-row__item">The queued run adds clustering, ordered symbols, and cluster summaries on top of that slice.</span>
+        <span className="filter-summary-row__item">The preview heatmap below is an open subset fetch from the current snapshot.</span>
+        <span className="filter-summary-row__item">The queued run adds clustering, ordered names, and group summaries on top of that slice.</span>
       </div>
 
       {previewError ? <div className="state-note state-note--error" style={{ marginTop: '1rem' }}>{previewError}</div> : null}
@@ -633,9 +635,19 @@ function StructureResult({ data }: { data: StructureResponse }) {
   return (
     <Panel variant="primary">
       <SectionHeader
-        title="Ordered structure"
-        subtitle="The heatmap shows the leading ordered slice, while the cluster list carries the full grouping summary."
+        title="Hidden groups summary"
+        subtitle="The heatmap shows the leading ordered slice, while the group list carries the full grouping summary."
       />
+
+      <div className="plain-summary">
+        {(() => {
+          const singleNameClusters = data.clusters.filter((c) => c.size === 1).length;
+          if (singleNameClusters > data.clusters.length * 0.5) {
+            return 'This basket is mostly loose — more than half the names sit on their own with no clear behavioural partner.';
+          }
+          return `The basket breaks into ${data.clusterCount} groups. The tightest bloc has ${Math.max(...data.clusters.map((c) => c.size))} names.`;
+        })()}
+      </div>
 
       <div className="stat-grid">
         <div className="stat-card">
@@ -643,7 +655,7 @@ function StructureResult({ data }: { data: StructureResponse }) {
           <div className="stat-card__value mono">{formatInteger(data.clusterCount)}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-card__label">Ordered symbols</div>
+          <div className="stat-card__label">Ordered names</div>
           <div className="stat-card__value mono">{formatInteger(data.orderedSymbols.length)}</div>
         </div>
         <div className="stat-card">
@@ -651,13 +663,15 @@ function StructureResult({ data }: { data: StructureResponse }) {
           <div className="stat-card__value mono">{formatInteger(data.heatmapSymbols.length)}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-card__label">Threshold</div>
+          <div className="stat-card__label">Group strictness</div>
           <div className="stat-card__value mono">{formatScore(data.clusterThreshold, 2)}</div>
+          <div className="stat-card__helper">Higher strictness produces tighter, smaller groups</div>
         </div>
       </div>
 
       {data.heatmapSymbols.length > 0 ? (
         <div style={{ marginTop: '1.5rem' }}>
+          <div className="workspace-note-list__item" style={{ marginBottom: '0.5rem' }}>How the basket looks when reordered by hidden groups</div>
           <HeatmapGrid symbols={data.heatmapSymbols} scores={data.heatmapScores} />
         </div>
       ) : null}
@@ -667,9 +681,14 @@ function StructureResult({ data }: { data: StructureResponse }) {
           <article key={cluster.id} className="rank-list__item">
             <span className="rank-list__index">{cluster.id}</span>
             <div className="rank-list__body">
-              <div className="rank-list__pair">Cluster {cluster.id}</div>
+              <div className="rank-list__pair">{cluster.size === 1 ? 'Standalone' : `Group ${cluster.id}`}</div>
               <div className="rank-list__meta">
-                {cluster.size} names · dominant sector {cluster.dominantSector ?? 'unclassified'} · internal avg {formatNullableScore(cluster.averageInternalScore)}
+                {cluster.size === 1
+                  ? 'This name currently stands on its own — no strong behavioural partner in this snapshot.'
+                  : cluster.size === Math.max(...data.clusters.map((c) => c.size))
+                    ? `This is the clearest hidden bloc in the basket — ${cluster.size} names · ${cluster.dominantSector ?? 'unclassified'} · internal avg ${formatNullableScore(cluster.averageInternalScore)}`
+                    : `${cluster.size} names · ${cluster.dominantSector ?? 'unclassified'} · internal avg ${formatNullableScore(cluster.averageInternalScore)}`
+                }
               </div>
               <div className="rank-list__meta mono">{cluster.symbols.slice(0, 8).join(', ')}{cluster.symbols.length > 8 ? ' …' : ''}</div>
             </div>
@@ -686,7 +705,7 @@ function StructureCompareResult({ data }: { data: CompareBuildStructuresResponse
     <div style={{ marginTop: '1.5rem' }}>
       <div className="stat-grid">
         <div className="stat-card">
-          <div className="stat-card__label">Common symbols</div>
+          <div className="stat-card__label">Common names</div>
           <div className="stat-card__value mono">{formatInteger(data.commonSymbolCount)}</div>
         </div>
         <div className="stat-card">
@@ -698,7 +717,7 @@ function StructureCompareResult({ data }: { data: CompareBuildStructuresResponse
           <div className="stat-card__value mono">{formatInteger(data.changedSymbolCount)}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-card__label">Cluster matches</div>
+          <div className="stat-card__label">Group matches</div>
           <div className="stat-card__value mono">{formatInteger(data.clusterMatches.length)}</div>
         </div>
       </div>
@@ -718,14 +737,10 @@ function StructureCompareResult({ data }: { data: CompareBuildStructuresResponse
           ))}
         </div>
       ) : (
-        <div className="state-note" style={{ marginTop: '1.5rem' }}>No moved symbols in the current comparison.</div>
+        <div className="state-note" style={{ marginTop: '1.5rem' }}>No moved names in the current comparison.</div>
       )}
     </div>
   );
-}
-
-function formatBuildOption(buildRun: BuildRunListItem): string {
-  return `${buildRun.universeId} · ${formatDateOnly(buildRun.asOfDate)} · ${buildRun.windowDays}d · ${buildRun.id.slice(0, 8)}`;
 }
 
 function formatStructureRunSummary(run: AnalysisRunListItem | AnalysisRunDetailResponse): string {
@@ -733,7 +748,7 @@ function formatStructureRunSummary(run: AnalysisRunListItem | AnalysisRunDetailR
     return 'Unsupported run kind.';
   }
 
-  return `${run.buildRunId.slice(0, 8)} · heatmap ${run.request.heatmapSize}`;
+  return `${run.buildRunId.slice(0, 8)} · preview ${run.request.heatmapSize}`;
 }
 
 function formatNullableScore(value: number | null): string {

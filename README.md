@@ -1,8 +1,38 @@
 # Risk Atlas
 
-Risk Atlas is an HK-first market-structure research workspace built around offline pairwise artifacts.
+Risk Atlas is a plain-English financial research product for reading how a basket of Hong Kong stocks is really behaving beneath the surface.
 
-It imports end-of-day prices, resolves a research universe for one date and window, computes a symmetric relationship matrix offline, stores the result as matrix.bsm plus metadata, and exposes read/query workflows through APIs and a web UI.
+Instead of starting from technical market-structure jargon, the product starts from five questions a human can actually ask:
+
+- Am I really diversified, or do these names still move like one trade?
+- Which relationships are strong enough, weak enough, or different enough to deserve a closer look?
+- If this stock drops, who tends to move with it?
+- What hidden groups already exist inside this basket?
+- What changed between one snapshot and another?
+
+The current release is HK-first. It builds point-in-time snapshots, rolling snapshot series, snapshot-to-snapshot comparison, relationship screening, spillover reads, and hidden-group views on top of offline relationship artifacts.
+
+## Research boundary
+
+Risk Atlas is for research support, not direct trading advice.
+
+- it describes co-movement and structure; it does not explain causality
+- it can highlight concentration, drift, spillover, and hidden groups; it does not guarantee persistence
+- it helps narrow where to look next; it does not replace judgment, portfolio context, or execution discipline
+
+## What the product does today
+
+- creates single market snapshots for one basket, one date, and one lookback
+- runs repeated snapshot series across daily, weekly, or monthly cadence
+- compares ready snapshots across time, lookback, and basket choice
+- surfaces relationships worth a closer look through persisted screening runs
+- shows spillover from one anchor name through neighbor ladders and concentration summaries
+- reveals hidden groups through ordered heatmaps, clustering summaries, and group-drift comparison
+- keeps reads and comparison open while gating create and queue actions behind invite codes
+
+## Under the hood
+
+Under the hood, Risk Atlas imports end-of-day prices, resolves a basket for one date and lookback, computes a symmetric relationship matrix offline, stores the result as matrix.bsm plus metadata, and exposes read/query workflows through APIs and a web UI.
 
 ## Strict status
 

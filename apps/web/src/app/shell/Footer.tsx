@@ -5,7 +5,7 @@ export default function Footer() {
   return (
     <footer className="footer">
       <div className="footer__content">
-        <span className="footer__text">Hong Kong correlation research workspace.</span>
+        <span className="footer__text">Hong Kong market relationship research.</span>
 
         <div className="footer__links">
           <a href={appConfig.apiDocsPath} target="_blank" rel="noreferrer">

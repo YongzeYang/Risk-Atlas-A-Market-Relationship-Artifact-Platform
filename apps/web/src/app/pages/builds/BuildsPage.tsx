@@ -1,10 +1,18 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
+import BoundaryNote from '../../../components/ui/BoundaryNote';
 import Panel from '../../../components/ui/Panel';
 import SectionHeader from '../../../components/ui/SectionHeader';
 import { useBuildRunsData } from '../../../features/builds/hooks';
+import { useCatalogData } from '../../../features/catalog/hooks';
+import {
+  describeSnapshotHint,
+  pickComparisonBuildPair,
+  pickFeaturedBuild
+} from '../../../lib/build-run-language';
 import { formatDateOnly, formatInteger } from '../../../lib/format';
+import { formatLookbackLabel } from '../../../lib/snapshot-language';
 import BuildRunsPanel from '../home/sections/BuildRunsPanel';
 import type { BuildRunListItem, BuildRunStatus } from '../../../types/api';
 
@@ -12,16 +20,31 @@ type SortMode = 'newest' | 'oldest' | 'asof_desc' | 'window_desc' | 'universe';
 
 export default function BuildsPage() {
   const { buildRuns, loading, refreshing, error, refresh } = useBuildRunsData(3000);
+  const { universes } = useCatalogData();
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | BuildRunStatus>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | BuildRunStatus>('succeeded');
   const [universeFilter, setUniverseFilter] = useState<'all' | string>('all');
-  const [sortMode, setSortMode] = useState<SortMode>('newest');
+  const [sortMode, setSortMode] = useState<SortMode>('asof_desc');
 
-  const runningCount = buildRuns.filter((item) => item.status === 'running').length;
-  const queuedCount = buildRuns.filter((item) => item.status === 'pending').length;
-  const succeededCount = buildRuns.filter((item) => item.status === 'succeeded').length;
-  const comparableCount = buildRuns.filter((item) => item.status === 'succeeded').length;
-  const latestBuild = buildRuns[0] ?? null;
+  const universeLabelById = useMemo(
+    () => Object.fromEntries(universes.map((item) => [item.id, item.name])),
+    [universes]
+  );
+  const readyBuilds = useMemo(
+    () => buildRuns.filter((item) => item.status === 'succeeded'),
+    [buildRuns]
+  );
+  const featuredBuild = useMemo(() => pickFeaturedBuild(readyBuilds), [readyBuilds]);
+  const comparisonPair = useMemo(() => pickComparisonBuildPair(readyBuilds), [readyBuilds]);
+  const featuredUniverseLabel = featuredBuild
+    ? universeLabelById[featuredBuild.universeId] ?? featuredBuild.universeId
+    : null;
+  const latestReadyDate = useMemo(
+    () => [...readyBuilds].sort((left, right) => right.asOfDate.localeCompare(left.asOfDate))[0]?.asOfDate ?? null,
+    [readyBuilds]
+  );
+  const readyBasketCount = new Set(readyBuilds.map((item) => item.universeId)).size;
+  const succeededCount = readyBuilds.length;
   const universeOptions = [...new Set(buildRuns.map((item) => item.universeId))].sort();
 
   const filteredBuilds = useMemo(() => {
@@ -47,59 +70,91 @@ export default function BuildsPage() {
       .sort((left, right) => compareBuildRuns(left, right, sortMode));
   }, [buildRuns, search, statusFilter, universeFilter, sortMode]);
 
+  const comparisonTo = comparisonPair
+    ? `/compare?left=${comparisonPair[0].id}&right=${comparisonPair[1].id}`
+    : '/compare';
+
   return (
     <div className="page page--builds">
       <section className="workspace-hero">
         <div className="workspace-hero__copy">
-          <div className="workspace-hero__eyebrow">Build workspace</div>
-          <h1 className="workspace-hero__title">Browse every build in a dedicated research workspace.</h1>
+          <div className="workspace-hero__eyebrow">Snapshots</div>
+          <h1 className="workspace-hero__title">Snapshots</h1>
           <p className="workspace-hero__description">
-            Keep creation, history, and analysis entry points separate so the platform can scale to
-            more research modules without collapsing back into a single cluttered home page.
+            Browse saved market reads, open one snapshot when your question is about a single basket,
+            and use comparison only when your real question is what changed.
           </p>
           <div className="workspace-hero__actions">
-            <Link to="/builds/new" className="button button--primary">
-              New build
+            <Link
+              to={featuredBuild ? `/builds/${featuredBuild.id}` : '/builds/new'}
+              className="button button--primary"
+            >
+              {featuredBuild ? 'Open latest ready snapshot' : 'Create snapshot'}
             </Link>
-            <Link to="/compare" className="button button--secondary">
-              Compare builds
+            <Link to="/builds/new" className="button button--secondary">
+              Create snapshot
             </Link>
-            <Link to="/divergence" className="button button--ghost">
-              Pair divergence
+            <Link to={comparisonTo} className="button button--ghost">
+              What changed
             </Link>
           </div>
         </div>
 
         <div className="workspace-hero__stats">
           <article className="workspace-hero__stat-card">
-            <div className="workspace-hero__stat-value mono">{buildRuns.length}</div>
-            <div className="workspace-hero__stat-label">Total builds</div>
-          </article>
-          <article className="workspace-hero__stat-card">
-            <div className="workspace-hero__stat-value mono">{runningCount}</div>
-            <div className="workspace-hero__stat-label">Running</div>
-          </article>
-          <article className="workspace-hero__stat-card">
-            <div className="workspace-hero__stat-value mono">{queuedCount}</div>
-            <div className="workspace-hero__stat-label">Queued</div>
-          </article>
-          <article className="workspace-hero__stat-card">
             <div className="workspace-hero__stat-value mono">{succeededCount}</div>
-            <div className="workspace-hero__stat-label">Succeeded</div>
+            <div className="workspace-hero__stat-label">Ready snapshots</div>
           </article>
           <article className="workspace-hero__stat-card">
-            <div className="workspace-hero__stat-value mono">{comparableCount}</div>
-            <div className="workspace-hero__stat-label">Comparable builds</div>
+            <div className="workspace-hero__stat-value mono">{readyBasketCount}</div>
+            <div className="workspace-hero__stat-label">Baskets in browser</div>
+          </article>
+          <article className="workspace-hero__stat-card">
+            <div className="workspace-hero__stat-value mono">
+              {latestReadyDate ? formatDateOnly(latestReadyDate) : '—'}
+            </div>
+            <div className="workspace-hero__stat-label">Latest ready date</div>
           </article>
         </div>
       </section>
 
       <div className="workspace-layout">
         <div className="workspace-layout__main">
+          {featuredBuild && featuredUniverseLabel ? (
+            <Panel variant="primary">
+              <SectionHeader
+                title="Start with a useful result"
+                subtitle="If you landed here first, open one finished snapshot before digging through the full history."
+              />
+
+              <div className="featured-snapshot-card">
+                <div className="featured-snapshot-card__eyebrow">Featured snapshot</div>
+                <div className="featured-snapshot-card__title">{featuredUniverseLabel}</div>
+                <div className="featured-snapshot-card__meta">
+                  {formatDateOnly(featuredBuild.asOfDate)} · {formatLookbackLabel(featuredBuild.windowDays)}
+                </div>
+                <div className="featured-snapshot-card__copy">
+                  {describeSnapshotHint(featuredBuild, featuredUniverseLabel)}
+                </div>
+
+                <div className="featured-snapshot-card__actions">
+                  <Link to={`/builds/${featuredBuild.id}`} className="button button--secondary button--sm">
+                    Open snapshot
+                  </Link>
+                  {comparisonPair ? (
+                    <Link to={comparisonTo} className="button button--ghost button--sm">
+                      Open what changed
+                    </Link>
+                  ) : null}
+                </div>
+              </div>
+            </Panel>
+          ) : null}
+
           <Panel variant="utility">
             <SectionHeader
-              title="Filter and sort"
-              subtitle="Frontend filtering is enough for the current build volume, so backend pagination is not required yet."
+              title="Search snapshots"
+              subtitle="Filter by basket, status, date, or lookback. Ready results stay on top by default."
             />
 
             <div className="query-form query-form--wide">
@@ -108,7 +163,7 @@ export default function BuildsPage() {
                 <input
                   className="field__control mono"
                   type="text"
-                  placeholder="Build id, dataset, universe, or date"
+                  placeholder="Basket, snapshot date, lookback, or snapshot ID"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                 />
@@ -122,24 +177,24 @@ export default function BuildsPage() {
                   onChange={(event) => setStatusFilter(event.target.value as 'all' | BuildRunStatus)}
                 >
                   <option value="all">All</option>
-                  <option value="pending">Pending</option>
+                  <option value="pending">Preparing</option>
                   <option value="running">Running</option>
-                  <option value="succeeded">Succeeded</option>
+                  <option value="succeeded">Ready</option>
                   <option value="failed">Failed</option>
                 </select>
               </label>
 
               <label className="field">
-                <span className="field__label">Universe</span>
+                <span className="field__label">Basket</span>
                 <select
                   className="field__control mono"
                   value={universeFilter}
                   onChange={(event) => setUniverseFilter(event.target.value)}
                 >
-                  <option value="all">All universes</option>
+                  <option value="all">All baskets</option>
                   {universeOptions.map((option) => (
                     <option key={option} value={option}>
-                      {option}
+                      {universeLabelById[option] ?? option}
                     </option>
                   ))}
                 </select>
@@ -154,16 +209,16 @@ export default function BuildsPage() {
                 >
                   <option value="newest">Newest created</option>
                   <option value="oldest">Oldest created</option>
-                  <option value="asof_desc">Newest as-of date</option>
-                  <option value="window_desc">Largest window</option>
-                  <option value="universe">Universe id</option>
+                  <option value="asof_desc">Newest snapshot date</option>
+                  <option value="window_desc">Longest lookback</option>
+                  <option value="universe">Basket code</option>
                 </select>
               </label>
             </div>
 
             <div className="filter-summary-row">
-              <span className="filter-summary-row__item">Showing {formatInteger(filteredBuilds.length)} of {formatInteger(buildRuns.length)} builds.</span>
-              <span className="filter-summary-row__item">Current scale does not justify a dedicated server-side filter API yet.</span>
+              <span className="filter-summary-row__item">Showing {formatInteger(filteredBuilds.length)} of {formatInteger(buildRuns.length)} snapshots.</span>
+              <span className="filter-summary-row__item">Default filter is Ready so finished results stay in front of the operational noise.</span>
             </div>
           </Panel>
 
@@ -173,9 +228,10 @@ export default function BuildsPage() {
             refreshing={refreshing}
             error={error}
             onRefresh={refresh}
-            title="Build history"
-            subtitle="A filtered build history workspace instead of a raw stream bolted onto the homepage."
-            emptyStateCopy="No builds yet. Start a new build to populate this workspace."
+            universeLabels={universeLabelById}
+            title="Browse results"
+            subtitle="Open one snapshot for a single read. Use What changed only when the question is cross-snapshot drift."
+            emptyStateCopy="No snapshots yet. Create one to populate this history."
           />
         </div>
 
@@ -183,36 +239,44 @@ export default function BuildsPage() {
           <Panel variant="utility">
             <SectionHeader
               title="What this page is for"
-              subtitle="A dedicated build history page keeps the homepage focused on product value and recent outcomes."
+              subtitle="Keep this page in a browsing mindset: find a useful finished result quickly, then open it."
             />
 
             <div className="workspace-note-list">
-              <div className="workspace-note-list__item">Use this page to monitor queued or running builds.</div>
-              <div className="workspace-note-list__item">Jump into any build detail as soon as the run is created.</div>
-              <div className="workspace-note-list__item">Use compare when you want drift analysis rather than single-run inspection.</div>
-              <div className="workspace-note-list__item">Client-side filtering is enough for the current history size, so backend pagination can wait until the build volume is materially larger.</div>
+              <div className="workspace-note-list__item">Browse useful finished outputs first.</div>
+              <div className="workspace-note-list__item">Open one snapshot when your question is about a single basket.</div>
+              <div className="workspace-note-list__item">Use What changed only when you are comparing across snapshots.</div>
             </div>
           </Panel>
 
+          <BoundaryNote title="Quant honesty" variant="accent">
+            A ready snapshot is a structured observation, not a prediction. Treat strong relationships, spillover,
+            or group structure as clues that deserve context, not as a standalone trade decision.
+          </BoundaryNote>
+
           <Panel variant="utility">
             <SectionHeader
-              title="Latest build"
-              subtitle="Quick context for the newest item in the queue."
+              title="Comparison shortcut"
+              subtitle="Use compare only when change is the real question."
             />
 
-            {latestBuild ? (
+            {comparisonPair ? (
               <div className="latest-build-card">
-                <div className="latest-build-card__title mono">{latestBuild.universeId}</div>
-                <div className="latest-build-card__meta">
-                  {formatDateOnly(latestBuild.asOfDate)} · {latestBuild.windowDays}-day window
+                <div className="latest-build-card__title">
+                  {universeLabelById[comparisonPair[0].universeId] ?? comparisonPair[0].universeId}
                 </div>
-                <div className="latest-build-card__meta mono">{latestBuild.id}</div>
-                <Link to={`/builds/${latestBuild.id}`} className="button button--secondary button--sm">
-                  Open latest build
+                <div className="latest-build-card__meta">
+                  {formatDateOnly(comparisonPair[0].asOfDate)} ↔ {formatDateOnly(comparisonPair[1].asOfDate)}
+                </div>
+                <div className="latest-build-card__meta">
+                  Start here when you want to see how one basket changed rather than reopen a single result.
+                </div>
+                <Link to={comparisonTo} className="button button--secondary button--sm">
+                  Open what changed
                 </Link>
               </div>
             ) : (
-              <div className="state-note">No build history yet.</div>
+              <div className="state-note">Need at least two ready snapshots before comparison becomes useful.</div>
             )}
           </Panel>
         </div>
@@ -221,7 +285,26 @@ export default function BuildsPage() {
   );
 }
 
+function buildStatusPriority(status: BuildRunStatus): number {
+  switch (status) {
+    case 'succeeded':
+      return 0;
+    case 'running':
+      return 1;
+    case 'pending':
+      return 2;
+    case 'failed':
+    default:
+      return 3;
+  }
+}
+
 function compareBuildRuns(left: BuildRunListItem, right: BuildRunListItem, sortMode: SortMode): number {
+  const statusCompare = buildStatusPriority(left.status) - buildStatusPriority(right.status);
+  if (statusCompare !== 0) {
+    return statusCompare;
+  }
+
   switch (sortMode) {
     case 'oldest':
       return new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime();

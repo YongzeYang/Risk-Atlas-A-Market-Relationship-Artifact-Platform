@@ -227,8 +227,8 @@ export default function HeatmapPanel({
   if (symbolOrder.length < 2) {
     return (
       <Panel variant="primary">
-        <SectionHeader title="Matrix view" subtitle="Inspect a selected symbol set." />
-        <div className="state-note">Not enough symbols are available for a matrix view.</div>
+        <SectionHeader title="1. Am I actually diversified?" subtitle="Inspect a selected set of names before trusting the basket label." />
+        <div className="state-note">Not enough names are available for a useful subset view.</div>
       </Panel>
     );
   }
@@ -236,8 +236,8 @@ export default function HeatmapPanel({
   return (
     <Panel variant="primary">
       <SectionHeader
-        title="Matrix"
-        subtitle="Inspect a selected symbol set with subset-aware contrast and statistical context."
+        title="1. Am I actually diversified?"
+        subtitle="Pick a handful of names and see whether the basket behaves like a mix, a bloc, or something in between."
         action={
           <div className="toolbar-inline">
             <button type="button" className="button button--ghost button--sm" onClick={resetPreset}>
@@ -265,7 +265,7 @@ export default function HeatmapPanel({
           </div>
 
           <div className="selection-summary__hint">
-            Default selection uses symbols from the strongest pairs. Color contrast adapts to the visible subset instead of flattening into one broad tone.
+            The default selection starts from the strongest relationships. Color contrast adapts to the visible subset instead of flattening into one broad tone.
           </div>
         </div>
 
@@ -335,19 +335,29 @@ export default function HeatmapPanel({
       {subset ? (
         <>
           {subsetStats ? (
+            <div className="plain-summary">
+              {subsetStats.positiveShare > 0.75
+                ? 'This visible slice looks more connected than scattered — most names move in the same direction.'
+                : subsetStats.positiveShare > 0.5
+                  ? 'The selected names show a fairly dense positive relationship pattern. Some overlap is present.'
+                  : 'This slice suggests a real mix of positive and negative relationships — closer to independence than concentration.'}
+            </div>
+          ) : null}
+
+          {subsetStats ? (
             <div className="matrix-stats-grid">
               <article className="matrix-stat-card">
-                <div className="matrix-stat-card__label">Visible pairs</div>
+                <div className="matrix-stat-card__label">Visible relationships</div>
                 <div className="matrix-stat-card__value mono">{formatInteger(subsetStats.pairCount)}</div>
               </article>
 
               <article className="matrix-stat-card">
-                <div className="matrix-stat-card__label">Median score</div>
+                <div className="matrix-stat-card__label">Middle score</div>
                 <div className="matrix-stat-card__value mono">{formatScore(subsetStats.median, 3)}</div>
               </article>
 
               <article className="matrix-stat-card">
-                <div className="matrix-stat-card__label">Std. deviation</div>
+                <div className="matrix-stat-card__label">Dispersion</div>
                 <div className="matrix-stat-card__value mono">{formatScore(subsetStats.stdDev, 3)}</div>
               </article>
 

@@ -1,7 +1,12 @@
 // apps/api/src/routes/catalog.ts
 import type { FastifyPluginAsync } from 'fastify';
 
-import { listDatasets, listUniverses, listSecurityMaster } from '../services/catalog-service.js';
+import {
+  CATALOG_CACHE_CONTROL,
+  listDatasets,
+  listUniverses,
+  listSecurityMaster
+} from '../services/catalog-service.js';
 
 const nullableIsoDateSchema = {
   anyOf: [
@@ -122,7 +127,8 @@ export const catalogRoutes: FastifyPluginAsync = async (app) => {
         }
       }
     },
-    async () => {
+    async (_request, reply) => {
+      reply.header('cache-control', CATALOG_CACHE_CONTROL);
       return listDatasets();
     }
   );
@@ -141,7 +147,8 @@ export const catalogRoutes: FastifyPluginAsync = async (app) => {
         }
       }
     },
-    async () => {
+    async (_request, reply) => {
+      reply.header('cache-control', CATALOG_CACHE_CONTROL);
       return listUniverses();
     }
   );
@@ -160,7 +167,8 @@ export const catalogRoutes: FastifyPluginAsync = async (app) => {
         }
       }
     },
-    async () => {
+    async (_request, reply) => {
+      reply.header('cache-control', CATALOG_CACHE_CONTROL);
       return listSecurityMaster();
     }
   );

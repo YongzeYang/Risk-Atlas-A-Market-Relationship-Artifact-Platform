@@ -67,17 +67,17 @@ export default function PairLookupPanel({
   return (
     <Panel variant="utility">
       <SectionHeader
-        title="Pair lookup"
-        subtitle="Inspect one explicit relationship before moving into broader divergence analysis."
+        title="Check one exact relationship"
+        subtitle="Useful when you already know the two names and want to verify how tight the relationship is in this snapshot."
       />
 
       {symbols.length === 0 ? (
-        <div className="state-note">No symbols are available for this build.</div>
+        <div className="state-note">No names are available for this snapshot.</div>
       ) : (
         <>
           <form className="query-form" onSubmit={handleSubmit}>
             <label className="field">
-              <span className="field__label">Left symbol</span>
+              <span className="field__label">First name</span>
               <select
                 className="field__control mono"
                 value={left}
@@ -92,7 +92,7 @@ export default function PairLookupPanel({
             </label>
 
             <label className="field">
-              <span className="field__label">Right symbol</span>
+              <span className="field__label">Second name</span>
               <select
                 className="field__control mono"
                 value={right}
@@ -107,7 +107,7 @@ export default function PairLookupPanel({
             </label>
 
             <button type="submit" className="button button--secondary">
-              {loading ? 'Checking…' : 'Check pair'}
+              {loading ? 'Checking…' : 'Check relationship'}
             </button>
           </form>
 
@@ -120,16 +120,16 @@ export default function PairLookupPanel({
               </div>
 
               <div className="query-result__row">
-                <span className="query-result__label">Correlation score</span>
+                <span className="query-result__label">Relationship score</span>
                 <ScorePill score={result.score} digits={4} />
               </div>
 
               <div className="query-result__hint">
-                Ordered input is preserved in the result so the lookup can feed future compare workflows.
+                Input order is preserved so the lookup can feed future compare or relationship workflows.
               </div>
             </div>
           ) : !error ? (
-            <div className="state-note">Choose two symbols and check one score.</div>
+            <div className="state-note">Choose two names and check one relationship score.</div>
           ) : null}
         </>
       )}

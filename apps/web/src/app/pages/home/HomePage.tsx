@@ -1,15 +1,29 @@
 // apps/web/src/app/pages/home/HomePage.tsx
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 
-import { useBuildRunsData, useBuildSeriesData } from '../../../features/builds/hooks';
-import { useCatalogData } from '../../../features/catalog/hooks';
+import BoundaryNote from '../../../components/ui/BoundaryNote';
 import Panel from '../../../components/ui/Panel';
 import SectionHeader from '../../../components/ui/SectionHeader';
+import { useBuildDetailData, useBuildRunsData } from '../../../features/builds/hooks';
+import { useCatalogData } from '../../../features/catalog/hooks';
+import { formatDateOnly } from '../../../lib/format';
+import {
+  describeExampleSnapshotBullets,
+  pickComparisonBuildPair,
+  pickFeaturedBuild
+} from '../../../lib/build-run-language';
+import { formatLookbackLabel } from '../../../lib/snapshot-language';
 import BuildRunsPanel from './sections/BuildRunsPanel';
 import HomeIntroBand from './sections/HomeIntroBand';
 
 export default function HomePage() {
-  const { datasets, universes, loading: catalogLoading, error: catalogError } = useCatalogData();
+  const {
+    universes,
+    loading: catalogLoading,
+    universesLoading,
+    error: catalogError
+  } = useCatalogData();
   const {
     buildRuns,
     loading: buildRunsLoading,
@@ -17,79 +31,126 @@ export default function HomePage() {
     error: buildRunsError,
     refresh: refreshBuildRuns
   } = useBuildRunsData(3000);
-  const { series } = useBuildSeriesData(5000);
+  const universeLabelById = useMemo(
+    () => Object.fromEntries(universes.map((item) => [item.id, item.name])),
+    [universes]
+  );
+  const readyBuilds = useMemo(
+    () => buildRuns.filter((item) => item.status === 'succeeded'),
+    [buildRuns]
+  );
+  const exampleBuild = useMemo(() => pickFeaturedBuild(readyBuilds), [readyBuilds]);
+  const comparisonPair = useMemo(() => pickComparisonBuildPair(readyBuilds), [readyBuilds]);
+  const comparisonTo = comparisonPair
+    ? `/compare?left=${comparisonPair[0].id}&right=${comparisonPair[1].id}`
+    : '/compare';
+  const recentSuccessfulBuilds = useMemo(() => {
+    if (!exampleBuild) {
+      return readyBuilds.slice(0, 3);
+    }
 
-  const recentSuccessfulBuilds = buildRuns.filter((item) => item.status === 'succeeded').slice(0, 3);
-  const activeSeries = series.filter((item) => item.status === 'pending' || item.status === 'running');
-  const dynamicUniverses = universes.filter((item) => item.definitionKind !== 'static');
+    return [exampleBuild, ...readyBuilds.filter((item) => item.id !== exampleBuild.id)].slice(0, 3);
+  }, [exampleBuild, readyBuilds]);
   const topUniverseLabels = [
     universes.find((item) => item.id === 'hk_top_50_liquid')?.name,
     universes.find((item) => item.id === 'hk_all_common_equity')?.name,
     universes.find((item) => item.id === 'hk_financials')?.name,
     universes.find((item) => item.id === 'hk_tech')?.name
   ].filter((item): item is string => Boolean(item));
+  const { detail: exampleDetail } = useBuildDetailData(exampleBuild?.id, 10000);
+  const showCatalogSkeleton = catalogLoading && universes.length === 0;
+  const exampleSnapshot = useMemo(() => {
+    if (!exampleBuild) {
+      return null;
+    }
 
-  const largestDataset = [...datasets].sort((left, right) => right.symbolCount - left.symbolCount)[0] ?? null;
+    const universeLabel = universeLabelById[exampleBuild.universeId] ?? exampleBuild.universeId;
+    const topPair = exampleDetail?.topPairs[0];
+    const topPairLabel = topPair ? `${topPair.left} and ${topPair.right}` : null;
+
+    return {
+      to: `/builds/${exampleBuild.id}`,
+      universeLabel,
+      asOfDate: formatDateOnly(exampleBuild.asOfDate),
+      lookbackLabel: formatLookbackLabel(exampleBuild.windowDays),
+      insights: describeExampleSnapshotBullets(
+        exampleBuild,
+        universeLabel,
+        topPairLabel,
+        exampleDetail?.symbolCount
+      )
+    };
+  }, [exampleBuild, exampleDetail?.symbolCount, exampleDetail?.topPairs, universeLabelById]);
+
+  const questionCards = [
+    {
+      title: 'Am I actually diversified?',
+      description: 'See where a basket is more concentrated than it looks.',
+      actionLabel: exampleBuild ? 'Open example snapshot' : 'Browse snapshots',
+      to: exampleBuild ? `/builds/${exampleBuild.id}` : '/builds'
+    },
+    {
+      title: 'Which relationships just broke?',
+      description: 'Find pairs that used to move together more closely than they do now.',
+      actionLabel: exampleBuild ? 'Open example relationships' : 'Open relationships',
+      to: exampleBuild ? `/divergence?build=${exampleBuild.id}` : '/divergence'
+    },
+    {
+      title: 'If this stock drops, who tends to move with it?',
+      description: 'Explore historical co-movement around one name.',
+      actionLabel: exampleBuild ? 'Open example spillover' : 'Open spillover',
+      to: exampleBuild ? `/exposure?build=${exampleBuild.id}` : '/exposure'
+    },
+    {
+      title: 'What hidden groups exist in the market?',
+      description: 'Find names that behave alike, even when the label says otherwise.',
+      actionLabel: exampleBuild ? 'Open example groups' : 'Open groups',
+      to: exampleBuild ? `/structure?build=${exampleBuild.id}` : '/structure'
+    },
+    {
+      title: 'What changed?',
+      description: 'Compare two snapshots across time, lookback, or basket.',
+      actionLabel: comparisonPair ? 'Open example comparison' : 'Open what changed',
+      to: comparisonTo
+    }
+  ];
 
   return (
     <div className="page page--home">
-      <HomeIntroBand
-        buildCount={buildRuns.length}
-        activeSeriesCount={activeSeries.length}
-        datasetCount={datasets.length}
-        dynamicUniverseCount={dynamicUniverses.length}
-      />
+      <HomeIntroBand comparisonTo={comparisonTo} exampleSnapshot={exampleSnapshot} />
 
-      <section className="home-module-grid">
-        <article className="module-card module-card--accent">
-          <div className="module-card__eyebrow">Workspace</div>
-          <h2 className="module-card__title">Builds</h2>
-          <p className="module-card__description">
-            Launch new snapshots from curated or dynamic universes, then keep a clean history of
-            finished, running, and failed research jobs.
-          </p>
-          <div className="module-card__meta">Single-build analysis · recent outcomes · detail workspace</div>
-          <div className="module-card__actions">
-            <Link to="/builds" className="button button--secondary button--sm">
-              View builds
+      <section className="home-module-grid home-module-grid--stories">
+        <SectionHeader
+          title="Start with one question"
+          subtitle="Each question leads to a different view of the same snapshot."
+        />
+
+        <div className="question-selector">
+          {questionCards.map((item) => (
+            <Link key={item.title} to={item.to} className="question-selector__card">
+              <div className="question-selector__label">{item.title}</div>
+              <div className="question-selector__description">{item.description}</div>
+              <div className="question-selector__action">{item.actionLabel}</div>
             </Link>
-            <Link to="/builds/new" className="button button--ghost button--sm">
-              New build
-            </Link>
-          </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="how-to-steps">
+        <article className="how-to-step">
+          <div className="how-to-step__number">Step 1</div>
+          <div className="how-to-step__title">Open one snapshot</div>
+          <div className="how-to-step__copy">Start with a ready example so you can see one clean market read immediately.</div>
         </article>
-
-        <article className="module-card">
-          <div className="module-card__eyebrow">Rolling research</div>
-          <h2 className="module-card__title">Series</h2>
-          <p className="module-card__description">
-            Treat rolling builds as a first-class workflow with date ranges, frequency controls,
-            progress tracking, and one-click access to each child build.
-          </p>
-          <div className="module-card__meta">{series.length} tracked series · {activeSeries.length} active now</div>
-          <div className="module-card__actions">
-            <Link to="/series" className="button button--secondary button--sm">
-              Open series
-            </Link>
-          </div>
+        <article className="how-to-step">
+          <div className="how-to-step__number">Step 2</div>
+          <div className="how-to-step__title">Read the basket</div>
+          <div className="how-to-step__copy">Explore diversification, relationships, spillover, and groups — all from the same snapshot.</div>
         </article>
-
-        <article className="module-card">
-          <div className="module-card__eyebrow">Structure drift</div>
-          <h2 className="module-card__title">Compare</h2>
-          <p className="module-card__description">
-            Compare builds across time, windows, and universes so drift analysis becomes a guided
-            research task rather than a manual build-id exercise.
-          </p>
-          <div className="module-card__meta">Time vs time · window vs window · universe vs universe</div>
-          <div className="module-card__actions">
-            <Link to="/compare" className="button button--secondary button--sm">
-              Open compare
-            </Link>
-            <Link to="/divergence" className="button button--ghost button--sm">
-              Open divergence
-            </Link>
-          </div>
+        <article className="how-to-step">
+          <div className="how-to-step__number">Step 3</div>
+          <div className="how-to-step__title">Compare snapshots</div>
+          <div className="how-to-step__copy">Compare across time, lookback, or basket when your real question is what changed.</div>
         </article>
       </section>
 
@@ -100,70 +161,54 @@ export default function HomePage() {
           refreshing={buildRunsRefreshing}
           error={buildRunsError}
           onRefresh={refreshBuildRuns}
-          title="Recent successful builds"
-          subtitle="A short shortlist of ready-to-open results instead of an endless home-page stream."
-          emptyStateCopy="No successful builds yet. Start one from the build workspace."
+          universeLabels={universeLabelById}
+          title="Start from a ready snapshot"
+          subtitle="These finished snapshots are the fastest way to understand what the product gives you."
+          emptyStateCopy="No ready snapshots yet. Create one to start reading the market."
           action={
             <Link to="/builds" className="button button--ghost button--sm">
-              View all builds
+              View all snapshots
             </Link>
           }
         />
 
         <Panel variant="utility" className="coverage-panel">
           <SectionHeader
-            title="Research coverage"
-            subtitle="Current data and universe foundation, presented as scope rather than a raw catalog dump."
+            title="What you can explore right now"
+            subtitle="Stable capabilities in this release, without leaning on fragile live counters."
           />
 
-          {catalogLoading ? <div className="state-note">Loading coverage…</div> : null}
+          {showCatalogSkeleton ? <div className="state-note">Loading coverage…</div> : null}
           {catalogError ? <div className="state-note state-note--error">{catalogError}</div> : null}
 
-          {!catalogLoading ? (
+          {!showCatalogSkeleton ? (
             <div className="coverage-panel__body">
-              <div className="coverage-panel__stat-grid">
-                <article className="coverage-stat">
-                  <div className="coverage-stat__value mono">{datasets.length}</div>
-                  <div className="coverage-stat__label">Datasets</div>
-                </article>
-
-                <article className="coverage-stat">
-                  <div className="coverage-stat__value mono">{universes.length}</div>
-                  <div className="coverage-stat__label">Universes</div>
-                </article>
-
-                <article className="coverage-stat">
-                  <div className="coverage-stat__value mono">{dynamicUniverses.length}</div>
-                  <div className="coverage-stat__label">Dynamic rules</div>
-                </article>
-
-                <article className="coverage-stat">
-                  <div className="coverage-stat__value mono">{largestDataset?.symbolCount ?? 0}</div>
-                  <div className="coverage-stat__label">Max symbols in one dataset</div>
-                </article>
+              <div className="coverage-panel__section">
+                <div className="coverage-panel__section-title">Start with baskets like</div>
+                {universesLoading && topUniverseLabels.length === 0 ? <div className="state-note">Loading baskets…</div> : null}
+                {topUniverseLabels.length > 0 ? (
+                  <div className="coverage-token-list">
+                    {topUniverseLabels.map((item) => (
+                      <span key={item} className="coverage-token">{item}</span>
+                    ))}
+                  </div>
+                ) : null}
               </div>
 
               <div className="coverage-panel__section">
-                <div className="coverage-panel__section-title">Universe types available now</div>
-                <div className="coverage-token-list">
-                  {topUniverseLabels.map((item) => (
-                    <span key={item} className="coverage-token">{item}</span>
-                  ))}
-                </div>
-              </div>
-
-              <div className="coverage-panel__section">
-                <div className="coverage-panel__section-title">Next research surfaces already planned for this shell</div>
+                <div className="coverage-panel__section-title">Use one snapshot for</div>
                 <div className="coverage-roadmap">
-                  <span className="coverage-roadmap__item">Pair divergence candidates</span>
-                  <span className="coverage-roadmap__item">Co-movement exposure</span>
-                  <span className="coverage-roadmap__item">Clustered structure view</span>
+                  <span className="coverage-roadmap__item">Single-snapshot reading</span>
+                  <span className="coverage-roadmap__item">Relationships worth a closer look</span>
+                  <span className="coverage-roadmap__item">Spillover reads</span>
+                  <span className="coverage-roadmap__item">Hidden-group discovery</span>
+                  <span className="coverage-roadmap__item">What changed</span>
                 </div>
               </div>
 
-              <div className="coverage-panel__section coverage-panel__section--note">
-                Largest dataset currently contains {largestDataset?.symbolCount ?? 0} symbols. Dynamic universes such as HK All Common Equities now resolve against the selected dataset, as-of date, and window, so the preflight count reflects coverage-qualified names first and the build pipeline can still drop flat return series before matrix generation.
-              </div>
+              <BoundaryNote variant="accent">
+                Co-movement is a historical pattern, not causality. Use one snapshot as research support, then compare only when your real question is change.
+              </BoundaryNote>
             </div>
           ) : null}
         </Panel>

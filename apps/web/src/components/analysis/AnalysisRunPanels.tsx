@@ -39,7 +39,7 @@ export function ActiveAnalysisRunPanel({
   if (!run) {
     return (
       <div className="build-state">
-        <div className="build-state__eyebrow">No queued run</div>
+        <div className="build-state__eyebrow">No current result</div>
         <h3 className="build-state__title">{idleTitle}</h3>
         <p className="build-state__description">{idleDescription}</p>
       </div>
@@ -51,9 +51,9 @@ export function ActiveAnalysisRunPanel({
       <div className="build-state__meta">
         <StatusBadge status={run.status} />
         <span className="mono">{truncateMiddle(run.id, 8, 6)}</span>
-        <span>Queued {formatDateTime(run.createdAt)}</span>
+        <span>Started {formatDateTime(run.createdAt)}</span>
       </div>
-      <h3 className="build-state__title">{run.status === 'succeeded' ? 'Result ready' : run.status === 'failed' ? 'Run failed' : 'Run in queue'}</h3>
+      <h3 className="build-state__title">{run.status === 'succeeded' ? 'Result ready' : run.status === 'failed' ? 'Run failed' : 'Preparing…'}</h3>
       <p className="build-state__description">{formatSummary(run)}</p>
       <div className="build-state__meta">
         <span>Started {formatDateTime(run.startedAt)}</span>
@@ -74,7 +74,7 @@ export function RecentAnalysisRunsPanel({
   onSelect
 }: RecentAnalysisRunsPanelProps) {
   if (loading && runs.length === 0) {
-    return <div className="state-note">Loading recent runs…</div>;
+    return <div className="state-note">Loading saved analyses…</div>;
   }
 
   if (runs.length === 0) {
@@ -103,7 +103,7 @@ export function RecentAnalysisRunsPanel({
           </div>
 
           <div className="recent-run-card__summary">{formatSummary(run)}</div>
-          <div className="recent-run-card__meta">Queued {formatDateTime(run.createdAt)}</div>
+          <div className="recent-run-card__meta">{formatDateTime(run.createdAt)}</div>
         </article>
       ))}
     </div>

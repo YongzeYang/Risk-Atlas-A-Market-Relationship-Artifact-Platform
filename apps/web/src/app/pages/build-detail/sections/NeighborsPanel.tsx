@@ -1,6 +1,7 @@
 // apps/web/src/app/pages/build-detail/sections/NeighborsPanel.tsx
 import { useEffect, useState } from 'react';
 
+import BoundaryNote from '../../../../components/ui/BoundaryNote';
 import ScorePill from '../../../../components/data-display/ScorePill';
 import Panel from '../../../../components/ui/Panel';
 import SectionHeader from '../../../../components/ui/SectionHeader';
@@ -71,19 +72,23 @@ export default function NeighborsPanel({
   }, [buildRunId, symbol, k]);
 
   return (
-    <Panel variant="utility">
+    <Panel variant="secondary">
       <SectionHeader
-        title="Co-movement exposure"
-        subtitle="Inspect the strongest neighbors for one symbol inside this build."
+        title="3. If this stock drops, who tends to move with it?"
+        subtitle="Start from one anchor name and inspect the closest co-movement neighbors inside this snapshot."
       />
 
+      <BoundaryNote variant="accent">
+        Historical co-movement, not causality.
+      </BoundaryNote>
+
       {symbols.length === 0 ? (
-        <div className="state-note">No symbols are available for this build.</div>
+        <div className="state-note">No names are available for this snapshot.</div>
       ) : (
         <>
           <div className="query-form query-form--inline">
             <label className="field">
-              <span className="field__label">Symbol</span>
+              <span className="field__label">Anchor name</span>
               <select
                 className="field__control mono"
                 value={symbol}
@@ -98,7 +103,7 @@ export default function NeighborsPanel({
             </label>
 
             <label className="field">
-              <span className="field__label">Top k</span>
+              <span className="field__label">Neighbor count</span>
               <select
                 className="field__control mono"
                 value={k}
@@ -113,28 +118,34 @@ export default function NeighborsPanel({
             </label>
           </div>
 
-          {loading ? <div className="state-note">Loading related symbols…</div> : null}
+          {loading ? <div className="state-note">Loading related names…</div> : null}
           {error ? <div className="state-note state-note--error">{error}</div> : null}
 
           {result && result.neighbors.length > 0 ? (
-            <ol className="neighbor-list">
+            <>
+              <div className="plain-summary">
+                Risk around <span className="mono">{result.symbol}</span> looks{' '}
+                {result.neighbors.length >= k ? 'broad rather than concentrated in one corner of the basket' : 'limited to a small circle of related names'}.
+              </div>
+              <ol className="neighbor-list">
               {result.neighbors.map((entry, index) => (
                 <li key={entry.symbol} className="neighbor-list__item">
                   <div className="neighbor-list__index mono">{index + 1}</div>
 
                   <div className="neighbor-list__body">
                     <div className="neighbor-list__symbol mono">{entry.symbol}</div>
-                    <div className="neighbor-list__meta">Nearest co-movement candidate for {result.symbol}</div>
+                    <div className="neighbor-list__meta">One of the closest co-movement names for {result.symbol}</div>
                   </div>
 
                   <ScorePill score={entry.score} digits={3} />
                 </li>
               ))}
             </ol>
+            </>
           ) : null}
 
           {!loading && !error && result && result.neighbors.length === 0 ? (
-            <div className="state-note">No related symbols found.</div>
+            <div className="state-note">No related names found.</div>
           ) : null}
         </>
       )}

@@ -2,7 +2,9 @@
 import { Fragment, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 
+import BoundaryNote from '../../../../components/ui/BoundaryNote';
 import Panel from '../../../../components/ui/Panel';
+import ResearchDetails from '../../../../components/ui/ResearchDetails';
 import StatCard from '../../../../components/ui/StatCard';
 import StatusBadge from '../../../../components/ui/StatusBadge';
 import {
@@ -13,6 +15,7 @@ import {
   formatScore,
   formatScoreRange
 } from '../../../../lib/format';
+import { formatLookbackLabel } from '../../../../lib/snapshot-language';
 import type { BuildRunDetailResponse } from '../../../../types/api';
 
 type BuildMetaHeaderProps = {
@@ -29,18 +32,31 @@ type SummaryStat = {
   mono?: boolean;
 };
 
+function buildConclusion(detail: BuildRunDetailResponse): string | null {
+  if (detail.status !== 'succeeded') return null;
+  if (detail.minScore != null && detail.maxScore != null && detail.minScore >= 0) {
+    return 'This basket looks moderately concentrated rather than fully diversified.';
+  }
+  if (detail.maxScore != null && detail.maxScore > 0.5) {
+    return 'Several names in this snapshot move together strongly enough to deserve a closer look.';
+  }
+  return 'This basket shows a wide spread of relationship scores — diversification looks present but uneven.';
+}
+
 function buildInsight(detail: BuildRunDetailResponse, symbolCount: number | null): ReactNode {
   if (detail.status === 'succeeded') {
+    const conclusion = buildConclusion(detail);
     const strongestPair = detail.topPairs[0];
 
     if (strongestPair) {
       return (
         <>
-          Strongest pair:{' '}
+          {conclusion ? <>{conclusion}{' '}</> : null}
+          The tightest relationship is between{' '}
           <span className="mono">{strongestPair.left}</span>
           {' and '}
           <span className="mono">{strongestPair.right}</span>
-          {' at '}
+          {', with a score of '}
           <span className="mono">{formatScore(strongestPair.score, 3)}</span>.
         </>
       );
@@ -48,38 +64,38 @@ function buildInsight(detail: BuildRunDetailResponse, symbolCount: number | null
 
     return (
       <>
-        Results are ready
-        {symbolCount !== null ? ` for ${formatInteger(symbolCount)} symbols.` : '.'}
+        {conclusion ?? 'This snapshot is ready'}
+        {symbolCount !== null ? ` ${formatInteger(symbolCount)} names resolved.` : '.'}
       </>
     );
   }
 
   if (detail.status === 'running') {
-    return 'This build is running. Results will appear here when the bundle is ready.';
+    return 'This snapshot is running. The summary and question-led sections will appear here when the result bundle is ready.';
   }
 
   if (detail.status === 'pending') {
-    return 'This build is queued and waiting to start.';
+    return 'This snapshot is preparing. Keep this page open or refresh in a moment.';
   }
 
-  return 'This build failed. Review the error below.';
+  return 'This snapshot failed. Review the error below.';
 }
 
 function buildStats(detail: BuildRunDetailResponse, symbolCount: number | null): SummaryStat[] {
   if (detail.status === 'succeeded') {
     return [
       {
-        label: 'As of date',
+        label: 'Snapshot date',
         value: formatDateOnly(detail.asOfDate),
         mono: true
       },
       {
-        label: 'Window',
-        value: `${detail.windowDays} day`,
+        label: 'Lookback',
+        value: formatLookbackLabel(detail.windowDays),
         mono: true
       },
       {
-        label: 'Symbols',
+        label: 'Names',
         value: symbolCount !== null ? formatInteger(symbolCount) : '—',
         mono: true
       },
@@ -93,13 +109,13 @@ function buildStats(detail: BuildRunDetailResponse, symbolCount: number | null):
 
   return [
     {
-      label: 'As of date',
+      label: 'Snapshot date',
       value: formatDateOnly(detail.asOfDate),
       mono: true
     },
     {
-      label: 'Window',
-      value: `${detail.windowDays} day`,
+      label: 'Lookback',
+      value: formatLookbackLabel(detail.windowDays),
       mono: true
     },
     {
@@ -117,13 +133,13 @@ function buildStats(detail: BuildRunDetailResponse, symbolCount: number | null):
 
 function buildBundleNote(detail: BuildRunDetailResponse, symbolCount: number | null): string {
   if (detail.status !== 'succeeded' || !detail.artifact) {
-    return 'Bundle details appear when the build is ready.';
+    return 'Downloadable research files appear when the snapshot is ready.';
   }
 
-  const parts: string[] = ['Bundle ready'];
+  const parts: string[] = ['Snapshot files ready'];
 
   if (symbolCount !== null) {
-    parts.push(`${formatInteger(symbolCount)} symbols`);
+    parts.push(`${formatInteger(symbolCount)} names`);
   }
 
   if (detail.artifact.matrixByteSize !== null && detail.artifact.matrixByteSize !== undefined) {
@@ -149,7 +165,7 @@ export default function BuildMetaHeader({
   if (loading && !detail) {
     return (
       <Panel variant="secondary">
-        <div className="state-note">Loading build result…</div>
+        <div className="state-note">Loading snapshot…</div>
       </Panel>
     );
   }
@@ -165,7 +181,7 @@ export default function BuildMetaHeader({
   if (!detail) {
     return (
       <Panel variant="secondary">
-        <div className="state-note">Build detail was not found.</div>
+        <div className="state-note">Snapshot detail was not found.</div>
       </Panel>
     );
   }
@@ -178,8 +194,8 @@ export default function BuildMetaHeader({
   const summaryItems = [
     detail.universeId,
     formatDateOnly(detail.asOfDate),
-    `${detail.windowDays}-day window`,
-    symbolCount !== null ? `${formatInteger(symbolCount)} symbols` : null
+    formatLookbackLabel(detail.windowDays),
+    symbolCount !== null ? `${formatInteger(symbolCount)} names` : null
   ].filter((item): item is string => Boolean(item));
 
   const stats = buildStats(detail, symbolCount);
@@ -189,14 +205,25 @@ export default function BuildMetaHeader({
       <Panel variant="secondary" className="meta-header__panel">
         <div className="meta-header__top">
           <Link to="/builds" className="button button--ghost button--sm">
-            Back to builds
+            Back to snapshots
           </Link>
 
           <div className="toolbar-inline">
             {detail.status === 'succeeded' ? (
-              <Link to={`/compare?left=${detail.id}`} className="button button--ghost button--sm">
-                Compare build
-              </Link>
+              <>
+                <Link to={`/compare?left=${detail.id}`} className="button button--ghost button--sm">
+                  What changed
+                </Link>
+                <Link to={`/divergence?build=${detail.id}`} className="button button--ghost button--sm">
+                  Relationships
+                </Link>
+                <Link to={`/exposure?build=${detail.id}`} className="button button--ghost button--sm">
+                  Spillover
+                </Link>
+                <Link to={`/structure?build=${detail.id}`} className="button button--ghost button--sm">
+                  Groups
+                </Link>
+              </>
             ) : null}
 
             <button type="button" className="button button--ghost button--sm" onClick={onRefresh}>
@@ -207,7 +234,7 @@ export default function BuildMetaHeader({
 
         <div className="meta-header__hero">
           <div className="meta-header__copy">
-            <h1 className="meta-header__title">Build result</h1>
+            <h1 className="meta-header__title">Snapshot</h1>
 
             <p className="meta-header__summary">
               {summaryItems.map((item, index) => (
@@ -220,41 +247,14 @@ export default function BuildMetaHeader({
 
             <p className="meta-header__insight">{buildInsight(detail, symbolCount)}</p>
 
-            <dl className="meta-header__meta-list">
-              <div>
-                <dt>Build ID</dt>
-                <dd className="mono meta-header__code">{detail.id}</dd>
-              </div>
-
-              <div>
-                <dt>Dataset</dt>
-                <dd className="mono">{detail.datasetId}</dd>
-              </div>
-
-              <div>
-                <dt>Universe</dt>
-                <dd className="mono">{detail.universeId}</dd>
-              </div>
-
-              <div>
-                <dt>Created</dt>
-                <dd className="mono">{formatDateTime(detail.createdAt)}</dd>
-              </div>
-            </dl>
+            <BoundaryNote variant="accent">
+              Use this page for the first read: hidden concentration, strong relationships, name-level spillover,
+              and whether you should move on to groups or comparison.
+            </BoundaryNote>
           </div>
 
           <div className="meta-header__side">
             <StatusBadge status={detail.status} />
-
-            {detail.status === 'succeeded' && detail.artifactDownload ? (
-              <a
-                className="button button--primary"
-                href={detail.artifactDownload.url}
-                download={detail.artifactDownload.filename}
-              >
-                Download matrix
-              </a>
-            ) : null}
 
             <div className="meta-header__side-note">
               {buildBundleNote(detail, symbolCount)}
@@ -276,6 +276,40 @@ export default function BuildMetaHeader({
             />
           ))}
         </div>
+
+        <ResearchDetails summary="Advanced details and downloads">
+          <dl className="meta-header__meta-list">
+            <div>
+              <dt>Snapshot ID</dt>
+              <dd className="mono meta-header__code">{detail.id}</dd>
+            </div>
+
+            <div>
+              <dt>Data source</dt>
+              <dd className="mono">{detail.datasetId}</dd>
+            </div>
+
+            <div>
+              <dt>Basket</dt>
+              <dd className="mono">{detail.universeId}</dd>
+            </div>
+
+            <div>
+              <dt>Created</dt>
+              <dd className="mono">{formatDateTime(detail.createdAt)}</dd>
+            </div>
+          </dl>
+
+          {detail.status === 'succeeded' && detail.artifactDownload ? (
+            <a
+              className="button button--secondary button--sm"
+              href={detail.artifactDownload.url}
+              download={detail.artifactDownload.filename}
+            >
+              Download matrix file
+            </a>
+          ) : null}
+        </ResearchDetails>
       </Panel>
     </section>
   );

@@ -1,12 +1,14 @@
 // apps/web/src/app/pages/compare/ComparePage.tsx
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
+import BoundaryNote from '../../../components/ui/BoundaryNote';
 import Panel from '../../../components/ui/Panel';
 import SectionHeader from '../../../components/ui/SectionHeader';
+import { compareBuilds } from '../../../features/builds/api';
 import { useBuildRunsData } from '../../../features/builds/hooks';
 import { formatDateOnly } from '../../../lib/format';
-import { compareBuilds } from '../../../features/builds/api';
+import { formatSnapshotOptionLabel } from '../../../lib/snapshot-language';
 import type { BuildRunListItem, CompareBuildsResponse } from '../../../types/api';
 
 export default function ComparePage() {
@@ -78,19 +80,23 @@ export default function ComparePage() {
     <div className="page page--compare">
       <Panel variant="primary">
         <SectionHeader
-          title="Compare builds"
-          subtitle="Compare succeeded builds across time, windows, and universes without manually typing identifiers."
+          title="What changed between two snapshots?"
+          subtitle="Compare two ready snapshots across time, lookback, or basket choice without manually typing identifiers."
         />
+
+        <BoundaryNote title="Open read" variant="accent">
+          Reading and comparing snapshots stays open here. Invite code is only required when you create or queue new work elsewhere.
+        </BoundaryNote>
 
         {comparableBuilds.length < 2 && !buildRunsLoading ? (
           <div className="state-note state-note--error">
-            At least two succeeded builds are required before comparison becomes available.
+            At least two ready snapshots are required before comparison becomes available.
           </div>
         ) : null}
 
         <form className="query-form query-form--inline" onSubmit={handleCompare}>
           <label className="field">
-            <span className="field__label">Base build</span>
+            <span className="field__label">Left snapshot</span>
             <select
               className="field__control mono"
               value={leftId}
@@ -99,14 +105,14 @@ export default function ComparePage() {
             >
               {comparableBuilds.map((buildRun) => (
                 <option key={buildRun.id} value={buildRun.id}>
-                  {formatBuildOption(buildRun)}
+                  {formatSnapshotOptionLabel(buildRun)}
                 </option>
               ))}
             </select>
           </label>
 
           <label className="field">
-            <span className="field__label">Comparison build</span>
+            <span className="field__label">Right snapshot</span>
             <select
               className="field__control mono"
               value={rightId}
@@ -115,7 +121,7 @@ export default function ComparePage() {
             >
               {comparableBuilds.map((buildRun) => (
                 <option key={buildRun.id} value={buildRun.id}>
-                  {formatBuildOption(buildRun)}
+                  {formatSnapshotOptionLabel(buildRun)}
                 </option>
               ))}
             </select>
@@ -139,61 +145,57 @@ export default function ComparePage() {
               className="button button--primary"
               disabled={loading || !leftId || !rightId || leftId === rightId || comparableBuilds.length < 2}
             >
-              {loading ? 'Comparing…' : 'Compare'}
+              {loading ? 'Comparing…' : 'Show what changed'}
             </button>
           </div>
         </form>
 
         <div className="field__hint">
-          Query access is open here. Invite codes are only required when you queue new analysis runs elsewhere in the workspace.
+          Choose two different snapshots. The page will infer whether you are mostly testing time, lookback, or basket change.
         </div>
 
         {leftId && rightId && leftId === rightId ? (
           <div className="state-note state-note--error">
-            Select two different builds to compare.
+            Select two different snapshots to compare.
           </div>
         ) : null}
       </Panel>
-
-      {error ? (
-        <Panel variant="primary">
-          <div className="state-note state-note--error">{error}</div>
-        </Panel>
-      ) : null}
 
       {result ? <CompareResult data={result} /> : null}
 
       {leftBuild && rightBuild ? (
         <Panel variant="utility">
           <SectionHeader
-            title="Comparison setup"
-            subtitle="Only succeeded builds are surfaced here, so comparison starts from valid research artifacts instead of queue state."
+            title="Detected comparison type"
+            subtitle="Only ready snapshots are surfaced here, so comparison starts from usable outputs rather than queue state."
           />
 
           <div className="compare-mode-grid">
             <article className={`compare-mode-card${comparisonMode === 'time_vs_time' ? ' compare-mode-card--active' : ''}`}>
-              <div className="compare-mode-card__title">Time vs time</div>
-              <div className="compare-mode-card__copy">Same universe and window, different dates.</div>
+              <div className="compare-mode-card__title">Time change</div>
+              <div className="compare-mode-card__copy">Same basket and lookback, different snapshot dates.</div>
             </article>
 
             <article className={`compare-mode-card${comparisonMode === 'window_vs_window' ? ' compare-mode-card--active' : ''}`}>
-              <div className="compare-mode-card__title">Window vs window</div>
-              <div className="compare-mode-card__copy">Same date and universe, different lookback windows.</div>
+              <div className="compare-mode-card__title">Lookback change</div>
+              <div className="compare-mode-card__copy">Same basket and date, different lookback lengths.</div>
             </article>
 
             <article className={`compare-mode-card${comparisonMode === 'universe_vs_universe' ? ' compare-mode-card--active' : ''}`}>
-              <div className="compare-mode-card__title">Universe vs universe</div>
-              <div className="compare-mode-card__copy">Same date and window, different resolved research scope.</div>
+              <div className="compare-mode-card__title">Basket change</div>
+              <div className="compare-mode-card__copy">Same date and lookback, different resolved baskets.</div>
             </article>
           </div>
         </Panel>
       ) : null}
+
+      {error ? (
+        <Panel variant="primary">
+          <div className="state-note state-note--error">{error}</div>
+        </Panel>
+      ) : null}
     </div>
   );
-}
-
-function formatBuildOption(buildRun: BuildRunListItem): string {
-  return `${buildRun.universeId} · ${formatDateOnly(buildRun.asOfDate)} · ${buildRun.windowDays}d · ${buildRun.id.slice(0, 8)}`;
 }
 
 function inferComparisonMode(
@@ -222,23 +224,33 @@ function inferComparisonMode(
 function CompareResult({ data }: { data: CompareBuildsResponse }) {
   return (
     <Panel variant="primary">
-      <SectionHeader title="Drift analysis" />
+      <SectionHeader
+        title="What changed"
+        subtitle="These are the relationships with the biggest score changes between the two snapshots."
+      />
+
+      <div className="plain-summary">
+        {data.topDriftPairs.length === 0
+          ? 'No material relationship change was surfaced by this comparison — overlapping names look stable across both snapshots.'
+          : `${data.topDriftPairs.length} relationship${data.topDriftPairs.length === 1 ? '' : 's'} shifted noticeably between these two snapshots.`
+        }
+      </div>
 
       <div className="stat-grid">
         <div className="stat-card">
-          <div className="stat-card__label">Common symbols</div>
+          <div className="stat-card__label">Common names</div>
           <div className="stat-card__value">{data.commonSymbols.length}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-card__label">Left date</div>
-          <div className="stat-card__value mono">{data.left.asOfDate}</div>
+          <div className="stat-card__label">Left snapshot</div>
+          <div className="stat-card__value mono">{formatDateOnly(data.left.asOfDate)}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-card__label">Right date</div>
-          <div className="stat-card__value mono">{data.right.asOfDate}</div>
+          <div className="stat-card__label">Right snapshot</div>
+          <div className="stat-card__value mono">{formatDateOnly(data.right.asOfDate)}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-card__label">Drift pairs shown</div>
+          <div className="stat-card__label">Changes shown</div>
           <div className="stat-card__value">{data.topDriftPairs.length}</div>
         </div>
       </div>
@@ -260,7 +272,11 @@ function CompareResult({ data }: { data: CompareBuildsResponse }) {
                     <span className="mono">{entry.right}</span>
                   </div>
                   <div className="rank-list__meta">
-                    Left: {entry.leftScore.toFixed(4)} · Right: {entry.rightScore.toFixed(4)}
+                    {absDelta > 0.3
+                      ? 'A large shift — this pair’s relationship changed substantially between snapshots.'
+                      : absDelta > 0.1
+                        ? 'A moderate drift — worth watching but not dramatic.'
+                        : 'A minor change — this pair stayed relatively stable.'}
                   </div>
                 </div>
                 <span className={`score-pill score-pill--${variant}`}>
@@ -271,7 +287,14 @@ function CompareResult({ data }: { data: CompareBuildsResponse }) {
           })}
         </div>
       ) : (
-        <div className="state-note">No significant drift detected.</div>
+        <div className="compare-empty-state">
+          <p>No material relationship change was surfaced by this comparison.</p>
+          <p>Consider comparing snapshots from different dates or lookback lengths.</p>
+          <div className="next-steps">
+            <Link to="/builds/new" className="button button--secondary">Create a new snapshot</Link>
+            <Link to="/divergence" className="button button--ghost">Open relationships</Link>
+          </div>
+        </div>
       )}
     </Panel>
   );

@@ -27,27 +27,27 @@ export default function TopBar() {
           </NavLink>
 
           <NavLink className={`topbar__link${buildsActive ? ' topbar__link--active' : ''}`} to="/builds">
-            Builds
+            Snapshots
           </NavLink>
 
           <NavLink className={navClassName} to="/series">
-            Series
+            Snapshot series
           </NavLink>
 
           <NavLink className={navClassName} to="/compare">
-            Compare
+            What changed
           </NavLink>
 
           <NavLink className={navClassName} to="/divergence">
-            Divergence
+            Relationships
           </NavLink>
 
           <NavLink className={navClassName} to="/exposure">
-            Exposure
+            Spillover
           </NavLink>
 
           <NavLink className={navClassName} to="/structure">
-            Structure
+            Groups
           </NavLink>
         </nav>
 
@@ -73,7 +73,7 @@ export default function TopBar() {
           ) : null}
 
           <Link to="/builds/new" className="button button--primary button--sm topbar__cta">
-            New build
+            Create snapshot
           </Link>
         </div>
       </div>

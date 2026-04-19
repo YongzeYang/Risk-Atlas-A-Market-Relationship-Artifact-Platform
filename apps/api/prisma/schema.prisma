@@ -84,11 +84,18 @@ model SecurityMaster {
 }
 
 model Dataset {
-  id        String          @id @default(cuid())
-  name      String
-  source    DatasetSource
-  market    Market
-  createdAt DateTime        @default(now())
+  id                      String          @id @default(cuid())
+  name                    String
+  source                  DatasetSource
+  market                  Market
+  catalogSymbolCount      Int             @default(0)
+  catalogPriceRowCount    BigInt          @default(0)
+  catalogMinTradeDate     String?         @db.VarChar(10)
+  catalogMaxTradeDate     String?         @db.VarChar(10)
+  catalogFirstValidAsOf60 String?         @db.VarChar(10)
+  catalogFirstValidAsOf120 String?        @db.VarChar(10)
+  catalogFirstValidAsOf252 String?        @db.VarChar(10)
+  createdAt               DateTime        @default(now())
 
   eodPrices   EodPrice[]
   buildRuns   BuildRun[]

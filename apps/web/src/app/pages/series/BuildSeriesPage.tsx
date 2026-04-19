@@ -2,7 +2,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 
+import BoundaryNote from '../../../components/ui/BoundaryNote';
 import Panel from '../../../components/ui/Panel';
+import ResearchDetails from '../../../components/ui/ResearchDetails';
 import SectionHeader from '../../../components/ui/SectionHeader';
 import StatusBadge from '../../../components/ui/StatusBadge';
 import { createBuildSeries } from '../../../features/builds/api';
@@ -14,6 +16,11 @@ import {
 import { useCatalogData } from '../../../features/catalog/hooks';
 import { getEarliestBuildableAsOfDate } from '../../../lib/build-dates';
 import { formatDateOnly, formatDateTime } from '../../../lib/format';
+import {
+  describeBasketKind,
+  describeCoverageCount,
+  formatLookbackLabel
+} from '../../../lib/snapshot-language';
 import type {
   BuildRunScoreMethod,
   BuildRunWindowDays,
@@ -27,7 +34,12 @@ const FREQUENCY_OPTIONS: BuildSeriesFrequency[] = ['daily', 'weekly', 'monthly']
 const SCORE_METHOD: BuildRunScoreMethod = 'pearson_corr';
 
 export default function BuildSeriesPage() {
-  const { datasets, universes, loading: catalogLoading } = useCatalogData();
+  const {
+    datasets,
+    universes,
+    datasetsLoading,
+    universesLoading
+  } = useCatalogData();
   const { series, loading: seriesLoading, refresh } = useBuildSeriesData();
 
   const [datasetId, setDatasetId] = useState('');
@@ -193,7 +205,7 @@ export default function BuildSeriesPage() {
         refresh();
         setSeriesName('');
       } catch (err) {
-        setSubmitError(err instanceof Error ? err.message : 'Failed to create series.');
+        setSubmitError(err instanceof Error ? err.message : 'Failed to create snapshot series.');
       } finally {
         setSubmitting(false);
       }
@@ -210,7 +222,7 @@ export default function BuildSeriesPage() {
     }
 
     if (minStartDate && startDate < minStartDate) {
-      return `Start date is earlier than the earliest buildable ${windowDays}-day date (${minStartDate}).`;
+      return `Start date is earlier than the earliest buildable ${formatLookbackLabel(windowDays)} date (${minStartDate}).`;
     }
 
     if (selectedDataset?.maxTradeDate && endDate > selectedDataset.maxTradeDate) {
@@ -224,11 +236,11 @@ export default function BuildSeriesPage() {
     <div className="page page--series">
       <section className="workspace-hero">
         <div className="workspace-hero__copy">
-          <div className="workspace-hero__eyebrow">Rolling research center</div>
-          <h1 className="workspace-hero__title">Manage rolling builds as a first-class research workflow.</h1>
+          <div className="workspace-hero__eyebrow">Snapshot series</div>
+          <h1 className="workspace-hero__title">Watch one basket through time.</h1>
           <p className="workspace-hero__description">
-            Series should feel like a timeline of research programs, not just another form.
-            Track active schedules, review finished windows, and jump into child builds when drift emerges.
+            A snapshot series is for repeated reads of the same setup across time. Use it when the question is not one day,
+            but the path of the basket across many dates.
           </p>
         </div>
 
@@ -239,7 +251,7 @@ export default function BuildSeriesPage() {
           </article>
           <article className="workspace-hero__stat-card">
             <div className="workspace-hero__stat-value mono">{activeSeries.length}</div>
-            <div className="workspace-hero__stat-label">Active programs</div>
+            <div className="workspace-hero__stat-label">Running now</div>
           </article>
           <article className="workspace-hero__stat-card">
             <div className="workspace-hero__stat-value mono">{completedSeries.length}</div>
@@ -256,8 +268,8 @@ export default function BuildSeriesPage() {
         <div className="workspace-layout__main">
           <Panel variant="primary">
             <SectionHeader
-              title="Active rolling programs"
-              subtitle="Use this area like a mission control board for rolling builds in flight."
+              title="Active snapshot series"
+              subtitle="Use this area to monitor repeated snapshot programs still in flight."
             />
 
             {!seriesLoading && activeSeries.length === 0 ? (
@@ -275,14 +287,14 @@ export default function BuildSeriesPage() {
 
           <Panel variant="primary">
             <SectionHeader
-              title="All series"
-              subtitle="Completed, failed, and active programs in one rolling-research ledger."
+              title="All snapshot series"
+              subtitle="Completed, failed, and active programs in one rolling ledger."
             />
 
             {seriesLoading ? <div className="state-note">Loading…</div> : null}
 
             {!seriesLoading && series.length === 0 ? (
-              <div className="state-note">No build series yet.</div>
+              <div className="state-note">No snapshot series yet.</div>
             ) : null}
 
             {series.length > 0 ? (
@@ -298,9 +310,14 @@ export default function BuildSeriesPage() {
         <div className="workspace-layout__side">
           <Panel variant="primary">
             <SectionHeader
-              title="Create series"
-              subtitle="Define a rolling program with explicit date range, window, and frequency."
+              title="Create snapshot series"
+              subtitle="Define a repeated snapshot program with an explicit date range, lookback, and cadence."
             />
+
+            <BoundaryNote title="What this does" variant="accent">
+              This creates many snapshots from the same basket setup across time. It is useful for drift tracking,
+              regime checks, and monitoring whether hidden groups stay stable.
+            </BoundaryNote>
 
             <form className="form-grid" onSubmit={handleSubmit}>
             <label className="field">
@@ -317,64 +334,64 @@ export default function BuildSeriesPage() {
 
             <div className="form-grid__inline">
               <label className="field">
-                <span className="field__label">Dataset</span>
+                <span className="field__label">Data source</span>
                 <select
                   className="field__control mono"
                   value={datasetId}
                   onChange={(e) => setDatasetId(e.target.value)}
-                  disabled={catalogLoading || submitting}
+                  disabled={datasetsLoading || submitting || datasets.length === 0}
                 >
                   {datasets.map((d) => (
-                    <option key={d.id} value={d.id}>{d.id}</option>
+                    <option key={d.id} value={d.id}>{d.name}</option>
                   ))}
                 </select>
                 <span className="field__hint">
-                  {selectedDataset
-                    ? `${selectedDataset.name} · ${formatDateOnly(selectedDataset.minTradeDate)} → ${formatDateOnly(selectedDataset.maxTradeDate)}` +
-                      (minStartDate
-                        ? ` · earliest ${windowDays}d first run ${formatDateOnly(minStartDate)}`
-                        : '')
-                    : 'Select one dataset.'}
+                  {datasetsLoading && datasets.length === 0
+                    ? 'Loading data sources…'
+                    : selectedDataset
+                      ? `${selectedDataset.name} · ${formatDateOnly(selectedDataset.minTradeDate)} → ${formatDateOnly(selectedDataset.maxTradeDate)}` +
+                        (minStartDate
+                          ? ` · earliest ${formatLookbackLabel(windowDays)} first run ${formatDateOnly(minStartDate)}`
+                          : '')
+                      : 'Select one data source.'}
                 </span>
               </label>
 
               <label className="field">
-                <span className="field__label">Universe</span>
+                <span className="field__label">Basket</span>
                 <select
                   className="field__control mono"
                   value={universeId}
                   onChange={(e) => setUniverseId(e.target.value)}
-                  disabled={catalogLoading || submitting || compatibleUniverses.length === 0}
+                  disabled={universesLoading || submitting || compatibleUniverses.length === 0}
                 >
                   {compatibleUniverses.map((u) => (
-                    <option key={u.id} value={u.id}>{u.id}</option>
+                    <option key={u.id} value={u.id}>{u.name}</option>
                   ))}
                 </select>
                 <span className="field__hint">
-                  {(() => {
-                    if (!selectedUniverse) {
-                      return 'Select one universe.';
-                    }
+                  {universesLoading && universes.length === 0
+                    ? 'Loading baskets…'
+                    : (() => {
+                        if (!selectedUniverse) {
+                          return 'Select one basket.';
+                        }
 
-                    const kind = selectedUniverse.definitionKind === 'static' ? 'static' : 'dynamic';
+                        const kind = describeBasketKind(selectedUniverse.definitionKind);
 
-                    if (startValidation?.valid && startValidation.resolvedSymbolCount != null) {
-                      return `${selectedUniverse.name} · ${kind} · ${startValidation.resolvedSymbolCount} matrix-ready symbols at the first scheduled run`;
-                    }
+                        if (startValidation?.valid && startValidation.resolvedSymbolCount != null) {
+                          return `${selectedUniverse.name} · ${kind} · ${startValidation.resolvedSymbolCount} names ready at the first scheduled run`;
+                        }
 
-                    const count =
-                      selectedUniverse.symbolCount != null
-                        ? `${selectedUniverse.symbolCount} symbols`
-                        : 'resolved against the selected dataset/date';
-                    return `${selectedUniverse.name} · ${kind} · ${count}`;
-                  })()}
+                        return `${selectedUniverse.name} · ${kind} · ${describeCoverageCount(selectedUniverse.symbolCount)}`;
+                      })()}
                 </span>
               </label>
             </div>
 
-            {compatibleUniverses.length === 0 ? (
+            {!universesLoading && compatibleUniverses.length === 0 ? (
               <div className="state-note state-note--error">
-                No compatible universes are available for dataset "{selectedDataset?.id ?? datasetId}".
+                No compatible baskets are available for data source "{selectedDataset?.id ?? datasetId}".
               </div>
             ) : null}
 
@@ -396,13 +413,13 @@ export default function BuildSeriesPage() {
 
             {!startValidationLoading && startValidation?.valid && startValidation.resolvedSymbolCount != null ? (
               <div className="state-note">
-                First scheduled run resolves to {startValidation.resolvedSymbolCount} matrix-ready symbols after row, alignment, and flat-series filtering.
+                First scheduled run resolves to {startValidation.resolvedSymbolCount} usable names after row, alignment, and flat-series filtering.
               </div>
             ) : null}
 
             <div className="form-grid__inline">
               <label className="field">
-                <span className="field__label">Start date</span>
+                <span className="field__label">First snapshot date</span>
                 <input
                   className="field__control mono"
                   type="date"
@@ -415,7 +432,7 @@ export default function BuildSeriesPage() {
               </label>
 
               <label className="field">
-                <span className="field__label">End date</span>
+                <span className="field__label">Last snapshot date</span>
                 <input
                   className="field__control mono"
                   type="date"
@@ -429,12 +446,12 @@ export default function BuildSeriesPage() {
             </div>
 
             <div className="field__hint">
-              The first scheduled run must already be buildable. The server snaps the cadence to real dataset trading dates, validates every scheduled run when you submit, and the earliest allowed start date still moves with the selected window.
+              The first scheduled run must already be buildable. The server snaps cadence to real trading dates, validates every scheduled run when you submit, and the earliest allowed start date still moves with the selected lookback.
             </div>
 
             <div className="form-grid__inline">
               <label className="field">
-                <span className="field__label">Window</span>
+                <span className="field__label">Lookback</span>
                 <select
                   className="field__control mono"
                   value={windowDays}
@@ -442,13 +459,13 @@ export default function BuildSeriesPage() {
                   disabled={submitting}
                 >
                   {WINDOW_OPTIONS.map((d) => (
-                    <option key={d} value={d}>{d} days</option>
+                    <option key={d} value={d}>{formatLookbackLabel(d)}</option>
                   ))}
                 </select>
               </label>
 
               <label className="field">
-                <span className="field__label">Frequency</span>
+                <span className="field__label">Cadence</span>
                 <select
                   className="field__control mono"
                   value={frequency}
@@ -473,10 +490,18 @@ export default function BuildSeriesPage() {
                 disabled={submitting}
                 autoComplete="off"
               />
-              <span className="field__hint">Required. Your code is saved in the browser.</span>
+              <span className="field__hint">Required for create actions. Saved in this browser for convenience.</span>
             </label>
 
             {submitError ? <div className="state-note state-note--error">{submitError}</div> : null}
+
+            <ResearchDetails summary="Research details">
+              <div className="workspace-note-list">
+                <div className="workspace-note-list__item">Weekly and monthly cadence snap to the last real trading date in each bucket.</div>
+                <div className="workspace-note-list__item">Every scheduled snapshot is validated before the series is accepted.</div>
+                <div className="workspace-note-list__item">A snapshot series is descriptive. It helps you watch drift and hidden groups over time, not bypass judgment.</div>
+              </div>
+            </ResearchDetails>
 
             <div className="form-actions">
               <button
@@ -495,7 +520,7 @@ export default function BuildSeriesPage() {
                   !startValidation?.valid
                 }
               >
-                {submitting ? 'Creating…' : 'Create series'}
+                {submitting ? 'Creating…' : 'Create snapshot series'}
               </button>
             </div>
             </form>
@@ -503,14 +528,14 @@ export default function BuildSeriesPage() {
 
           <Panel variant="utility">
             <SectionHeader
-              title="Rolling design notes"
-              subtitle="This is where rolling research becomes operationally understandable."
+              title="How to use it"
+              subtitle="Choose cadence based on the type of change you are trying to detect."
             />
 
             <div className="workspace-note-list">
-              <div className="workspace-note-list__item">Daily series are useful for temporal drift scans across one stable universe definition.</div>
-              <div className="workspace-note-list__item">Weekly and monthly cadence now follow the last real trading date in each bucket instead of approximating with calendar Fridays or month-end weekdays.</div>
-              <div className="workspace-note-list__item">Dynamic universes make rolling runs more realistic because the resolved scope can change with liquidity and sector rules.</div>
+              <div className="workspace-note-list__item">Daily series are useful when short-lived drift matters.</div>
+              <div className="workspace-note-list__item">Weekly and monthly cadence are better when you want a cleaner long-horizon read.</div>
+              <div className="workspace-note-list__item">Rule-based baskets make rolling runs more realistic because the resolved scope can change with market rules and liquidity.</div>
             </div>
           </Panel>
         </div>
@@ -547,7 +572,7 @@ function SeriesRow({ item }: { item: BuildSeriesListItem }) {
           <span>
             <span className="build-stream__meta-label">Progress</span>
             <span className="mono">
-              {item.completedRunCount}/{item.totalRunCount} runs ({progress}%)
+              {item.completedRunCount}/{item.totalRunCount} snapshots ({progress}%)
             </span>
           </span>
           {item.failedRunCount > 0 ? (

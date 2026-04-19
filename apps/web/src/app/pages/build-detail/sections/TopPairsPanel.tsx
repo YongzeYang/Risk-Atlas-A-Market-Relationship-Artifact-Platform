@@ -14,16 +14,20 @@ export default function TopPairsPanel({ topPairs, symbolCount }: TopPairsPanelPr
   return (
     <Panel variant="secondary">
       <SectionHeader
-        title="Pairs"
+        title="2. Which relationships deserve a closer look?"
         subtitle={
           symbolCount
-            ? `Top ${topPairs.length} candidates from ${formatInteger(symbolCount)} resolved symbols.`
-            : 'Highest absolute-score relationships in this build.'
+            ? `Top ${topPairs.length} relationships drawn from ${formatInteger(symbolCount)} resolved names.`
+            : 'Highest absolute-score relationships in this snapshot.'
         }
       />
 
+      <div className="plain-summary">
+        These are the strongest relationships inside this snapshot. Use them as starting points for deeper follow-up, not as a finished thesis.
+      </div>
+
       {topPairs.length === 0 ? (
-        <div className="state-note">No pair summary is available for this build.</div>
+        <div className="state-note">No relationship summary is available for this snapshot.</div>
       ) : (
         <ol className="rank-list">
           {topPairs.map((pair, index) => (
@@ -40,7 +44,11 @@ export default function TopPairsPanel({ topPairs, symbolCount }: TopPairsPanelPr
                   <span className="mono">{pair.right}</span>
                 </div>
 
-                <div className="rank-list__meta">Candidate pair for deeper drift or divergence follow-up</div>
+                <div className="rank-list__meta">
+                  {index < 3
+                    ? 'One of the strongest pairs — worth comparing across time or lookback'
+                    : 'A notable relationship in this snapshot'}
+                </div>
               </div>
 
               <ScorePill score={pair.score} digits={3} />

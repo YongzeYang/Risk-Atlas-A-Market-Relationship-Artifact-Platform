@@ -6,7 +6,7 @@ type StatusBadgeProps = {
 };
 
 const STATUS_LABELS: Record<BuildRunStatus | BuildSeriesStatus | AnalysisRunStatus, string> = {
-  pending: 'Queued',
+  pending: 'Preparing',
   running: 'Running',
   succeeded: 'Ready',
   failed: 'Failed',

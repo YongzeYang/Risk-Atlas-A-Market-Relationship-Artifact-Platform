@@ -2,8 +2,13 @@
 import type { Prisma } from '@prisma/client';
 
 import { prisma } from '../lib/prisma.js';
-import { BUILD_RUN_WINDOW_DAYS } from '../contracts/build-runs.js';
-import { getBuildRequestValidationForResolvedUniverse } from './build-request-validation-service.js';
+
+const CATALOG_CACHE_TTL_MS = Number.parseInt(process.env.CATALOG_CACHE_TTL_MS ?? '30000', 10);
+
+export const CATALOG_CACHE_CONTROL = `public, max-age=${Math.max(
+  0,
+  Math.floor(CATALOG_CACHE_TTL_MS / 1000)
+)}`;
 
 function asStringArray(value: Prisma.JsonValue): string[] {
   if (value === null || value === undefined) return [];
@@ -48,72 +53,90 @@ export type SecurityMasterItem = {
   market: string;
 };
 
+type CacheEntry<T> = {
+  value: T | null;
+  expiresAt: number;
+  promise: Promise<T> | null;
+};
+
+const datasetListCache: CacheEntry<DatasetListItem[]> = {
+  value: null,
+  expiresAt: 0,
+  promise: null
+};
+
+const universeListCache: CacheEntry<UniverseListItem[]> = {
+  value: null,
+  expiresAt: 0,
+  promise: null
+};
+
+const securityMasterCache: CacheEntry<SecurityMasterItem[]> = {
+  value: null,
+  expiresAt: 0,
+  promise: null
+};
+
+async function withCatalogCache<T>(cache: CacheEntry<T>, loader: () => Promise<T>): Promise<T> {
+  const now = Date.now();
+
+  if (cache.value !== null && cache.expiresAt > now) {
+    return cache.value;
+  }
+
+  if (cache.promise) {
+    return cache.promise;
+  }
+
+  cache.promise = loader()
+    .then((value) => {
+      cache.value = value;
+      cache.expiresAt = Date.now() + CATALOG_CACHE_TTL_MS;
+      return value;
+    })
+    .finally(() => {
+      cache.promise = null;
+    });
+
+  return cache.promise;
+}
+
+function toInt(value: bigint | number | null | undefined): number {
+  if (typeof value === 'bigint') {
+    return Number(value);
+  }
+
+  return value ?? 0;
+}
+
 export async function listDatasets(): Promise<DatasetListItem[]> {
-  const datasets = await prisma.dataset.findMany({
-    orderBy: {
-      createdAt: 'asc'
-    }
-  });
+  return withCatalogCache(datasetListCache, async () => {
+    const datasets = await prisma.dataset.findMany({
+      select: {
+        id: true,
+        name: true,
+        source: true,
+        market: true,
+        createdAt: true,
+        catalogSymbolCount: true,
+        catalogPriceRowCount: true,
+        catalogMinTradeDate: true,
+        catalogMaxTradeDate: true,
+        catalogFirstValidAsOf60: true,
+        catalogFirstValidAsOf120: true,
+        catalogFirstValidAsOf252: true
+      },
+      orderBy: {
+        createdAt: 'asc'
+      }
+    });
 
-  return Promise.all(
-    datasets.map(async (dataset) => {
-      const [priceRowCount, distinctSymbols, minTradeDateRow, maxTradeDateRow, distinctTradeDates] = await Promise.all([
-        prisma.eodPrice.count({
-          where: {
-            datasetId: dataset.id
-          }
-        }),
-        prisma.eodPrice.findMany({
-          where: {
-            datasetId: dataset.id
-          },
-          distinct: ['symbol'],
-          select: {
-            symbol: true
-          }
-        }),
-        prisma.eodPrice.findFirst({
-          where: {
-            datasetId: dataset.id
-          },
-          orderBy: {
-            tradeDate: 'asc'
-          },
-          select: {
-            tradeDate: true
-          }
-        }),
-        prisma.eodPrice.findFirst({
-          where: {
-            datasetId: dataset.id
-          },
-          orderBy: {
-            tradeDate: 'desc'
-          },
-          select: {
-            tradeDate: true
-          }
-        }),
-        prisma.eodPrice.findMany({
-          where: {
-            datasetId: dataset.id
-          },
-          distinct: ['tradeDate'],
-          orderBy: {
-            tradeDate: 'asc'
-          },
-          select: {
-            tradeDate: true
-          }
-        })
-      ]);
-
-      const firstValidAsOfByWindowDays = Object.fromEntries(
-        BUILD_RUN_WINDOW_DAYS.map((windowDays) => [
-          String(windowDays),
-          distinctTradeDates[windowDays]?.tradeDate ?? null
-        ])
-      );
+    return datasets.map((dataset) => {
+      const firstValidAsOfByWindowDays = {
+        '60': dataset.catalogFirstValidAsOf60,
+        '120': dataset.catalogFirstValidAsOf120,
+        '252': dataset.catalogFirstValidAsOf252
+      };
 
       return {
         id: dataset.id,
@@ -121,98 +144,65 @@ export async function listDatasets(): Promise<DatasetListItem[]> {
         source: dataset.source,
         market: dataset.market,
         createdAt: dataset.createdAt.toISOString(),
-        symbolCount: distinctSymbols.length,
-        priceRowCount,
-        minTradeDate: minTradeDateRow?.tradeDate ?? null,
-        maxTradeDate: maxTradeDateRow?.tradeDate ?? null,
+        symbolCount: dataset.catalogSymbolCount,
+        priceRowCount: toInt(dataset.catalogPriceRowCount),
+        minTradeDate: dataset.catalogMinTradeDate,
+        maxTradeDate: dataset.catalogMaxTradeDate,
         firstValidAsOfByWindowDays
       };
-    })
-  );
+    });
+  });
 }
 
 export async function listUniverses(): Promise<UniverseListItem[]> {
-  const universes = await prisma.universe.findMany({
-    orderBy: [{ symbolCount: { sort: 'desc', nulls: 'last' } }, { id: 'asc' }]
-  });
-
-  const datasets = await prisma.dataset.findMany({
-    select: {
-      id: true,
-      market: true
-    }
-  });
-
-  const datasetsWithMaxTradeDate = await Promise.all(
-    datasets.map(async (dataset) => {
-      const maxTradeDateRow = await prisma.eodPrice.findFirst({
-        where: {
-          datasetId: dataset.id
-        },
-        orderBy: {
-          tradeDate: 'desc'
-        },
+  return withCatalogCache(universeListCache, async () => {
+    const [universes, datasets] = await Promise.all([
+      prisma.universe.findMany({
+        orderBy: [{ symbolCount: { sort: 'desc', nulls: 'last' } }, { id: 'asc' }]
+      }),
+      prisma.dataset.findMany({
         select: {
-          tradeDate: true
+          id: true,
+          market: true
         }
-      });
+      })
+    ]);
 
-      return {
-        ...dataset,
-        maxTradeDate: maxTradeDateRow?.tradeDate ?? null
-      };
-    })
-  );
+    const datasetIdsByMarket = new Map<string, string[]>();
 
-  const maxWindowDays = Math.max(...BUILD_RUN_WINDOW_DAYS) as (typeof BUILD_RUN_WINDOW_DAYS)[number];
+    for (const dataset of datasets) {
+      const existing = datasetIdsByMarket.get(dataset.market) ?? [];
+      existing.push(dataset.id);
+      datasetIdsByMarket.set(dataset.market, existing);
+    }
 
-  return Promise.all(
-    universes.map(async (universe) => {
-      const symbols = asStringArray(universe.symbolsJson);
-      let supportedDatasetIds: string[] = [];
-
-      for (const dataset of datasetsWithMaxTradeDate) {
-        if (dataset.market !== universe.market || !dataset.maxTradeDate) {
-          continue;
-        }
-
-        const validation = await getBuildRequestValidationForResolvedUniverse({
-          dataset,
-          universe,
-          asOfDate: dataset.maxTradeDate,
-          windowDays: maxWindowDays
-        });
-
-        if (validation.valid) {
-          supportedDatasetIds.push(dataset.id);
-        }
-      }
-      return {
-        id: universe.id,
-        name: universe.name,
-        market: universe.market,
-        symbolCount: universe.symbolCount,
-        symbols,
-        definitionKind: universe.definitionKind,
-        definitionParams: universe.definitionParams,
-        supportedDatasetIds,
-        createdAt: universe.createdAt.toISOString()
-      };
-    })
-  );
+    return universes.map((universe) => ({
+      id: universe.id,
+      name: universe.name,
+      market: universe.market,
+      symbolCount: universe.symbolCount,
+      symbols: asStringArray(universe.symbolsJson),
+      definitionKind: universe.definitionKind,
+      definitionParams: universe.definitionParams,
+      supportedDatasetIds: datasetIdsByMarket.get(universe.market) ?? [],
+      createdAt: universe.createdAt.toISOString()
+    }));
+  });
 }
 
 export async function listSecurityMaster(): Promise<SecurityMasterItem[]> {
-  const entries = await prisma.securityMaster.findMany({
-    orderBy: { symbol: 'asc' }
-  });
+  return withCatalogCache(securityMasterCache, async () => {
+    const entries = await prisma.securityMaster.findMany({
+      orderBy: { symbol: 'asc' }
+    });
 
-  return entries.map((entry) => ({
-    symbol: entry.symbol,
-    name: entry.name,
-    shortName: entry.shortName,
-    securityType: entry.securityType,
-    sector: entry.sector,
-    market: entry.market
-  }));
+    return entries.map((entry) => ({
+      symbol: entry.symbol,
+      name: entry.name,
+      shortName: entry.shortName,
+      securityType: entry.securityType,
+      sector: entry.sector,
+      market: entry.market
+    }));
+  });
 }

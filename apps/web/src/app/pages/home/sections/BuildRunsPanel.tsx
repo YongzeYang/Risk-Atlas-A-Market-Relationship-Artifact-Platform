@@ -5,7 +5,9 @@ import { Link } from 'react-router-dom';
 import Panel from '../../../../components/ui/Panel';
 import SectionHeader from '../../../../components/ui/SectionHeader';
 import StatusBadge from '../../../../components/ui/StatusBadge';
+import { describeSnapshotHint, summarizeBuildFailure } from '../../../../lib/build-run-language';
 import { formatDateOnly, formatDateTime, formatDurationMs, truncateMiddle } from '../../../../lib/format';
+import { formatLookbackLabel } from '../../../../lib/snapshot-language';
 import type { BuildRunListItem } from '../../../../types/api';
 
 type BuildRunsPanelProps = {
@@ -19,6 +21,7 @@ type BuildRunsPanelProps = {
   subtitle?: string;
   emptyStateCopy?: string;
   action?: ReactNode;
+  universeLabels?: Record<string, string>;
 };
 
 function formatBuildDuration(buildRun: BuildRunListItem): string {
@@ -33,7 +36,7 @@ function formatBuildDuration(buildRun: BuildRunListItem): string {
   }
 
   if (buildRun.status === 'pending') {
-    return 'Queued';
+    return 'Preparing';
   }
 
   return '—';
@@ -46,10 +49,11 @@ export default function BuildRunsPanel({
   error,
   lastCreatedBuildId = null,
   onRefresh,
-  title = 'Recent builds',
+  title = 'Recent snapshots',
   subtitle,
-  emptyStateCopy = 'No builds yet. Start one from the build workspace.',
-  action
+  emptyStateCopy = 'No snapshots yet. Create one to start reading the market in this format.',
+  action,
+  universeLabels = {}
 }: BuildRunsPanelProps) {
   return (
     <Panel variant="primary">
@@ -63,7 +67,7 @@ export default function BuildRunsPanel({
         )}
       />
 
-      {loading ? <div className="state-note">Loading builds…</div> : null}
+      {loading ? <div className="state-note">Loading snapshots…</div> : null}
       {error ? <div className="state-note state-note--error">{error}</div> : null}
 
       {!loading && buildRuns.length === 0 ? (
@@ -72,62 +76,72 @@ export default function BuildRunsPanel({
 
       {buildRuns.length > 0 ? (
         <div className="build-stream">
-          {buildRuns.map((buildRun) => (
-            <article
-              key={buildRun.id}
-              className={`build-stream__item${
-                lastCreatedBuildId === buildRun.id ? ' build-stream__item--highlight' : ''
-              }`}
-            >
-              <div className="build-stream__main">
-                <div className="build-stream__topline">
-                  <StatusBadge status={buildRun.status} />
+          {buildRuns.map((buildRun) => {
+            const universeLabel = universeLabels[buildRun.universeId] ?? buildRun.universeId;
+            const actionLabel = buildRun.status === 'succeeded' ? 'Open snapshot' : 'Open details';
+
+            return (
+              <article
+                key={buildRun.id}
+                className={`build-stream__item${
+                  lastCreatedBuildId === buildRun.id ? ' build-stream__item--highlight' : ''
+                }`}
+              >
+                <div className="build-stream__main">
+                  <div className="build-stream__topline">
+                    <StatusBadge status={buildRun.status} />
+                    <div className="build-stream__title">{universeLabel}</div>
+                  </div>
 
                   <div className="build-stream__scope">
-                    <span className="mono">{buildRun.universeId}</span>
+                    <span>Snapshot date {formatDateOnly(buildRun.asOfDate)}</span>
                     <span className="build-stream__divider">·</span>
-                    <span className="mono">{formatDateOnly(buildRun.asOfDate)}</span>
-                    <span className="build-stream__divider">·</span>
-                    <span>{buildRun.windowDays}-day window</span>
+                    <span>{formatLookbackLabel(buildRun.windowDays)}</span>
                   </div>
+
+                  <div className="build-stream__summary">
+                    {describeSnapshotHint(buildRun, universeLabel)}
+                  </div>
+
+                  <div className="build-stream__meta">
+                    {universeLabel !== buildRun.universeId ? (
+                      <span>
+                        <span className="build-stream__meta-label">Basket code</span>
+                        <span className="mono">{buildRun.universeId}</span>
+                      </span>
+                    ) : null}
+
+                    <span>
+                      <span className="build-stream__meta-label">Created</span>
+                      <span className="mono">{formatDateTime(buildRun.createdAt)}</span>
+                    </span>
+
+                    <span>
+                      <span className="build-stream__meta-label">Run time</span>
+                      <span className="mono">{formatBuildDuration(buildRun)}</span>
+                    </span>
+
+                    <span>
+                      <span className="build-stream__meta-label">Snapshot ID</span>
+                      <span className="mono">{truncateMiddle(buildRun.id, 8, 6)}</span>
+                    </span>
+                  </div>
+
+                  {buildRun.errorMessage ? (
+                    <div className="build-stream__secondary-note">
+                      {summarizeBuildFailure(buildRun.errorMessage)}
+                    </div>
+                  ) : null}
                 </div>
 
-                <div className="build-stream__meta">
-                  <span>
-                    <span className="build-stream__meta-label">Dataset</span>
-                    <span className="mono">{buildRun.datasetId}</span>
-                  </span>
-
-                  <span>
-                    <span className="build-stream__meta-label">Created</span>
-                    <span className="mono">{formatDateTime(buildRun.createdAt)}</span>
-                  </span>
-
-                  <span>
-                    <span className="build-stream__meta-label">Duration</span>
-                    <span className="mono">{formatBuildDuration(buildRun)}</span>
-                  </span>
-
-                  <span>
-                    <span className="build-stream__meta-label">Build</span>
-                    <span className="mono">{truncateMiddle(buildRun.id, 8, 6)}</span>
-                  </span>
+                <div className="build-stream__action">
+                  <Link to={`/builds/${buildRun.id}`} className="button button--secondary button--sm">
+                    {actionLabel}
+                  </Link>
                 </div>
-
-                {buildRun.errorMessage ? (
-                  <div className="state-note state-note--error build-stream__error">
-                    {buildRun.errorMessage}
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="build-stream__action">
-                <Link to={`/builds/${buildRun.id}`} className="button button--secondary button--sm">
-                  Open build
-                </Link>
-              </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
       ) : null}
     </Panel>

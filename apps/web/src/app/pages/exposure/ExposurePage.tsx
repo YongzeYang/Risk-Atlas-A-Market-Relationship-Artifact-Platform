@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { ActiveAnalysisRunPanel, RecentAnalysisRunsPanel } from '../../../components/analysis/AnalysisRunPanels';
+import BoundaryNote from '../../../components/ui/BoundaryNote';
 import Panel from '../../../components/ui/Panel';
 import Modal from '../../../components/ui/Modal';
 import SectionHeader from '../../../components/ui/SectionHeader';
@@ -14,6 +15,7 @@ import {
   useInviteCode
 } from '../../../features/builds/hooks';
 import { formatDateOnly, formatInteger, formatScore } from '../../../lib/format';
+import { formatLookbackLabel, formatSnapshotOptionLabel } from '../../../lib/snapshot-language';
 import type {
   AnalysisRunDetailResponse,
   AnalysisRunListItem,
@@ -178,12 +180,12 @@ export default function ExposurePage() {
       event.preventDefault();
 
       if (!buildId || !symbol) {
-        setError('Select a succeeded build and anchor symbol before queueing exposure analysis.');
+        setError('Select a ready snapshot and anchor name before preparing spillover analysis.');
         return;
       }
 
       if (!inviteCode) {
-        setError('Invite code is required before queueing exposure analysis.');
+        setError('Invite code is required before preparing spillover analysis.');
         return;
       }
 
@@ -208,7 +210,7 @@ export default function ExposurePage() {
 
         adoptRun(queued);
       } catch (nextError) {
-        setError(nextError instanceof Error ? nextError.message : 'Failed to queue exposure analysis.');
+        setError(nextError instanceof Error ? nextError.message : 'Failed to prepare spillover analysis.');
       } finally {
         setSubmitting(false);
       }
@@ -220,18 +222,19 @@ export default function ExposurePage() {
     <div className="page page--exposure">
       <section className="workspace-hero">
         <div className="workspace-hero__copy">
-          <div className="workspace-hero__eyebrow">Co-movement exposure</div>
-          <h1 className="workspace-hero__title">Start from one symbol and expose how concentrated its market neighborhood really is.</h1>
+          <h1 className="workspace-hero__title">If this stock drops, who tends to move with it?</h1>
           <p className="workspace-hero__description">
-            Queue the exposure readout, keep working elsewhere, and reopen the persisted result
-            later instead of pinning the browser to one long request.
+            Start from one stock and inspect its historical co-movement circle.
           </p>
+          <BoundaryNote variant="accent">
+            Historical co-movement, not causality.
+          </BoundaryNote>
           <div className="workspace-hero__actions">
             <Link to="/builds" className="button button--secondary">
-              Browse builds
+              Browse snapshots
             </Link>
             <Link to="/structure" className="button button--ghost">
-              Open structure view
+              Open groups
             </Link>
           </div>
         </div>
@@ -239,19 +242,19 @@ export default function ExposurePage() {
         <div className="workspace-hero__stats">
           <article className="workspace-hero__stat-card">
             <div className="workspace-hero__stat-value mono">{formatInteger(comparableBuilds.length)}</div>
-            <div className="workspace-hero__stat-label">Succeeded builds</div>
+            <div className="workspace-hero__stat-label">Ready snapshots</div>
           </article>
           <article className="workspace-hero__stat-card">
             <div className="workspace-hero__stat-value mono">{selectedBuild ? formatDateOnly(selectedBuild.asOfDate) : '—'}</div>
-            <div className="workspace-hero__stat-label">Selected as-of</div>
+            <div className="workspace-hero__stat-label">Snapshot date</div>
           </article>
           <article className="workspace-hero__stat-card">
             <div className="workspace-hero__stat-value mono">{symbol || '—'}</div>
-            <div className="workspace-hero__stat-label">Anchor symbol</div>
+            <div className="workspace-hero__stat-label">Anchor name</div>
           </article>
           <article className="workspace-hero__stat-card">
             <div className="workspace-hero__stat-value mono">{formatInteger(activeResult?.neighborCount ?? 0)}</div>
-            <div className="workspace-hero__stat-label">Neighbors returned</div>
+            <div className="workspace-hero__stat-label">Related names returned</div>
           </article>
         </div>
       </section>
@@ -260,8 +263,8 @@ export default function ExposurePage() {
         <div className="workspace-layout__main">
           <Panel variant="primary">
             <SectionHeader
-              title="Exposure settings"
-              subtitle="Queue the run, then revisit the saved result later by run id."
+              title="Spillover settings"
+              subtitle="Prepare the analysis, then revisit the saved result later."
               action={
                 <button
                   type="button"
@@ -276,13 +279,13 @@ export default function ExposurePage() {
 
             {comparableBuilds.length === 0 && !buildRunsLoading ? (
               <div className="state-note state-note--error">
-                At least one succeeded build is required before exposure analysis becomes available.
+                At least one ready snapshot is required before spillover analysis becomes available.
               </div>
             ) : null}
 
             <form className="query-form query-form--wide" onSubmit={handleAnalyze}>
               <label className="field">
-                <span className="field__label">Build</span>
+                <span className="field__label">Snapshot</span>
                 <select
                   className="field__control mono"
                   value={buildId}
@@ -294,14 +297,14 @@ export default function ExposurePage() {
                 >
                   {comparableBuilds.map((buildRun) => (
                     <option key={buildRun.id} value={buildRun.id}>
-                      {formatBuildOption(buildRun)}
+                      {formatSnapshotOptionLabel(buildRun)}
                     </option>
                   ))}
                 </select>
               </label>
 
               <label className="field">
-                <span className="field__label">Anchor symbol</span>
+                <span className="field__label">Anchor name</span>
                 <select
                   className="field__control mono"
                   value={symbol}
@@ -317,7 +320,7 @@ export default function ExposurePage() {
               </label>
 
               <label className="field">
-                <span className="field__label">Neighbor depth</span>
+                <span className="field__label">How many related names</span>
                 <select
                   className="field__control mono"
                   value={k}
@@ -336,7 +339,7 @@ export default function ExposurePage() {
                 <input
                   className="field__control mono"
                   type="text"
-                  placeholder="Required for queueing analysis"
+                  placeholder="Needed to prepare analysis"
                   value={inviteCode}
                   onChange={(event) => setInviteCode(event.target.value)}
                   autoComplete="off"
@@ -350,7 +353,7 @@ export default function ExposurePage() {
                   className="button button--primary"
                   disabled={submitting || !buildId || !symbol || !inviteCode}
                 >
-                  {submitting ? 'Queueing…' : 'Queue exposure'}
+                  {submitting ? 'Preparing…' : 'Prepare spillover view'}
                 </button>
               </div>
             </form>
@@ -358,14 +361,14 @@ export default function ExposurePage() {
 
           <Panel variant="primary">
             <SectionHeader
-              title="Active run"
-              subtitle="Queued runs keep their status and results after reload."
+              title="Current result"
+              subtitle="Results are saved and available after page reload."
             />
             <ActiveAnalysisRunPanel
               run={run}
               loading={runLoading}
-              idleTitle="No active exposure run selected"
-              idleDescription="Queue one run above or reopen a recent run from the side rail."
+              idleTitle="No current result"
+              idleDescription="Prepare one analysis above or reopen a saved analysis from the side rail."
               formatSummary={formatExposureRunSummary}
             />
             {runError ? <div className="state-note state-note--error">{runError}</div> : null}
@@ -378,8 +381,8 @@ export default function ExposurePage() {
         <div className="workspace-layout__side">
           <Panel variant="utility">
             <SectionHeader
-              title="Recent runs"
-              subtitle="Reopen finished or still-running exposure reads without requeueing them."
+              title="Saved analyses"
+              subtitle="Reopen finished results without rerunning them."
             />
             <RecentAnalysisRunsPanel
               runs={recentRuns}
@@ -387,8 +390,8 @@ export default function ExposurePage() {
               activeRunId={runId}
               emptyCopy={
                 buildId
-                  ? 'No exposure runs yet for the selected build.'
-                  : 'Select a build to load recent exposure runs.'
+                  ? 'No saved analyses yet for the selected snapshot.'
+                  : 'Select a snapshot to load saved analyses.'
               }
               formatSummary={formatExposureRunSummary}
               onSelect={(nextRunId) => {
@@ -403,14 +406,13 @@ export default function ExposurePage() {
           <Panel variant="utility">
             <SectionHeader
               title="How to read it"
-              subtitle="This page asks whether co-movement is broad, narrow, and sector-concentrated."
+              subtitle="This page asks whether co-movement from one name is broad, narrow, and sector-concentrated."
             />
 
             <div className="workspace-note-list">
-              <div className="workspace-note-list__item">Browsing build metadata stays open; queue creation requires an invite code.</div>
-              <div className="workspace-note-list__item">Use concentration index to see whether the anchor relies on only a few dominant neighbors.</div>
-              <div className="workspace-note-list__item">Use same-sector weight share to distinguish sector concentration from broader market structure.</div>
-              <div className="workspace-note-list__item">Strength bands make the ladder easier to interpret than a raw score list alone.</div>
+              <div className="workspace-note-list__item">Use this page to see whether co-movement around one name is broad or narrow.</div>
+              <div className="workspace-note-list__item">Same-sector concentration helps separate local overlap from broader market structure.</div>
+              <div className="workspace-note-list__item">This is a historical relationship read, not a guarantee of future contagion.</div>
             </div>
           </Panel>
         </div>
@@ -419,7 +421,7 @@ export default function ExposurePage() {
       <Modal
         open={previewOpen}
         title="Run preview"
-        subtitle="Preview the scope and a small live neighbor slice before you queue the full exposure run."
+        subtitle="Preview the scope and a small live neighbor slice before you queue the full spillover run."
         onClose={() => setPreviewOpen(false)}
       >
         <ExposurePreview
@@ -454,7 +456,7 @@ function ExposurePreview({
   previewLoading: boolean;
 }) {
   if (!selectedBuild) {
-    return <div className="state-note">Select one succeeded build to preview this run.</div>;
+    return <div className="state-note">Select one ready snapshot to preview this run.</div>;
   }
 
   if (previewLoading && !preview) {
@@ -470,14 +472,14 @@ function ExposurePreview({
     <>
       <div className="stat-grid">
         <div className="stat-card">
-          <div className="stat-card__label">Build scope</div>
+          <div className="stat-card__label">Snapshot scope</div>
           <div className="stat-card__value mono">{selectedBuild.universeId}</div>
-          <div className="stat-card__helper">{formatDateOnly(selectedBuild.asOfDate)} · {selectedBuild.windowDays}d</div>
+          <div className="stat-card__helper">{formatDateOnly(selectedBuild.asOfDate)} · {formatLookbackLabel(selectedBuild.windowDays)}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-card__label">Universe size</div>
+          <div className="stat-card__label">Basket size</div>
           <div className="stat-card__value mono">{formatInteger(universeSize)}</div>
-          <div className="stat-card__helper">Symbols available for the anchor picker</div>
+          <div className="stat-card__helper">Names available for the anchor picker</div>
         </div>
         <div className="stat-card">
           <div className="stat-card__label">Anchor / depth</div>
@@ -509,7 +511,7 @@ function ExposurePreview({
                   <span className="rank-list__pair-sep">→</span>
                   <span className="mono">{entry.symbol}</span>
                 </div>
-                <div className="rank-list__meta">Preview neighbor from the stored BSM top-k lookup.</div>
+                <div className="rank-list__meta">Preview neighbor from the stored snapshot top-k lookup.</div>
               </div>
               <span className="score-pill score-pill--neutral">{formatScore(entry.score, 3)}</span>
             </article>
@@ -524,9 +526,17 @@ function ExposureResult({ data }: { data: ExposureResponse }) {
   return (
     <Panel variant="primary">
       <SectionHeader
-        title="Exposure summary"
-        subtitle="The anchor symbol is shown with neighbor ladder, sector aggregation, and concentration metrics in one place."
+        title="Spillover summary"
+        subtitle="The anchor name is shown with related names, sector mix, and concentration metrics in one place."
       />
+
+      <div className="plain-summary">
+        Risk around <span className="mono">{data.symbol}</span> looks{' '}
+        {data.concentrationIndex > 0.5 ? 'concentrated in a small circle' : 'broad rather than concentrated in one corner of the basket'}.{' '}
+        {data.sameSectorWeightShare > 0.5
+          ? 'The related names lean heavily toward the same sector.'
+          : 'The related names are spread across multiple sectors.'}
+      </div>
 
       <div className="stat-grid">
         <div className="stat-card">
@@ -534,12 +544,13 @@ function ExposureResult({ data }: { data: ExposureResponse }) {
           <div className="stat-card__value">{data.anchorSector ?? 'unclassified'}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-card__label">Avg neighbor score</div>
+          <div className="stat-card__label">Average relationship</div>
           <div className="stat-card__value mono">{formatScore(data.averageNeighborScore, 3)}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-card__label">Concentration index</div>
+          <div className="stat-card__label">Risk circle breadth</div>
           <div className="stat-card__value mono">{formatScore(data.concentrationIndex, 3)}</div>
+          <div className="stat-card__helper">Lower values mean risk is spread across more names</div>
         </div>
         <div className="stat-card">
           <div className="stat-card__label">Same-sector weight</div>
@@ -550,8 +561,8 @@ function ExposureResult({ data }: { data: ExposureResponse }) {
       <div className="workspace-layout" style={{ marginTop: '1.5rem' }}>
         <div className="workspace-layout__main">
           <SectionHeader
-            title="Neighbor ladder"
-            subtitle="Ranked by score descending from the BSM row-topk path."
+            title="Closest names"
+            subtitle="Ranked by relationship score from the stored snapshot."
           />
 
           <div className="rank-list">
@@ -563,7 +574,7 @@ function ExposureResult({ data }: { data: ExposureResponse }) {
                     <span className="mono">{entry.symbol}</span>
                   </div>
                   <div className="rank-list__meta">
-                    Sector {entry.sector ?? 'unclassified'} · Type {entry.securityType ?? 'unknown'} · {entry.strengthBand.replace('_', ' ')}
+                    {entry.sector ?? 'unclassified'} · {entry.strengthBand.replace('_', ' ')} · historically one of the closest names to {data.symbol}
                   </div>
                 </div>
                 <span className={`score-pill ${entry.sameSector ? 'score-pill--positive' : 'score-pill--neutral'}`}>
@@ -576,7 +587,7 @@ function ExposureResult({ data }: { data: ExposureResponse }) {
 
         <div className="workspace-layout__side">
           <Panel variant="utility">
-            <SectionHeader title="Sector aggregation" />
+            <SectionHeader title="Where the related names cluster" />
             <div className="workspace-note-list">
               {data.sectors.map((entry) => (
                 <div key={entry.sector ?? 'unclassified'} className="workspace-note-list__item">
@@ -587,7 +598,7 @@ function ExposureResult({ data }: { data: ExposureResponse }) {
           </Panel>
 
           <Panel variant="utility">
-            <SectionHeader title="Strength bands" />
+            <SectionHeader title="How strong the related names are" />
             <div className="workspace-note-list">
               {data.bands.map((entry) => (
                 <div key={entry.band} className="workspace-note-list__item">
@@ -602,16 +613,12 @@ function ExposureResult({ data }: { data: ExposureResponse }) {
   );
 }
 
-function formatBuildOption(buildRun: BuildRunListItem): string {
-  return `${buildRun.universeId} · ${formatDateOnly(buildRun.asOfDate)} · ${buildRun.windowDays}d · ${buildRun.id.slice(0, 8)}`;
-}
-
 function formatExposureRunSummary(run: AnalysisRunListItem | AnalysisRunDetailResponse): string {
   if (run.kind !== 'exposure') {
     return 'Unsupported run kind.';
   }
 
-  return `${run.buildRunId.slice(0, 8)} · ${run.request.symbol} · top ${run.request.k}`;
+  return `${run.buildRunId.slice(0, 8)} · ${run.request.symbol} · neighbors ${run.request.k}`;
 }
 
 function formatPercent(value: number): string {

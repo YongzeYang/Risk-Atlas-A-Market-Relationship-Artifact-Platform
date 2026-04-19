@@ -6,6 +6,7 @@ import SectionHeader from '../../../components/ui/SectionHeader';
 import StatusBadge from '../../../components/ui/StatusBadge';
 import { useBuildSeriesDetailData } from '../../../features/builds/hooks';
 import { formatDateOnly, formatDateTime } from '../../../lib/format';
+import { formatLookbackLabel } from '../../../lib/snapshot-language';
 import type { BuildSeriesRunItem } from '../../../types/api';
 
 export default function BuildSeriesDetailPage() {
@@ -16,7 +17,7 @@ export default function BuildSeriesDetailPage() {
     return (
       <div className="page page--series-detail">
         <Panel variant="primary">
-          <div className="state-note">Loading series…</div>
+          <div className="state-note">Loading snapshot series…</div>
         </Panel>
       </div>
     );
@@ -36,7 +37,7 @@ export default function BuildSeriesDetailPage() {
     return (
       <div className="page page--series-detail">
         <Panel variant="primary">
-          <div className="state-note state-note--error">Series not found.</div>
+          <div className="state-note state-note--error">Snapshot series not found.</div>
         </Panel>
       </div>
     );
@@ -54,14 +55,14 @@ export default function BuildSeriesDetailPage() {
       <Panel variant="primary">
         <SectionHeader
           title={detail.name || detail.id}
-          subtitle={`Series · ${detail.frequency} · ${formatDateOnly(detail.startDate)} → ${formatDateOnly(detail.endDate)}`}
+          subtitle={`Snapshot series · ${detail.frequency} · ${formatDateOnly(detail.startDate)} → ${formatDateOnly(detail.endDate)}`}
         />
 
         <div className="series-detail__meta">
           <div className="series-detail__meta-row">
             <StatusBadge status={detail.status} />
             <span className="mono">
-              {detail.completedRunCount}/{detail.totalRunCount} runs completed ({progress}%)
+              {detail.completedRunCount}/{detail.totalRunCount} snapshots completed ({progress}%)
             </span>
             {detail.failedRunCount > 0 && (
               <span className="mono" style={{ color: 'var(--color-danger, #ef4444)' }}>
@@ -71,8 +72,8 @@ export default function BuildSeriesDetailPage() {
           </div>
           <div className="series-detail__meta-row">
             <span>
-              <span className="build-stream__meta-label">Window</span>
-              <span className="mono">{detail.windowDays} days</span>
+              <span className="build-stream__meta-label">Lookback</span>
+              <span className="mono">{formatLookbackLabel(detail.windowDays)}</span>
             </span>
             <span>
               <span className="build-stream__meta-label">Score method</span>
@@ -88,12 +89,12 @@ export default function BuildSeriesDetailPage() {
 
       <Panel variant="primary">
         <SectionHeader
-          title="Runs"
-          subtitle={`${detail.runs.length} build runs in this series`}
+          title="Snapshots"
+          subtitle={`${detail.runs.length} scheduled snapshots in this series`}
         />
 
         {detail.runs.length === 0 ? (
-          <div className="state-note">No runs yet.</div>
+          <div className="state-note">No snapshots yet.</div>
         ) : (
           <div className="build-stream">
             {detail.runs.map((run) => (

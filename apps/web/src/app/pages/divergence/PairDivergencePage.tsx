@@ -2,8 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { ActiveAnalysisRunPanel, RecentAnalysisRunsPanel } from '../../../components/analysis/AnalysisRunPanels';
+import BoundaryNote from '../../../components/ui/BoundaryNote';
 import Panel from '../../../components/ui/Panel';
 import Modal from '../../../components/ui/Modal';
+import ResearchDetails from '../../../components/ui/ResearchDetails';
 import SectionHeader from '../../../components/ui/SectionHeader';
 import { createPairDivergenceAnalysisRun } from '../../../features/builds/api';
 import {
@@ -14,6 +16,7 @@ import {
   useInviteCode
 } from '../../../features/builds/hooks';
 import { formatDateOnly, formatInteger, formatScore } from '../../../lib/format';
+import { formatLookbackLabel, formatSnapshotOptionLabel } from '../../../lib/snapshot-language';
 import type {
   AnalysisRunDetailResponse,
   AnalysisRunListItem,
@@ -152,12 +155,12 @@ export default function PairDivergencePage() {
       event.preventDefault();
 
       if (!buildId) {
-        setError('Select a succeeded build before queueing divergence analysis.');
+        setError('Select a ready snapshot before preparing relationship analysis.');
         return;
       }
 
       if (!inviteCode) {
-        setError('Invite code is required before queueing divergence analysis.');
+        setError('Invite code is required before preparing relationship analysis.');
         return;
       }
 
@@ -193,7 +196,7 @@ export default function PairDivergencePage() {
 
         adoptRun(queued);
       } catch (nextError) {
-        setError(nextError instanceof Error ? nextError.message : 'Failed to queue divergence analysis.');
+        setError(nextError instanceof Error ? nextError.message : 'Failed to prepare relationship analysis.');
       } finally {
         setSubmitting(false);
       }
@@ -213,18 +216,19 @@ export default function PairDivergencePage() {
     <div className="page page--divergence">
       <section className="workspace-hero">
         <div className="workspace-hero__copy">
-          <div className="workspace-hero__eyebrow">Pair divergence</div>
-          <h1 className="workspace-hero__title">Rank relationship breaks before they disappear inside a full matrix.</h1>
+          <h1 className="workspace-hero__title">Which relationships deserve a second look?</h1>
           <p className="workspace-hero__description">
-            Queue a persisted screen, let the worker compute it in the background, and reopen the
-            run later by id instead of holding one long blocking request open.
+            Find pairs whose relationship looks unusually stronger, weaker, or newly stretched.
           </p>
+          <BoundaryNote variant="accent">
+            Research lead, not a direct trading signal.
+          </BoundaryNote>
           <div className="workspace-hero__actions">
             <Link to="/compare" className="button button--secondary">
-              Compare builds
+              What changed
             </Link>
             <Link to="/builds" className="button button--ghost">
-              Browse builds
+              Browse snapshots
             </Link>
           </div>
         </div>
@@ -232,15 +236,15 @@ export default function PairDivergencePage() {
         <div className="workspace-hero__stats">
           <article className="workspace-hero__stat-card">
             <div className="workspace-hero__stat-value mono">{formatInteger(comparableBuilds.length)}</div>
-            <div className="workspace-hero__stat-label">Succeeded builds</div>
+            <div className="workspace-hero__stat-label">Ready snapshots</div>
           </article>
           <article className="workspace-hero__stat-card">
             <div className="workspace-hero__stat-value mono">{selectedBuild ? formatDateOnly(selectedBuild.asOfDate) : '—'}</div>
-            <div className="workspace-hero__stat-label">Selected as-of</div>
+            <div className="workspace-hero__stat-label">Snapshot date</div>
           </article>
           <article className="workspace-hero__stat-card">
-            <div className="workspace-hero__stat-value mono">{selectedBuild ? `${selectedBuild.windowDays}d` : '—'}</div>
-            <div className="workspace-hero__stat-label">Long window</div>
+            <div className="workspace-hero__stat-value mono">{selectedBuild ? formatLookbackLabel(selectedBuild.windowDays) : '—'}</div>
+            <div className="workspace-hero__stat-label">Anchor lookback</div>
           </article>
           <article className="workspace-hero__stat-card">
             <div className="workspace-hero__stat-value mono">{formatInteger(activeResult?.candidateCount ?? 0)}</div>
@@ -253,8 +257,8 @@ export default function PairDivergencePage() {
         <div className="workspace-layout__main">
           <Panel variant="primary">
             <SectionHeader
-              title="Screen settings"
-              subtitle="Queue a persisted screen instead of waiting on one synchronous request. The result stays available under its run id."
+              title="Relationship screen settings"
+              subtitle="Prepare a persisted view. The result stays available so you can reopen it later."
               action={
                 <button
                   type="button"
@@ -269,13 +273,13 @@ export default function PairDivergencePage() {
 
             {comparableBuilds.length === 0 && !buildRunsLoading ? (
               <div className="state-note state-note--error">
-                At least one succeeded build is required before divergence analysis becomes available.
+                At least one ready snapshot is required before relationship analysis becomes available.
               </div>
             ) : null}
 
             <form className="query-form query-form--wide" onSubmit={handleAnalyze}>
               <label className="field">
-                <span className="field__label">Build</span>
+                <span className="field__label">Snapshot</span>
                 <select
                   className="field__control mono"
                   value={buildId}
@@ -287,14 +291,14 @@ export default function PairDivergencePage() {
                 >
                   {comparableBuilds.map((buildRun) => (
                     <option key={buildRun.id} value={buildRun.id}>
-                      {formatBuildOption(buildRun)}
+                      {formatSnapshotOptionLabel(buildRun)}
                     </option>
                   ))}
                 </select>
               </label>
 
               <label className="field">
-                <span className="field__label">Recent window</span>
+                <span className="field__label">Fresh lookback</span>
                 <input
                   className="field__control mono"
                   type="number"
@@ -307,51 +311,11 @@ export default function PairDivergencePage() {
               </label>
 
               <label className="field">
-                <span className="field__label">Min |long corr|</span>
-                <input
-                  className="field__control mono"
-                  type="number"
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  value={minLongCorrAbs}
-                  onChange={(event) => setMinLongCorrAbs(event.target.value)}
-                />
-              </label>
-
-              <label className="field">
-                <span className="field__label">Min |corr delta|</span>
-                <input
-                  className="field__control mono"
-                  type="number"
-                  min={0}
-                  max={2}
-                  step={0.01}
-                  value={minCorrDeltaAbs}
-                  onChange={(event) => setMinCorrDeltaAbs(event.target.value)}
-                />
-              </label>
-
-              <label className="field">
-                <span className="field__label">Return limit</span>
-                <select
-                  className="field__control mono"
-                  value={limit}
-                  onChange={(event) => setLimit(event.target.value)}
-                >
-                  <option value="25">25</option>
-                  <option value="50">50</option>
-                  <option value="100">100</option>
-                  <option value="200">200</option>
-                </select>
-              </label>
-
-              <label className="field">
                 <span className="field__label">Invite code</span>
                 <input
                   className="field__control mono"
                   type="text"
-                  placeholder="Required for queueing analysis"
+                  placeholder="Needed to prepare analysis"
                   value={inviteCode}
                   onChange={(event) => setInviteCode(event.target.value)}
                   autoComplete="off"
@@ -365,28 +329,66 @@ export default function PairDivergencePage() {
                   className="button button--primary"
                   disabled={submitting || !buildId || !inviteCode || comparableBuilds.length === 0}
                 >
-                  {submitting ? 'Queueing…' : 'Queue screen'}
+                  {submitting ? 'Preparing…' : 'Prepare relationships view'}
                 </button>
               </div>
             </form>
 
-            <div className="filter-summary-row">
-              <span className="filter-summary-row__item">Browsing build metadata stays open; only queue creation requires an invite code.</span>
-              <span className="filter-summary-row__item">Long correlation comes from the stored build artifact.</span>
-              <span className="filter-summary-row__item">Recent metrics are recomputed by the worker and persisted under the returned run id.</span>
-            </div>
+            <ResearchDetails summary="Advanced settings">
+              <div className="query-form query-form--wide">
+                <label className="field">
+                  <span className="field__label">Minimum anchor strength</span>
+                  <input
+                    className="field__control mono"
+                    type="number"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={minLongCorrAbs}
+                    onChange={(event) => setMinLongCorrAbs(event.target.value)}
+                  />
+                </label>
+
+                <label className="field">
+                  <span className="field__label">Minimum change size</span>
+                  <input
+                    className="field__control mono"
+                    type="number"
+                    min={0}
+                    max={2}
+                    step={0.01}
+                    value={minCorrDeltaAbs}
+                    onChange={(event) => setMinCorrDeltaAbs(event.target.value)}
+                  />
+                </label>
+
+                <label className="field">
+                  <span className="field__label">Result limit</span>
+                  <select
+                    className="field__control mono"
+                    value={limit}
+                    onChange={(event) => setLimit(event.target.value)}
+                  >
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                    <option value="200">200</option>
+                  </select>
+                </label>
+              </div>
+            </ResearchDetails>
           </Panel>
 
           <Panel variant="primary">
             <SectionHeader
-              title="Active run"
-              subtitle="Runs are persisted. You can reload the page later and reopen the same id."
+              title="Current result"
+              subtitle="Results are saved. You can reload the page later and reopen the same analysis."
             />
             <ActiveAnalysisRunPanel
               run={run}
               loading={runLoading}
-              idleTitle="No active divergence run selected"
-              idleDescription="Queue one run above or reopen a recent run from the side rail."
+              idleTitle="No current result"
+              idleDescription="Prepare one analysis above or reopen a saved analysis from the side rail."
               formatSummary={formatDivergenceRunSummary}
             />
             {runError ? <div className="state-note state-note--error">{runError}</div> : null}
@@ -399,8 +401,8 @@ export default function PairDivergencePage() {
         <div className="workspace-layout__side">
           <Panel variant="utility">
             <SectionHeader
-              title="Recent runs"
-              subtitle="Reopen queued or finished screens without rerunning them."
+              title="Saved analyses"
+              subtitle="Reopen finished results without rerunning them."
             />
             <RecentAnalysisRunsPanel
               runs={recentRuns}
@@ -408,8 +410,8 @@ export default function PairDivergencePage() {
               activeRunId={runId}
               emptyCopy={
                 buildId
-                  ? 'No divergence runs yet for the selected build.'
-                  : 'Select a build to load recent divergence runs.'
+                  ? 'No saved analyses yet for the selected snapshot.'
+                  : 'Select a snapshot to load saved analyses.'
               }
               formatSummary={formatDivergenceRunSummary}
               onSelect={(nextRunId) => {
@@ -424,14 +426,13 @@ export default function PairDivergencePage() {
           <Panel variant="utility">
             <SectionHeader
               title="How to read it"
-              subtitle="This screen is for pairs that deserve a closer look, not for proving mean reversion on its own."
+              subtitle="This screen is for pairs that deserve a closer look, not for proving a trade thesis on its own."
             />
 
             <div className="workspace-note-list">
-              <div className="workspace-note-list__item">Start with large |corr delta| because that is the primary regime-shift signal.</div>
-              <div className="workspace-note-list__item">Use recent relative-return gap to distinguish structural divergence from minor statistical noise.</div>
-              <div className="workspace-note-list__item">Use spread z-score as a simple dislocation cue, not as a standalone trading rule.</div>
-              <div className="workspace-note-list__item">Sector labels help separate intra-sector unwind from broader cross-sector regime changes.</div>
+              <div className="workspace-note-list__item">Start with the largest relationship changes.</div>
+              <div className="workspace-note-list__item">Use return gaps and spread z-scores as context, not as standalone trading rules.</div>
+              <div className="workspace-note-list__item">Use sector labels to separate local moves from broader cross-sector shifts.</div>
             </div>
           </Panel>
         </div>
@@ -440,7 +441,7 @@ export default function PairDivergencePage() {
       <Modal
         open={previewOpen}
         title="Run preview"
-        subtitle="This is a workload preview, not a paragraph. Use it to judge scope before you queue the screen."
+        subtitle="Use this to judge scope before you queue the relationships screen."
         onClose={() => setPreviewOpen(false)}
       >
         <DivergencePreview
@@ -478,11 +479,11 @@ function DivergencePreview({
   minCorrDeltaAbs: string;
 }) {
   if (!selectedBuild) {
-    return <div className="state-note">Select one succeeded build to preview this screen.</div>;
+    return <div className="state-note">Select one ready snapshot to preview this screen.</div>;
   }
 
   if (loading && !detail) {
-    return <div className="state-note">Loading build preview…</div>;
+    return <div className="state-note">Loading snapshot preview…</div>;
   }
 
   if (error) {
@@ -497,14 +498,14 @@ function DivergencePreview({
     <>
       <div className="stat-grid">
         <div className="stat-card">
-          <div className="stat-card__label">Build scope</div>
+          <div className="stat-card__label">Snapshot scope</div>
           <div className="stat-card__value mono">{selectedBuild.universeId}</div>
-          <div className="stat-card__helper">{formatDateOnly(selectedBuild.asOfDate)} · {selectedBuild.windowDays}d</div>
+          <div className="stat-card__helper">{formatDateOnly(selectedBuild.asOfDate)} · {formatLookbackLabel(selectedBuild.windowDays)}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-card__label">Universe size</div>
+          <div className="stat-card__label">Basket size</div>
           <div className="stat-card__value mono">{formatInteger(symbolCount)}</div>
-          <div className="stat-card__helper">Stored artifact snapshot</div>
+          <div className="stat-card__helper">Stored snapshot size</div>
         </div>
         <div className="stat-card">
           <div className="stat-card__label">Pair scan load</div>
@@ -534,7 +535,7 @@ function DivergencePreview({
                   <span className="rank-list__pair-sep">↔</span>
                   <span className="mono">{pair.right}</span>
                 </div>
-                <div className="rank-list__meta">Stored long-window anchor pair from the artifact preview.</div>
+                <div className="rank-list__meta">Stored anchor relationship from the snapshot preview.</div>
               </div>
               <span className="score-pill score-pill--neutral">{formatScore(pair.score, 3)}</span>
             </article>
@@ -562,17 +563,29 @@ function PairDivergenceResult({ data }: { data: PairDivergenceResponse }) {
   return (
     <Panel variant="primary">
       <SectionHeader
-        title="Candidate list"
-        subtitle="Ranked first by absolute correlation delta, then by recent return gap and spread dislocation."
+        title="Relationships worth a closer look"
+        subtitle="Ranked first by change in relationship strength, then by fresh return gap and spread dislocation."
       />
+
+      <div className="plain-summary">
+        {data.candidateCount} relationship{data.candidateCount === 1 ? '' : 's'} stood out in this scan.{' '}
+        {strongest
+          ? `The top candidate is ${strongest.left} ↔ ${strongest.right}, where the recent relationship is ${strongest.corrDelta > 0 ? 'stronger' : 'weaker'} than the longer read.`
+          : ''}
+        {sameSectorCount > data.candidates.length * 0.5
+          ? ' Most changes here are same-sector rather than cross-sector.'
+          : data.candidates.length > 0
+            ? ' Most of the largest changes here are cross-sector rather than inside one sector.'
+            : ''}
+      </div>
 
       <div className="stat-grid">
         <div className="stat-card">
-          <div className="stat-card__label">Candidates found</div>
+          <div className="stat-card__label">Relationships found</div>
           <div className="stat-card__value mono">{formatInteger(data.candidateCount)}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-card__label">Recent window</div>
+          <div className="stat-card__label">Fresh lookback</div>
           <div className="stat-card__value mono">{data.recentWindowDays}d</div>
         </div>
         <div className="stat-card">
@@ -584,7 +597,7 @@ function PairDivergenceResult({ data }: { data: PairDivergenceResponse }) {
           </div>
         </div>
         <div className="stat-card">
-          <div className="stat-card__label">Top candidate</div>
+          <div className="stat-card__label">Top relationship</div>
           <div className="stat-card__value">{strongest ? `${strongest.left} ↔ ${strongest.right}` : '—'}</div>
         </div>
       </div>
@@ -609,7 +622,10 @@ function PairDivergenceResult({ data }: { data: PairDivergenceResponse }) {
                   <span className="mono">{candidate.right}</span>
                 </div>
                 <div className="rank-list__meta">
-                  Long {formatScore(candidate.longWindowCorr, 3)} · Recent {formatScore(candidate.recentCorr, 3)} · Gap {formatPercent(candidate.recentRelativeReturnGap)} · Spread z {formatNullableScore(candidate.spreadZScore)}
+                  Long {formatScore(candidate.longWindowCorr, 3)} → Recent {formatScore(candidate.recentCorr, 3)}.{' '}
+                  {candidate.corrDelta > 0
+                    ? 'These names look more aligned in the fresher window than in the longer read.'
+                    : 'These names used to move together more closely than they do now.'}
                 </div>
                 <div className="rank-list__meta">{formatSectorLine(candidate)}</div>
               </div>
@@ -620,14 +636,10 @@ function PairDivergenceResult({ data }: { data: PairDivergenceResponse }) {
           ))}
         </div>
       ) : (
-        <div className="state-note">No candidates matched the current thresholds.</div>
+        <div className="state-note">No relationships matched the current thresholds.</div>
       )}
     </Panel>
   );
-}
-
-function formatBuildOption(buildRun: BuildRunListItem): string {
-  return `${buildRun.universeId} · ${formatDateOnly(buildRun.asOfDate)} · ${buildRun.windowDays}d · ${buildRun.id.slice(0, 8)}`;
 }
 
 function formatPercent(value: number): string {
@@ -650,7 +662,7 @@ function formatDivergenceRunSummary(run: AnalysisRunListItem | AnalysisRunDetail
     return 'Unsupported run kind.';
   }
 
-  return `${run.buildRunId.slice(0, 8)} · recent ${run.request.recentWindowDays}d · limit ${run.request.limit} · |long| ≥ ${formatScore(run.request.minLongCorrAbs, 2)} · |delta| ≥ ${formatScore(run.request.minCorrDeltaAbs, 2)}`;
+  return `${run.buildRunId.slice(0, 8)} · fresh ${run.request.recentWindowDays}d · limit ${run.request.limit} · anchor ≥ ${formatScore(run.request.minLongCorrAbs, 2)} · change ≥ ${formatScore(run.request.minCorrDeltaAbs, 2)}`;
 }
 
 function scorePillClassName(corrDelta: number): string {
