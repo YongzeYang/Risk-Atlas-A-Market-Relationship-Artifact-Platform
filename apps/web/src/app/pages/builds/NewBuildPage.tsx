@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 import BoundaryNote from '../../../components/ui/BoundaryNote';
 import Panel from '../../../components/ui/Panel';
@@ -6,37 +6,59 @@ import SectionHeader from '../../../components/ui/SectionHeader';
 import { useCatalogData } from '../../../features/catalog/hooks';
 import BuildFormPanel from '../home/sections/BuildFormPanel';
 
-type LearningGoal = 'diversification' | 'relationships' | 'spillover' | 'groups' | 'comparison';
+type WorkflowId = 'snapshots' | 'series' | 'compare' | 'relationships' | 'spillover';
 
-const GOALS: { id: LearningGoal; label: string; description: string }[] = [
-  { id: 'diversification', label: 'See through fake diversification', description: 'Check whether this basket really spreads risk.' },
-  { id: 'relationships', label: 'Find relationships worth a closer look', description: 'Spot pairs whose connection looks too strong, too weak, or newly different.' },
-  { id: 'spillover', label: "Explore one stock's risk circle", description: 'See who tends to come along when one name moves.' },
-  { id: 'groups', label: 'Find hidden groups', description: 'Reveal clusters the basket is forming beneath the surface.' },
-  { id: 'comparison', label: 'Prepare snapshots for comparison', description: 'Create a clean point-in-time read you can compare later.' }
+const WORKFLOWS: {
+  id: WorkflowId;
+  label: string;
+  title: string;
+  description: string;
+  to: string;
+  actionLabel: string;
+  current?: boolean;
+}[] = [
+  {
+    id: 'snapshots',
+    label: 'Snapshots',
+    title: 'Start with one clean snapshot',
+    description: 'Use this page when you want one basket at one date before any follow-up screen.',
+    to: '/builds/new',
+    actionLabel: 'You are here',
+    current: true
+  },
+  {
+    id: 'series',
+    label: 'Snapshot series',
+    title: 'Track one basket through time',
+    description: 'Use repeated snapshots when the real question is drift across many dates.',
+    to: '/series',
+    actionLabel: 'Open Snapshot series'
+  },
+  {
+    id: 'compare',
+    label: 'What changed',
+    title: 'Compare two finished snapshots',
+    description: 'Use this only after you already have two ready snapshots worth reopening.',
+    to: '/compare',
+    actionLabel: 'Open What changed'
+  },
+  {
+    id: 'relationships',
+    label: 'Relationships',
+    title: 'Follow unusual pair moves',
+    description: 'Use one ready snapshot to find relationships worth a closer look.',
+    to: '/divergence',
+    actionLabel: 'Open Relationships'
+  },
+  {
+    id: 'spillover',
+    label: 'Spillover',
+    title: 'Start from one stock inside a snapshot',
+    description: 'Use one ready snapshot when your question is who tends to move with an anchor name.',
+    to: '/exposure',
+    actionLabel: 'Open Spillover'
+  }
 ];
-
-const GOAL_PREVIEWS: Record<LearningGoal, string[]> = {
-  diversification: [
-    'A first read on whether the basket really spreads risk',
-    'Strong overlaps inside the basket',
-    'A group-oriented view of names that already move together'
-  ],
-  relationships: [
-    'The strongest relationships in the snapshot',
-    'A starting point for deeper follow-up',
-    'A quick handoff into the Relationships screen'
-  ],
-  spillover: [
-    'A snapshot that can be used to inspect related names around one anchor stock'
-  ],
-  groups: [
-    'A basket-level view that can be reordered into hidden groups'
-  ],
-  comparison: [
-    'A clean point-in-time read you can compare later'
-  ]
-};
 
 export default function NewBuildPage() {
   const {
@@ -47,8 +69,6 @@ export default function NewBuildPage() {
     universesLoading,
     error
   } = useCatalogData();
-
-  const [selectedGoal, setSelectedGoal] = useState<LearningGoal>('diversification');
 
   const staticUniverses = universes.filter((u) => u.definitionKind === 'static');
   const dynamicUniverses = universes.filter((u) => u.definitionKind !== 'static');
@@ -66,34 +86,46 @@ export default function NewBuildPage() {
         </div>
       </section>
 
-      <section style={{ marginBottom: 'var(--space-5)' }}>
+      <section className="workflow-picker">
         <SectionHeader
-          title="What are you trying to learn?"
-          subtitle="Pick a starting question — it shapes the helper copy below."
+          title="Choose the right starting point"
+          subtitle="These are different workflows. This page creates one snapshot; the other paths open their own screens."
         />
 
-        <div className="question-selector">
-          {GOALS.map((goal) => (
-            <button
-              key={goal.id}
-              type="button"
-              className={`question-selector__card${selectedGoal === goal.id ? ' question-selector__card--active' : ''}`}
-              onClick={() => setSelectedGoal(goal.id)}
+        <div className="workflow-picker__grid">
+          {WORKFLOWS.map((workflow) => (
+            <article
+              key={workflow.id}
+              className={`workflow-card${workflow.current ? ' workflow-card--current' : ''}`}
             >
-              <div className="question-selector__label">{goal.label}</div>
-              <div className="question-selector__description">{goal.description}</div>
-            </button>
+              <div className="workflow-card__label">{workflow.label}</div>
+              <div className="workflow-card__title">{workflow.title}</div>
+              <div className="workflow-card__description">{workflow.description}</div>
+              {workflow.current ? (
+                <div className="workflow-card__action workflow-card__action--current">
+                  {workflow.actionLabel}
+                </div>
+              ) : (
+                <Link to={workflow.to} className="workflow-card__action">
+                  {workflow.actionLabel}
+                </Link>
+              )}
+            </article>
           ))}
         </div>
 
         <div className="goal-preview">
-          <div className="goal-preview__title">What you'll get</div>
+          <div className="goal-preview__title">What one snapshot gives you</div>
           <ul className="goal-preview__list">
-            {GOAL_PREVIEWS[selectedGoal].map((item) => (
-              <li key={item} className="goal-preview__item">{item}</li>
-            ))}
+            <li className="goal-preview__item">A first basket-level read of overlap, concentration, and hidden structure.</li>
+            <li className="goal-preview__item">The base read you can later reopen in Relationships, Spillover, or What changed.</li>
+            <li className="goal-preview__item">The starting point for hidden-group inspection, even if that is your final question.</li>
           </ul>
         </div>
+
+        <BoundaryNote variant="accent">
+          Hidden groups still begin with a ready snapshot. This page creates that base read; the follow-up screens come after.
+        </BoundaryNote>
       </section>
 
       <div className="workspace-layout">

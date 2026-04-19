@@ -221,7 +221,7 @@ export default function PairDivergencePage() {
             Find pairs whose relationship looks unusually stronger, weaker, or newly stretched.
           </p>
           <BoundaryNote variant="accent">
-            Research lead, not a direct trading signal.
+            Use as follow-up research, not a trade instruction.
           </BoundaryNote>
           <div className="workspace-hero__actions">
             <Link to="/compare" className="button button--secondary">

@@ -313,7 +313,7 @@ export default function StructurePage() {
             Reorder the basket into groups so the market structure becomes easier to read.
           </p>
           <BoundaryNote variant="accent">
-            These groups reflect behavior in this snapshot, not permanent labels.
+            These groups describe this snapshot only. They are not permanent labels.
           </BoundaryNote>
           <div className="workspace-hero__actions">
             <Link to="/exposure" className="button button--secondary">

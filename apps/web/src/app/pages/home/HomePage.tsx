@@ -84,33 +84,38 @@ export default function HomePage() {
 
   const questionCards = [
     {
+      eyebrow: 'Best first click',
       title: 'Am I actually diversified?',
       description: 'See where a basket is more concentrated than it looks.',
-      actionLabel: exampleBuild ? 'Open example snapshot' : 'Browse snapshots',
+      actionLabel: exampleBuild ? 'Start with this read' : 'Browse snapshots',
       to: exampleBuild ? `/builds/${exampleBuild.id}` : '/builds'
     },
     {
+      eyebrow: 'Relationships',
       title: 'Which relationships just broke?',
       description: 'Find pairs that used to move together more closely than they do now.',
-      actionLabel: exampleBuild ? 'Open example relationships' : 'Open relationships',
+      actionLabel: exampleBuild ? 'Check the drift view' : 'Open relationships',
       to: exampleBuild ? `/divergence?build=${exampleBuild.id}` : '/divergence'
     },
     {
+      eyebrow: 'Spillover',
       title: 'If this stock drops, who tends to move with it?',
       description: 'Explore historical co-movement around one name.',
-      actionLabel: exampleBuild ? 'Open example spillover' : 'Open spillover',
+      actionLabel: exampleBuild ? 'Open spillover' : 'Open spillover',
       to: exampleBuild ? `/exposure?build=${exampleBuild.id}` : '/exposure'
     },
     {
+      eyebrow: 'Groups',
       title: 'What hidden groups exist in the market?',
       description: 'Find names that behave alike, even when the label says otherwise.',
-      actionLabel: exampleBuild ? 'Open example groups' : 'Open groups',
+      actionLabel: exampleBuild ? 'Open hidden groups' : 'Open groups',
       to: exampleBuild ? `/structure?build=${exampleBuild.id}` : '/structure'
     },
     {
+      eyebrow: 'Compare',
       title: 'What changed?',
       description: 'Compare two snapshots across time, lookback, or basket.',
-      actionLabel: comparisonPair ? 'Open example comparison' : 'Open what changed',
+      actionLabel: comparisonPair ? 'Compare snapshots' : 'Open what changed',
       to: comparisonTo
     }
   ];
@@ -119,18 +124,33 @@ export default function HomePage() {
     <div className="page page--home">
       <HomeIntroBand comparisonTo={comparisonTo} exampleSnapshot={exampleSnapshot} />
 
-      <section className="home-module-grid home-module-grid--stories">
-        <SectionHeader
-          title="Start with one question"
-          subtitle="Each question leads to a different view of the same snapshot."
-        />
+      <section className="home-question-section">
+        <div className="home-question-section__intro">
+          <SectionHeader
+            title="Start with one question"
+            subtitle="Each question opens a different read on the same snapshot."
+          />
 
-        <div className="question-selector">
-          {questionCards.map((item) => (
-            <Link key={item.title} to={item.to} className="question-selector__card">
-              <div className="question-selector__label">{item.title}</div>
-              <div className="question-selector__description">{item.description}</div>
-              <div className="question-selector__action">{item.actionLabel}</div>
+          <div className="home-question-section__note">
+            <div className="home-question-section__note-label">New here?</div>
+            <div className="home-question-section__note-copy">
+              Open the example snapshot above first if you want the quickest feel for the product.
+              Use these question paths once you know what you want to inspect next.
+            </div>
+          </div>
+        </div>
+
+        <div className="home-question-grid">
+          {questionCards.map((item, index) => (
+            <Link
+              key={item.title}
+              to={item.to}
+              className={`home-question-card${index === 0 ? ' home-question-card--primary' : ''}`}
+            >
+              <div className="home-question-card__eyebrow">{item.eyebrow}</div>
+              <div className="home-question-card__title">{item.title}</div>
+              <div className="home-question-card__description">{item.description}</div>
+              <div className="home-question-card__action">{item.actionLabel}</div>
             </Link>
           ))}
         </div>
