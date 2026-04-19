@@ -1,7 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 
 import {
-  analysisInviteHeadersSchema,
   compareBuildStructuresResponseSchema,
   compareBuildsQuerystringSchema,
   type CompareBuildsQuerystring,
@@ -9,9 +8,8 @@ import {
   type CompareDriftEntry
 } from '../contracts/build-runs.js';
 import { ServiceError } from '../lib/service-error.js';
-import { readPreviewArtifact } from '../services/local-artifact-store.js';
-import { prisma } from '../lib/prisma.js';
-import { requireInviteCodeHeader } from '../services/invite-code-service.js';
+import { loadSucceededBuildRunArtifactContext } from '../services/build-run-artifact-context.js';
+import { queryBsmCompareTopDrift } from '../services/bsm-reader.js';
 import { compareBuildStructures } from '../services/structure-service.js';
 
 export const compareRoutes: FastifyPluginAsync = async (app) => {
@@ -21,13 +19,11 @@ export const compareRoutes: FastifyPluginAsync = async (app) => {
       schema: {
         tags: ['compare'],
         summary: 'Compare two build runs by their top drift pairs',
-        headers: analysisInviteHeadersSchema,
         querystring: compareBuildsQuerystringSchema
       }
     },
     async (request, reply) => {
       try {
-        await requireInviteCodeHeader(request.headers);
         const result = await compareBuilds(request.query.leftId, request.query.rightId);
         return result;
       } catch (error) {
@@ -45,7 +41,6 @@ export const compareRoutes: FastifyPluginAsync = async (app) => {
       schema: {
         tags: ['compare'],
         summary: 'Compare clustered structure drift between two build runs',
-        headers: analysisInviteHeadersSchema,
         querystring: compareBuildsQuerystringSchema,
         response: {
           200: compareBuildStructuresResponseSchema
@@ -54,7 +49,6 @@ export const compareRoutes: FastifyPluginAsync = async (app) => {
     },
     async (request, reply) => {
       try {
-        await requireInviteCodeHeader(request.headers);
         return await compareBuildStructures(request.query.leftId, request.query.rightId);
       } catch (error) {
         if (error instanceof ServiceError) {
@@ -70,80 +64,73 @@ async function compareBuilds(
   leftId: string,
   rightId: string
 ): Promise<CompareBuildsResponse> {
-  const [leftRun, rightRun] = await Promise.all([
-    prisma.buildRun.findUnique({
-      where: { id: leftId },
-      include: { artifact: true }
-    }),
-    prisma.buildRun.findUnique({
-      where: { id: rightId },
-      include: { artifact: true }
-    })
-  ]);
-
-  if (!leftRun) throw new ServiceError(404, `Build run "${leftId}" not found.`);
-  if (!rightRun) throw new ServiceError(404, `Build run "${rightId}" not found.`);
-
-  if (leftRun.status !== 'succeeded' || !leftRun.artifact) {
-    throw new ServiceError(409, `Build run "${leftId}" is not ready for comparison.`);
-  }
-  if (rightRun.status !== 'succeeded' || !rightRun.artifact) {
-    throw new ServiceError(409, `Build run "${rightId}" is not ready for comparison.`);
-  }
-
-  const [leftPreview, rightPreview] = await Promise.all([
-    readPreviewArtifact(leftRun.artifact.storageKind, leftRun.artifact.storagePrefix),
-    readPreviewArtifact(rightRun.artifact.storageKind, rightRun.artifact.storagePrefix)
+  const [leftContext, rightContext] = await Promise.all([
+    loadSucceededBuildRunArtifactContext(
+      leftId,
+      `Build run "${leftId}" is not ready for comparison.`
+    ),
+    loadSucceededBuildRunArtifactContext(
+      rightId,
+      `Build run "${rightId}" is not ready for comparison.`
+    )
   ]);
 
   // Find common symbols
-  const leftSymbolSet = new Set(leftPreview.symbolOrder);
-  const rightSymbolSet = new Set(rightPreview.symbolOrder);
-  const commonSymbols = leftPreview.symbolOrder.filter((s) => rightSymbolSet.has(s)).sort();
+  const rightSymbolSet = new Set(rightContext.preview.symbolOrder);
+  const commonSymbols = leftContext.preview.symbolOrder
+    .filter((symbol) => rightSymbolSet.has(symbol))
+    .sort();
 
   if (commonSymbols.length < 2) {
     throw new ServiceError(400, 'Fewer than 2 common symbols between builds.');
   }
 
   // Build index maps
-  const leftIndexMap = new Map(leftPreview.symbolOrder.map((s, i) => [s, i]));
-  const rightIndexMap = new Map(rightPreview.symbolOrder.map((s, i) => [s, i]));
-
-  // Compute drift for all common symbol pairs
-  const driftPairs: CompareDriftEntry[] = [];
-  for (let i = 0; i < commonSymbols.length; i++) {
-    for (let j = i + 1; j < commonSymbols.length; j++) {
-      const left = commonSymbols[i]!;
-      const right = commonSymbols[j]!;
-
-      const li = leftIndexMap.get(left)!;
-      const lj = leftIndexMap.get(right)!;
-      const ri = rightIndexMap.get(left)!;
-      const rj = rightIndexMap.get(right)!;
-
-      const leftScore = leftPreview.scores[li]![lj]!;
-      const rightScore = rightPreview.scores[ri]![rj]!;
-      const delta = rightScore - leftScore;
-
-      driftPairs.push({ left, right, leftScore, rightScore, delta });
+  const leftIndices = commonSymbols.map((symbol) => {
+    const index = leftContext.symbolIndexBySymbol.get(symbol);
+    if (index === undefined) {
+      throw new Error(`Missing left-side symbol index for "${symbol}".`);
     }
-  }
 
-  // Sort by absolute delta descending
-  driftPairs.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+    return index;
+  });
+  const rightIndices = commonSymbols.map((symbol) => {
+    const index = rightContext.symbolIndexBySymbol.get(symbol);
+    if (index === undefined) {
+      throw new Error(`Missing right-side symbol index for "${symbol}".`);
+    }
+
+    return index;
+  });
+
+  const driftPairs: CompareDriftEntry[] = (
+    await queryBsmCompareTopDrift({
+      leftBsmPath: leftContext.matrixPath,
+      rightBsmPath: rightContext.matrixPath,
+      leftIndices,
+      rightIndices,
+      limit: 50
+    })
+  ).map((entry) => ({
+    left: commonSymbols[entry.leftPos]!,
+    right: commonSymbols[entry.rightPos]!,
+    leftScore: entry.leftScore,
+    rightScore: entry.rightScore,
+    delta: entry.delta
+  }));
 
   return {
     left: {
       id: leftId,
-      asOfDate: leftRun.asOfDate,
-      symbolCount: leftPreview.symbolOrder.length
+      asOfDate: leftContext.asOfDate,
+      symbolCount: leftContext.preview.symbolOrder.length
     },
     right: {
       id: rightId,
-      asOfDate: rightRun.asOfDate,
-      symbolCount: rightPreview.symbolOrder.length
+      asOfDate: rightContext.asOfDate,
+      symbolCount: rightContext.preview.symbolOrder.length
     },
     commonSymbols,
-    topDriftPairs: driftPairs.slice(0, 50)
+    topDriftPairs: driftPairs
   };
 }

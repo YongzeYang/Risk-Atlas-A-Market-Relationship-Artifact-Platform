@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 
 import { ActiveAnalysisRunPanel, RecentAnalysisRunsPanel } from '../../../components/analysis/AnalysisRunPanels';
 import Panel from '../../../components/ui/Panel';
+import Modal from '../../../components/ui/Modal';
 import SectionHeader from '../../../components/ui/SectionHeader';
 import { createPairDivergenceAnalysisRun } from '../../../features/builds/api';
 import {
@@ -41,11 +42,16 @@ export default function PairDivergencePage() {
   const [minCorrDeltaAbs, setMinCorrDeltaAbs] = useState(
     searchParams.get('minCorrDeltaAbs') ?? DEFAULT_MIN_CORR_DELTA_ABS
   );
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { inviteCode, setInviteCode } = useInviteCode();
   const { buildRuns, loading: buildRunsLoading } = useBuildRunsData(5000);
-  const { detail } = useBuildDetailData(buildId || undefined, 5000);
+  const {
+    detail,
+    loading: previewLoading,
+    error: previewError
+  } = useBuildDetailData(previewOpen ? buildId || undefined : undefined, 5000);
   const { run, loading: runLoading, error: runError } = useAnalysisRunData(runId || undefined, 1500);
   const { runs: recentRuns, loading: recentRunsLoading } = useAnalysisRunListData(
     'pair_divergence',
@@ -59,7 +65,7 @@ export default function PairDivergencePage() {
   );
 
   useEffect(() => {
-    if (comparableBuilds.length === 0 || buildId) {
+    if (comparableBuilds.length === 0 || buildId || (runId && !run && !runError)) {
       return;
     }
 
@@ -72,7 +78,7 @@ export default function PairDivergencePage() {
     if (nextBuildId) {
       setBuildId(nextBuildId);
     }
-  }, [buildId, comparableBuilds, searchParams]);
+  }, [buildId, comparableBuilds, run, runError, runId, searchParams]);
 
   useEffect(() => {
     if (!run || run.kind !== 'pair_divergence') {
@@ -249,6 +255,16 @@ export default function PairDivergencePage() {
             <SectionHeader
               title="Screen settings"
               subtitle="Queue a persisted screen instead of waiting on one synchronous request. The result stays available under its run id."
+              action={
+                <button
+                  type="button"
+                  className="button button--secondary button--sm"
+                  onClick={() => setPreviewOpen(true)}
+                  disabled={!selectedBuild}
+                >
+                  Open preview
+                </button>
+              }
             />
 
             {comparableBuilds.length === 0 && !buildRunsLoading ? (
@@ -263,7 +279,10 @@ export default function PairDivergencePage() {
                 <select
                   className="field__control mono"
                   value={buildId}
-                  onChange={(event) => setBuildId(event.target.value)}
+                  onChange={(event) => {
+                    setBuildId(event.target.value);
+                    setRunId('');
+                  }}
                   disabled={submitting || buildRunsLoading || comparableBuilds.length === 0}
                 >
                   {comparableBuilds.map((buildRun) => (
@@ -358,21 +377,6 @@ export default function PairDivergencePage() {
             </div>
           </Panel>
 
-          <Panel variant="utility">
-            <SectionHeader
-              title="Run preview"
-              subtitle="This is a workload preview, not a paragraph. Use it to judge scope before you queue the screen."
-            />
-            <DivergencePreview
-              detail={detail}
-              selectedBuild={selectedBuild}
-              recentWindowDays={recentWindowDays}
-              limit={limit}
-              minLongCorrAbs={minLongCorrAbs}
-              minCorrDeltaAbs={minCorrDeltaAbs}
-            />
-          </Panel>
-
           <Panel variant="primary">
             <SectionHeader
               title="Active run"
@@ -402,7 +406,11 @@ export default function PairDivergencePage() {
               runs={recentRuns}
               loading={recentRunsLoading}
               activeRunId={runId}
-              emptyCopy="No divergence runs yet for the selected build."
+              emptyCopy={
+                buildId
+                  ? 'No divergence runs yet for the selected build.'
+                  : 'Select a build to load recent divergence runs.'
+              }
               formatSummary={formatDivergenceRunSummary}
               onSelect={(nextRunId) => {
                 const next = recentRuns.find((item) => item.id === nextRunId);
@@ -428,12 +436,32 @@ export default function PairDivergencePage() {
           </Panel>
         </div>
       </div>
+
+      <Modal
+        open={previewOpen}
+        title="Run preview"
+        subtitle="This is a workload preview, not a paragraph. Use it to judge scope before you queue the screen."
+        onClose={() => setPreviewOpen(false)}
+      >
+        <DivergencePreview
+          detail={detail}
+          loading={previewLoading}
+          error={previewError}
+          selectedBuild={selectedBuild}
+          recentWindowDays={recentWindowDays}
+          limit={limit}
+          minLongCorrAbs={minLongCorrAbs}
+          minCorrDeltaAbs={minCorrDeltaAbs}
+        />
+      </Modal>
     </div>
   );
 }
 
 function DivergencePreview({
   detail,
+  loading,
+  error,
   selectedBuild,
   recentWindowDays,
   limit,
@@ -441,6 +469,8 @@ function DivergencePreview({
   minCorrDeltaAbs
 }: {
   detail: BuildRunDetailResponse | null;
+  loading: boolean;
+  error: string | null;
   selectedBuild: BuildRunListItem | null;
   recentWindowDays: string;
   limit: string;
@@ -449,6 +479,14 @@ function DivergencePreview({
 }) {
   if (!selectedBuild) {
     return <div className="state-note">Select one succeeded build to preview this screen.</div>;
+  }
+
+  if (loading && !detail) {
+    return <div className="state-note">Loading build preview…</div>;
+  }
+
+  if (error) {
+    return <div className="state-note state-note--error">{error}</div>;
   }
 
   const symbolCount = detail?.symbolOrder.length ?? 0;

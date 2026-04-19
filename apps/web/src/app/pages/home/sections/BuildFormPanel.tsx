@@ -7,6 +7,7 @@ import SectionHeader from '../../../../components/ui/SectionHeader';
 import StatusBadge from '../../../../components/ui/StatusBadge';
 import { createBuildRun } from '../../../../features/builds/api';
 import { useBuildRequestValidation, useInviteCode } from '../../../../features/builds/hooks';
+import { getEarliestBuildableAsOfDate } from '../../../../lib/build-dates';
 import { formatDateOnly } from '../../../../lib/format';
 import type {
   BuildRunListItem,
@@ -59,6 +60,10 @@ export default function BuildFormPanel({
     () => universes.find((universe) => universe.id === universeId) ?? null,
     [universeId, universes]
   );
+  const minAsOfDate = useMemo(
+    () => getEarliestBuildableAsOfDate(selectedDataset, windowDays),
+    [selectedDataset, windowDays]
+  );
 
   const compatibleUniverses = useMemo(
     () =>
@@ -107,8 +112,34 @@ export default function BuildFormPanel({
   useEffect(() => {
     if (selectedDataset?.maxTradeDate) {
       setAsOfDate(selectedDataset.maxTradeDate);
+      return;
     }
+
+    setAsOfDate('');
   }, [selectedDataset?.id, selectedDataset?.maxTradeDate]);
+
+  useEffect(() => {
+    const maxTradeDate = selectedDataset?.maxTradeDate;
+    if (!maxTradeDate || !minAsOfDate) {
+      return;
+    }
+
+    setAsOfDate((current) => {
+      if (!current) {
+        return maxTradeDate;
+      }
+
+      if (current < minAsOfDate) {
+        return minAsOfDate;
+      }
+
+      if (current > maxTradeDate) {
+        return maxTradeDate;
+      }
+
+      return current;
+    });
+  }, [minAsOfDate, selectedDataset?.maxTradeDate]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -185,7 +216,8 @@ export default function BuildFormPanel({
             {selectedDataset
               ? `${selectedDataset.name} · ${formatDateOnly(selectedDataset.minTradeDate)} → ${formatDateOnly(
                   selectedDataset.maxTradeDate
-                )}`
+                )}` +
+                (minAsOfDate ? ` · earliest ${windowDays}d build ${formatDateOnly(minAsOfDate)}` : '')
               : 'Select one dataset.'}
           </span>
         </label>
@@ -211,7 +243,7 @@ export default function BuildFormPanel({
               const kind = selectedUniverse.definitionKind === 'static' ? 'static' : 'dynamic';
 
               if (buildValidation?.valid && buildValidation.resolvedSymbolCount != null) {
-                return `${selectedUniverse.name} · ${kind} · ${buildValidation.resolvedSymbolCount} coverage-qualified symbols at this date`;
+                return `${selectedUniverse.name} · ${kind} · ${buildValidation.resolvedSymbolCount} matrix-ready symbols at this date`;
               }
 
               const count =
@@ -230,15 +262,17 @@ export default function BuildFormPanel({
             type="date"
             value={asOfDate}
             onChange={(event) => setAsOfDate(event.target.value)}
-            min={selectedDataset?.minTradeDate ?? undefined}
+            min={minAsOfDate ?? selectedDataset?.minTradeDate ?? undefined}
             max={selectedDataset?.maxTradeDate ?? undefined}
             disabled={loading || submitting}
           />
 
           <span className="field__hint">
             {buildValidation?.valid && buildValidation.resolvedSymbolCount != null
-              ? `Uses daily log returns ending on this trading date. Resolved ${buildValidation.resolvedSymbolCount} coverage-qualified symbols with at least ${buildValidation.requiredRows} rows each. Flat return series, if any, are filtered during build preparation.`
-              : 'Uses daily log returns ending on this trading date.'}
+              ? `Uses daily log returns ending on this trading date. Resolved ${buildValidation.resolvedSymbolCount} matrix-ready symbols after row, alignment, and flat-series filtering.`
+              : minAsOfDate
+                ? `Uses daily log returns ending on this trading date. Earliest ${windowDays}d buildable date: ${formatDateOnly(minAsOfDate)}.`
+                : 'Uses daily log returns ending on this trading date.'}
           </span>
         </label>
 
@@ -276,7 +310,7 @@ export default function BuildFormPanel({
         ) : null}
 
         {buildValidating ? (
-          <div className="state-note">Checking dataset coverage and resolved universe size…</div>
+          <div className="state-note">Checking matrix-ready coverage, alignment, and resolved universe size…</div>
         ) : null}
 
         {!buildValidating && buildValidationError ? (

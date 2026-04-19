@@ -4,7 +4,6 @@ import type { FastifyPluginAsync } from 'fastify';
 
 import {
   ARTIFACT_FILE_NAMES,
-  analysisInviteHeadersSchema,
   buildRequestValidationResponseSchema,
   buildRunDetailResponseSchema,
   buildRunIdParamSchema,
@@ -234,7 +233,6 @@ export const buildRunRoutes: FastifyPluginAsync = async (app) => {
         tags: ['build-runs'],
         summary: 'Get pair divergence candidates for one succeeded build',
         params: buildRunIdParamSchema,
-        headers: analysisInviteHeadersSchema,
         querystring: pairDivergenceQuerystringSchema,
         response: {
           200: pairDivergenceResponseSchema
@@ -243,7 +241,6 @@ export const buildRunRoutes: FastifyPluginAsync = async (app) => {
     },
     async (request, reply) => {
       try {
-        await requireInviteCodeHeader(request.headers);
         return await getBuildRunPairDivergence(request.params.id, request.query);
       } catch (error) {
         if (error instanceof ServiceError) {
@@ -264,7 +261,6 @@ export const buildRunRoutes: FastifyPluginAsync = async (app) => {
         tags: ['build-runs'],
         summary: 'Get one-symbol co-movement exposure from matrix.bsm plus sector overlay',
         params: buildRunIdParamSchema,
-        headers: analysisInviteHeadersSchema,
         querystring: exposureQuerystringSchema,
         response: {
           200: exposureResponseSchema
@@ -273,7 +269,6 @@ export const buildRunRoutes: FastifyPluginAsync = async (app) => {
     },
     async (request, reply) => {
       try {
-        await requireInviteCodeHeader(request.headers);
         return await getBuildRunExposure(request.params.id, request.query);
       } catch (error) {
         if (error instanceof ServiceError) {
@@ -294,7 +289,6 @@ export const buildRunRoutes: FastifyPluginAsync = async (app) => {
         tags: ['build-runs'],
         summary: 'Get clustered structure summary and ordered heatmap metadata for one build',
         params: buildRunIdParamSchema,
-        headers: analysisInviteHeadersSchema,
         querystring: structureQuerystringSchema,
         response: {
           200: structureResponseSchema
@@ -303,7 +297,6 @@ export const buildRunRoutes: FastifyPluginAsync = async (app) => {
     },
     async (request, reply) => {
       try {
-        await requireInviteCodeHeader(request.headers);
         return await getBuildRunStructure(request.params.id, request.query);
       } catch (error) {
         if (error instanceof ServiceError) {

@@ -1,5 +1,5 @@
 // apps/web/src/app/pages/series/BuildSeriesPage.tsx
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import Panel from '../../../components/ui/Panel';
@@ -12,6 +12,7 @@ import {
   useInviteCode
 } from '../../../features/builds/hooks';
 import { useCatalogData } from '../../../features/catalog/hooks';
+import { getEarliestBuildableAsOfDate } from '../../../lib/build-dates';
 import { formatDateOnly, formatDateTime } from '../../../lib/format';
 import type {
   BuildRunScoreMethod,
@@ -39,6 +40,7 @@ export default function BuildSeriesPage() {
   const { inviteCode, setInviteCode } = useInviteCode();
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const previousDatasetIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!datasetId && datasets.length > 0) setDatasetId(datasets[0].id);
@@ -51,6 +53,10 @@ export default function BuildSeriesPage() {
   const selectedUniverse = useMemo(
     () => universes.find((universe) => universe.id === universeId) ?? null,
     [universeId, universes]
+  );
+  const minStartDate = useMemo(
+    () => getEarliestBuildableAsOfDate(selectedDataset, windowDays),
+    [selectedDataset, windowDays]
   );
   const compatibleUniverses = useMemo(
     () =>
@@ -96,13 +102,60 @@ export default function BuildSeriesPage() {
   );
 
   useEffect(() => {
+    const currentDatasetId = selectedDataset?.id ?? null;
+    const datasetChanged = previousDatasetIdRef.current !== currentDatasetId;
+    previousDatasetIdRef.current = currentDatasetId;
+
     if (!selectedDataset) {
+      setStartDate('');
+      setEndDate('');
       return;
     }
 
-    setStartDate(selectedDataset.minTradeDate ?? '');
-    setEndDate(selectedDataset.maxTradeDate ?? '');
-  }, [selectedDataset?.id, selectedDataset?.maxTradeDate, selectedDataset?.minTradeDate]);
+    if (datasetChanged) {
+      setStartDate(minStartDate ?? '');
+      setEndDate(selectedDataset.maxTradeDate ?? '');
+    }
+  }, [minStartDate, selectedDataset?.id, selectedDataset?.maxTradeDate]);
+
+  useEffect(() => {
+    const maxTradeDate = selectedDataset?.maxTradeDate;
+    if (!maxTradeDate) {
+      return;
+    }
+
+    if (!minStartDate) {
+      setStartDate('');
+      return;
+    }
+
+    setStartDate((current) => {
+      if (!current) {
+        return minStartDate;
+      }
+
+      if (current < minStartDate) {
+        return minStartDate;
+      }
+
+      if (current > maxTradeDate) {
+        return maxTradeDate;
+      }
+
+      return current;
+    });
+    setEndDate((current) => {
+      if (!current) {
+        return maxTradeDate;
+      }
+
+      if (current > maxTradeDate) {
+        return maxTradeDate;
+      }
+
+      return current;
+    });
+  }, [minStartDate, selectedDataset?.maxTradeDate]);
 
   useEffect(() => {
     if (compatibleUniverses.length === 0) {
@@ -156,8 +209,8 @@ export default function BuildSeriesPage() {
       return 'Start date must be earlier than end date.';
     }
 
-    if (selectedDataset?.minTradeDate && startDate < selectedDataset.minTradeDate) {
-      return `Start date is earlier than the dataset range (${selectedDataset.minTradeDate}).`;
+    if (minStartDate && startDate < minStartDate) {
+      return `Start date is earlier than the earliest buildable ${windowDays}-day date (${minStartDate}).`;
     }
 
     if (selectedDataset?.maxTradeDate && endDate > selectedDataset.maxTradeDate) {
@@ -165,7 +218,7 @@ export default function BuildSeriesPage() {
     }
 
     return null;
-  }, [endDate, selectedDataset?.maxTradeDate, selectedDataset?.minTradeDate, startDate]);
+  }, [endDate, minStartDate, selectedDataset?.maxTradeDate, startDate, windowDays]);
 
   return (
     <div className="page page--series">
@@ -277,7 +330,10 @@ export default function BuildSeriesPage() {
                 </select>
                 <span className="field__hint">
                   {selectedDataset
-                    ? `${selectedDataset.name} · ${formatDateOnly(selectedDataset.minTradeDate)} → ${formatDateOnly(selectedDataset.maxTradeDate)}`
+                    ? `${selectedDataset.name} · ${formatDateOnly(selectedDataset.minTradeDate)} → ${formatDateOnly(selectedDataset.maxTradeDate)}` +
+                      (minStartDate
+                        ? ` · earliest ${windowDays}d first run ${formatDateOnly(minStartDate)}`
+                        : '')
                     : 'Select one dataset.'}
                 </span>
               </label>
@@ -303,7 +359,7 @@ export default function BuildSeriesPage() {
                     const kind = selectedUniverse.definitionKind === 'static' ? 'static' : 'dynamic';
 
                     if (startValidation?.valid && startValidation.resolvedSymbolCount != null) {
-                      return `${selectedUniverse.name} · ${kind} · ${startValidation.resolvedSymbolCount} coverage-qualified symbols at the first scheduled run`;
+                      return `${selectedUniverse.name} · ${kind} · ${startValidation.resolvedSymbolCount} matrix-ready symbols at the first scheduled run`;
                     }
 
                     const count =
@@ -327,7 +383,7 @@ export default function BuildSeriesPage() {
             ) : null}
 
             {startValidationLoading ? (
-              <div className="state-note">Checking the first scheduled build for coverage and size…</div>
+              <div className="state-note">Checking the first scheduled build for matrix-ready coverage and size…</div>
             ) : null}
 
             {!startValidationLoading && startValidationError ? (
@@ -340,7 +396,7 @@ export default function BuildSeriesPage() {
 
             {!startValidationLoading && startValidation?.valid && startValidation.resolvedSymbolCount != null ? (
               <div className="state-note">
-                First scheduled run resolves to {startValidation.resolvedSymbolCount} coverage-qualified symbols with at least {startValidation.requiredRows} rows each. Flat return series, if any, are filtered during build preparation.
+                First scheduled run resolves to {startValidation.resolvedSymbolCount} matrix-ready symbols after row, alignment, and flat-series filtering.
               </div>
             ) : null}
 
@@ -352,7 +408,7 @@ export default function BuildSeriesPage() {
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  min={selectedDataset?.minTradeDate ?? undefined}
+                  min={minStartDate ?? selectedDataset?.minTradeDate ?? undefined}
                   max={selectedDataset?.maxTradeDate ?? undefined}
                   disabled={submitting}
                 />
@@ -365,7 +421,7 @@ export default function BuildSeriesPage() {
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  min={selectedDataset?.minTradeDate ?? undefined}
+                  min={(startDate || minStartDate || selectedDataset?.minTradeDate) ?? undefined}
                   max={selectedDataset?.maxTradeDate ?? undefined}
                   disabled={submitting}
                 />
@@ -373,7 +429,7 @@ export default function BuildSeriesPage() {
             </div>
 
             <div className="field__hint">
-              The first scheduled run must already be buildable. The server rechecks the first and last scheduled dates when you submit.
+              The first scheduled run must already be buildable. The server snaps the cadence to real dataset trading dates, validates every scheduled run when you submit, and the earliest allowed start date still moves with the selected window.
             </div>
 
             <div className="form-grid__inline">
@@ -453,7 +509,7 @@ export default function BuildSeriesPage() {
 
             <div className="workspace-note-list">
               <div className="workspace-note-list__item">Daily series are useful for temporal drift scans across one stable universe definition.</div>
-              <div className="workspace-note-list__item">Weekly and monthly cadence help reduce noise when you care more about structure regime shifts than day-to-day churn.</div>
+              <div className="workspace-note-list__item">Weekly and monthly cadence now follow the last real trading date in each bucket instead of approximating with calendar Fridays or month-end weekdays.</div>
               <div className="workspace-note-list__item">Dynamic universes make rolling runs more realistic because the resolved scope can change with liquidity and sector rules.</div>
             </div>
           </Panel>

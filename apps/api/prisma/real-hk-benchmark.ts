@@ -1,13 +1,19 @@
 import 'dotenv/config';
 
-import { existsSync } from 'node:fs';
+import { createReadStream, createWriteStream, existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
+import { createInterface } from 'node:readline';
 
-import { Market, Prisma, SecurityType } from '@prisma/client';
+import { Market, Prisma, SecurityType, Sector } from '@prisma/client';
+import * as XLSX from 'xlsx';
 
 import { prisma } from '../src/lib/prisma.js';
+import {
+  assessBuildRequestCoverage,
+  getBuildRequestValidation
+} from '../src/services/build-request-validation-service.js';
 import { computeLogReturns } from '../src/services/correlation-analytics.js';
 import { runBuild } from '../src/services/build-run-runner.js';
 import { importEodCsv } from './import-eod.js';
@@ -15,30 +21,45 @@ import { MIN_REQUIRED_PRICE_ROWS } from './mvp-config.js';
 
 const DATASET_ID = 'hk_eod_yahoo_real_v1';
 const DATASET_NAME = 'Hong Kong EOD Real Yahoo Chart v1';
-const UNIVERSE_300_ID = 'hk_real_yahoo_300';
-const UNIVERSE_500_ID = 'hk_real_yahoo_500';
-const OUTPUT_CSV_PATH = resolve(process.cwd(), '../../data/real-hk/hk_eod_yahoo_real_v1.csv');
-const OUTPUT_SYMBOLS_PATH = resolve(process.cwd(), '../../data/real-hk/hk_eod_yahoo_real_v1.symbols.json');
+const OUTPUT_ROOT_DIR = resolve(process.cwd(), '../../data/real-hk');
+const OUTPUT_CSV_PATH = resolve(OUTPUT_ROOT_DIR, 'hk_eod_yahoo_real_v1.csv');
+const OUTPUT_SYMBOLS_PATH = resolve(OUTPUT_ROOT_DIR, 'hk_eod_yahoo_real_v1.symbols.json');
+const OUTPUT_TAXONOMY_PATH = resolve(OUTPUT_ROOT_DIR, 'hk_eod_yahoo_real_v1.taxonomy.json');
+const OUTPUT_HKEX_WORKBOOK_PATH = resolve(OUTPUT_ROOT_DIR, 'hkex_ListOfSecurities.xlsx');
 const OUTPUT_REPORT_PATH = resolve(
   process.cwd(),
   `../../artifacts/benchmark-reports/hk-real-yahoo-benchmark-${new Date().toISOString().slice(0, 10)}.json`
 );
 
+const HKEX_FULL_LIST_URL = 'https://www.hkex.com.hk/eng/services/trading/securities/securitieslists/ListOfSecurities.xlsx';
 const FETCH_START_DATE = '2024-01-01';
-const FETCH_END_DATE = '2026-04-18';
-const TARGET_SYMBOL_COUNT = 500;
-const ACCEPTED_SYMBOL_TARGET = 650;
-const SCAN_START_CODE = 1;
-const SCAN_END_CODE = 9999;
-const FETCH_BATCH_SIZE = 8;
+const FETCH_END_DATE = new Date().toISOString().slice(0, 10);
+const FETCH_CONCURRENCY = 12;
 const MAX_FETCH_ATTEMPTS = 3;
-const ACTIVE_MIN_LAST_TRADE_DATE = '2026-04-01';
 const NEAR_ZERO_VARIANCE_THRESHOLD = 1e-20;
+const WINDOW_DAYS = 252;
+const TAXONOMY_ONLY_MODE = process.argv.includes('--taxonomy-only');
+const OFFICIAL_EQUITY_SUBCATEGORIES = new Set([
+  'Equity Securities (Main Board)',
+  'Equity Securities (GEM)'
+]);
+const BENCHMARK_PLANS = [
+  { universeId: 'hk_real_yahoo_300', universeName: 'HK Real Yahoo 300', requestedSymbolCount: 300 },
+  { universeId: 'hk_real_yahoo_500', universeName: 'HK Real Yahoo 500', requestedSymbolCount: 500 },
+  { universeId: 'hk_real_yahoo_1000', universeName: 'HK Real Yahoo 1000', requestedSymbolCount: 1000 }
+] as const;
 
 type PricePoint = {
   tradeDate: string;
   adjClose: number;
   volume: bigint | null;
+};
+
+type OfficialSecurity = {
+  symbol: string;
+  stockCode: string;
+  name: string;
+  board: 'main_board' | 'gem';
 };
 
 type SymbolHistory = {
@@ -48,8 +69,24 @@ type SymbolHistory = {
   lastTradeDate: string;
 };
 
+type SecurityTaxonomySnapshot = {
+  symbol: string;
+  shortName: string | null;
+  rawSector: string | null;
+  rawIndustry: string | null;
+  broadSector: Sector | null;
+  source: 'cache' | 'yahoo_search' | 'name_heuristic' | 'unmapped';
+};
+
+type TaxonomyRefreshOutcome = {
+  snapshots: SecurityTaxonomySnapshot[];
+  reusedSnapshotCount: number;
+  fetchedSnapshotCount: number;
+};
+
 type BenchmarkEntry = {
   universeId: string;
+  universeName: string;
   requestedSymbolCount: number;
   buildRunId: string;
   status: string;
@@ -63,10 +100,155 @@ type BenchmarkEntry = {
   finishedAt: string | null;
 };
 
-async function main() {
-  console.log('Starting real HK benchmark fetch/import/build flow.');
+type FetchRejectionReason =
+  | 'missing_payload'
+  | 'not_hkg_equity'
+  | 'insufficient_history'
+  | 'inactive'
+  | 'request_failed';
 
-  const selectedHistories = await loadOrFetchHistories();
+type FetchRejection = {
+  symbol: string;
+  name: string;
+  reason: FetchRejectionReason;
+};
+
+type RefreshOutcome = {
+  acceptedHistories: SymbolHistory[];
+  rejections: FetchRejection[];
+  officialEquities: OfficialSecurity[];
+  reusedSymbolCount: number;
+  fetchedSymbolCount: number;
+};
+
+type RealCoverageReport = {
+  source: string;
+  generatedAt: string;
+  officialUniverse: {
+    sourceUrl: string;
+    workbookPath: string;
+    filteredSymbolCount: number;
+    filter: {
+      category: string;
+      subCategories: string[];
+      tradingCurrency: string;
+      excludeRmbCounter: boolean;
+    };
+  };
+  fetch: {
+    startDate: string;
+    endDate: string;
+    activeMinLastTradeDate: string;
+    reusedSymbolCount: number;
+    fetchedSymbolCount: number;
+    acceptedSymbolCount: number;
+    rejectedSymbolCount: number;
+    rejectionBreakdown: Record<string, number>;
+    sampleRejectedSymbols: Array<{ symbol: string; name: string; reason: string }>;
+    csvPath: string;
+    symbolsPath: string;
+  };
+  dataset: {
+    datasetId: string;
+    datasetName: string;
+    rowCount: number;
+    symbolCount: number;
+    minTradeDate: string;
+    maxTradeDate: string;
+  };
+  taxonomy: {
+    taxonomyPath: string;
+    reusedSnapshotCount: number;
+    fetchedSnapshotCount: number;
+    broadSectorMappedCount: number;
+    broadSectorMappedRate: number;
+    rawSectorCount: number;
+    rawIndustryCount: number;
+    sourceBreakdown: Record<string, number>;
+    sampleUnmappedSymbols: Array<{ symbol: string; shortName: string | null; rawSector: string | null; rawIndustry: string | null }>;
+  };
+  coverageAudit: {
+    targetDate: string;
+    requiredRows: number;
+    officialCommonEquityCount: number;
+    datasetImportedSymbolCount: number;
+    coverageQualifiedSymbolCount: number;
+    matrixReadySymbolCount: number;
+    filteredOutSymbolCount: number;
+    coverageQualifiedRate: number;
+    matrixReadyRate: number;
+    latestWindowTradeDateCount: number;
+    latestWindowFullSymbolCount: number;
+    latestWindowFullRate: number;
+    sharedAlignedTradeDateCountAcrossCoverageQualified: number;
+    currentValidation: {
+      valid: boolean;
+      reasonCode: string;
+      message: string | null;
+    };
+  };
+  benchmarkEligibility: {
+    varianceEligibleSymbolCount: number;
+    requestedUniversePlans: Array<{ universeId: string; universeName: string; requestedSymbolCount: number }>;
+  };
+  benchmarks: BenchmarkEntry[];
+};
+
+type WorkbookWithFiles = XLSX.WorkBook & {
+  files?: Record<
+    string,
+    {
+      content?: Buffer | Uint8Array | string;
+    }
+  >;
+};
+
+async function main() {
+  console.log(
+    TAXONOMY_ONLY_MODE
+      ? 'Starting official HKEX + Yahoo real HK taxonomy refresh flow.'
+      : 'Starting official HKEX + Yahoo real HK refresh/import/audit flow.'
+  );
+
+  const officialEquities = await downloadAndParseOfficialEquities();
+  const currentTaxonomyCache = await loadCachedTaxonomy(
+    OUTPUT_TAXONOMY_PATH,
+    new Set(officialEquities.map((entry) => entry.symbol))
+  );
+  const taxonomyOutcome = await refreshOfficialTaxonomy(officialEquities, currentTaxonomyCache);
+  await mkdir(OUTPUT_ROOT_DIR, { recursive: true });
+  await writeSecurityTaxonomyJson(taxonomyOutcome.snapshots, OUTPUT_TAXONOMY_PATH);
+  await upsertSecurityMaster(officialEquities, taxonomyOutcome.snapshots);
+
+  if (TAXONOMY_ONLY_MODE) {
+    const mappedCount = taxonomyOutcome.snapshots.filter((snapshot) => snapshot.broadSector !== null).length;
+    console.log(
+      JSON.stringify(
+        {
+          mode: 'taxonomy-only',
+          officialEquityCount: officialEquities.length,
+          mappedCount,
+          mappedRate: roundRatio(mappedCount, officialEquities.length),
+          reusedSnapshotCount: taxonomyOutcome.reusedSnapshotCount,
+          fetchedSnapshotCount: taxonomyOutcome.fetchedSnapshotCount,
+          taxonomyPath: OUTPUT_TAXONOMY_PATH
+        },
+        null,
+        2
+      )
+    );
+    return;
+  }
+
+  const currentCache = await loadCachedHistories(
+    OUTPUT_CSV_PATH,
+    new Set(officialEquities.map((entry) => entry.symbol))
+  );
+  const refreshOutcome = await refreshOfficialUniverseHistories(officialEquities, currentCache);
+  const activeMinLastTradeDate = computeActiveMinLastTradeDate(FETCH_END_DATE);
+
+  await writeNormalizedCsv(refreshOutcome.acceptedHistories, OUTPUT_CSV_PATH);
+  await writeAcceptedSymbolsJson(refreshOutcome.acceptedHistories, OUTPUT_SYMBOLS_PATH);
 
   const importSummary = await importEodCsv({
     datasetId: DATASET_ID,
@@ -74,138 +256,409 @@ async function main() {
     csvPath: OUTPUT_CSV_PATH,
     replaceExisting: true,
     prismaClient: prisma,
-    transactionTimeoutMs: 600_000
+    transactionTimeoutMs: 900_000
   });
 
-  await upsertSecurityMaster(selectedHistories);
-  const benchmarkSymbols = await selectBenchmarkEligibleSymbols(DATASET_ID, importSummary.maxTradeDate);
-  if (benchmarkSymbols.length < TARGET_SYMBOL_COUNT) {
-    throw new Error(
-      `Only ${benchmarkSymbols.length} symbols passed the 252-day variance screen, below target ${TARGET_SYMBOL_COUNT}.`
+  const universeRow = await prisma.universe.findUnique({
+    where: { id: 'hk_all_common_equity' },
+    select: {
+      id: true,
+      definitionKind: true,
+      symbolsJson: true,
+      definitionParams: true
+    }
+  });
+
+  if (!universeRow) {
+    throw new Error('Universe "hk_all_common_equity" was not found.');
+  }
+
+  const coverageAssessment = await assessBuildRequestCoverage({
+    datasetId: DATASET_ID,
+    universe: universeRow,
+    asOfDate: importSummary.maxTradeDate,
+    windowDays: WINDOW_DAYS
+  });
+  const validation = await getBuildRequestValidation({
+    datasetId: DATASET_ID,
+    universeId: 'hk_all_common_equity',
+    asOfDate: importSummary.maxTradeDate,
+    windowDays: WINDOW_DAYS
+  });
+  const alignmentAudit = await measureAlignmentAudit({
+    datasetId: DATASET_ID,
+    asOfDate: importSummary.maxTradeDate,
+    requiredRows: WINDOW_DAYS + 1
+  });
+
+  const benchmarkEligibleSymbols = await selectBenchmarkEligibleSymbols(DATASET_ID, importSummary.maxTradeDate);
+  const acceptedBySymbol = new Map(
+    refreshOutcome.acceptedHistories.map((entry) => [entry.symbol, entry] as const)
+  );
+  const benchmarkHistories = benchmarkEligibleSymbols
+    .map((symbol) => acceptedBySymbol.get(symbol))
+    .filter((entry): entry is SymbolHistory => entry !== undefined);
+
+  const benchmarkPlans = BENCHMARK_PLANS.filter(
+    (plan) => benchmarkHistories.length >= plan.requestedSymbolCount
+  );
+
+  for (const plan of benchmarkPlans) {
+    await upsertStaticUniverse(
+      plan.universeId,
+      plan.universeName,
+      benchmarkHistories.slice(0, plan.requestedSymbolCount)
     );
   }
 
-  const selectedBySymbol = new Map(selectedHistories.map((entry) => [entry.symbol, entry] as const));
-  const benchmarkHistories = benchmarkSymbols
-    .map((symbol) => selectedBySymbol.get(symbol))
-    .filter((entry): entry is SymbolHistory => entry !== undefined);
-
-  await upsertStaticUniverse(UNIVERSE_300_ID, 'HK Real Yahoo 300', benchmarkHistories.slice(0, 300));
-  await upsertStaticUniverse(UNIVERSE_500_ID, 'HK Real Yahoo 500', benchmarkHistories.slice(0, 500));
-
-  const benchmarks = await runBenchmarks(importSummary.maxTradeDate);
-
-  const report = {
-    source: 'yahoo_chart_api',
-    generatedAt: new Date().toISOString(),
-    fetch: {
-      startDate: FETCH_START_DATE,
-      endDate: FETCH_END_DATE,
-      scannedRange: [SCAN_START_CODE, SCAN_END_CODE],
-      acceptedSymbolCount: selectedHistories.length,
-      varianceEligibleSymbolCount: benchmarkHistories.length,
-      csvPath: OUTPUT_CSV_PATH,
-      symbolsPath: OUTPUT_SYMBOLS_PATH
-    },
-    dataset: importSummary,
-    benchmarks,
-    recommendation: buildRecommendation(benchmarks)
-  };
+  const benchmarks = await runBenchmarks(importSummary.maxTradeDate, benchmarkPlans);
+  const report = buildCoverageReport({
+    officialEquities,
+    refreshOutcome,
+    taxonomyOutcome,
+    activeMinLastTradeDate,
+    importSummary,
+    coverageAssessment,
+    validation,
+    alignmentAudit,
+    benchmarkEligibleSymbols,
+    benchmarkPlans,
+    benchmarks
+  });
 
   await mkdir(resolve(process.cwd(), '../../artifacts/benchmark-reports'), { recursive: true });
   await writeFile(OUTPUT_REPORT_PATH, JSON.stringify(report, null, 2));
 
-  console.log('Benchmark complete.');
+  console.log('Real HK refresh complete.');
   console.log(JSON.stringify(report, null, 2));
   console.log(`Report written to ${OUTPUT_REPORT_PATH}`);
 }
 
-async function loadOrFetchHistories(): Promise<SymbolHistory[]> {
-  if (existsSync(OUTPUT_CSV_PATH) && existsSync(OUTPUT_SYMBOLS_PATH)) {
-    console.log(`Reusing cached real HK data from ${OUTPUT_CSV_PATH}.`);
-    const cached = JSON.parse(await readFile(OUTPUT_SYMBOLS_PATH, 'utf8')) as Array<{
-      symbol: string;
-      name: string;
-      lastTradeDate: string;
-      rowCount: number;
-    }>;
+async function downloadAndParseOfficialEquities(): Promise<OfficialSecurity[]> {
+  await mkdir(OUTPUT_ROOT_DIR, { recursive: true });
 
-    if (cached.length >= ACCEPTED_SYMBOL_TARGET) {
-      return cached.slice(0, ACCEPTED_SYMBOL_TARGET).map((entry) => ({
-        symbol: entry.symbol,
-        name: entry.name,
-        lastTradeDate: entry.lastTradeDate,
-        prices: []
-      }));
+  const response = await fetch(HKEX_FULL_LIST_URL, {
+    headers: {
+      accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'user-agent': 'Mozilla/5.0 RiskAtlasOfficialHkex/1.0'
     }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to download HKEX security list. HTTP ${response.status}.`);
   }
 
-  const histories = await fetchAcceptedSymbolHistories();
-  if (histories.length < ACCEPTED_SYMBOL_TARGET) {
-    throw new Error(
-      `Only fetched ${histories.length} valid Hong Kong symbols, below target candidate pool ${ACCEPTED_SYMBOL_TARGET}.`
-    );
+  const buffer = Buffer.from(await response.arrayBuffer());
+  await writeFile(OUTPUT_HKEX_WORKBOOK_PATH, buffer);
+  const deduped = new Map<string, OfficialSecurity>();
+  for (const row of parseOfficialWorkbookRows(buffer)) {
+    const category = row.category;
+    const subCategory = row.subCategory;
+    const tradingCurrency = row.tradingCurrency;
+    const rmbCounter = row.rmbCounter;
+
+    if (category !== 'Equity') {
+      continue;
+    }
+
+    if (!OFFICIAL_EQUITY_SUBCATEGORIES.has(subCategory)) {
+      continue;
+    }
+
+    if (tradingCurrency !== 'HKD') {
+      continue;
+    }
+
+    if (rmbCounter) {
+      continue;
+    }
+
+    const stockCodeText = normalizeOfficialStockCode(row.stockCode);
+    if (!stockCodeText) {
+      continue;
+    }
+
+    const symbol = `${stockCodeText}.HK`;
+    deduped.set(symbol, {
+      symbol,
+      stockCode: stockCodeText,
+      name: row.name || symbol,
+      board: subCategory === 'Equity Securities (GEM)' ? 'gem' : 'main_board'
+    });
   }
 
-  const selectedHistories = histories.slice(0, ACCEPTED_SYMBOL_TARGET);
-  await writeNormalizedCsv(selectedHistories, OUTPUT_CSV_PATH);
-  await writeFile(
-    OUTPUT_SYMBOLS_PATH,
-    JSON.stringify(
-      selectedHistories.map((entry) => ({
-        symbol: entry.symbol,
-        name: entry.name,
-        lastTradeDate: entry.lastTradeDate,
-        rowCount: entry.prices.length
-      })),
-      null,
-      2
-    )
-  );
-
-  return selectedHistories;
+  return [...deduped.values()].sort((left, right) => left.symbol.localeCompare(right.symbol));
 }
 
-async function fetchAcceptedSymbolHistories(): Promise<SymbolHistory[]> {
-  const accepted: SymbolHistory[] = [];
-  let scanned = 0;
+function normalizeOfficialStockCode(value: unknown): string | null {
+  const text = String(value ?? '').trim();
+  if (!/^\d+$/.test(text)) {
+    return null;
+  }
 
-  for (let code = SCAN_START_CODE; code <= SCAN_END_CODE; code += FETCH_BATCH_SIZE) {
-    const batchSymbols = Array.from({ length: FETCH_BATCH_SIZE }, (_, index) => code + index)
-      .filter((candidate) => candidate <= SCAN_END_CODE)
-      .map(toHkSymbol);
+  const normalizedNumber = Number.parseInt(text, 10);
+  if (!Number.isFinite(normalizedNumber)) {
+    return null;
+  }
 
-    const batchResults = await Promise.all(batchSymbols.map((symbol) => fetchSymbolHistory(symbol)));
+  return normalizedNumber.toString().padStart(4, '0');
+}
 
-    for (const result of batchResults) {
-      scanned += 1;
-      if (result) {
-        accepted.push(result);
+function parseOfficialWorkbookRows(buffer: Buffer): Array<{
+  stockCode: string;
+  name: string;
+  category: string;
+  subCategory: string;
+  tradingCurrency: string;
+  rmbCounter: string;
+}> {
+  const workbook = XLSX.read(buffer, { type: 'buffer', bookFiles: true }) as WorkbookWithFiles;
+  const sheetXml = getWorkbookEntryText(workbook, 'xl/worksheets/sheet1.xml');
+  const sharedStrings = parseSharedStrings(getWorkbookEntryText(workbook, 'xl/sharedStrings.xml'));
+  const rows: Array<{
+    stockCode: string;
+    name: string;
+    category: string;
+    subCategory: string;
+    tradingCurrency: string;
+    rmbCounter: string;
+  }> = [];
+
+  for (const rowMatch of sheetXml.matchAll(/<[^:>]*:?row\b[^>]*r="(\d+)"[^>]*>([\s\S]*?)<\/[^:>]*:?row>/g)) {
+    const rowNumber = Number.parseInt(rowMatch[1] ?? '', 10);
+    const rowXml = rowMatch[2] ?? '';
+    if (!Number.isFinite(rowNumber) || rowNumber < 4) {
+      continue;
+    }
+
+    const cellValues = parseWorksheetCellMap(rowXml, sharedStrings);
+    const stockCode = (cellValues.get('A') ?? '').trim();
+    const name = (cellValues.get('B') ?? '').trim();
+    const category = (cellValues.get('C') ?? '').trim();
+    const subCategory = (cellValues.get('D') ?? '').trim();
+    const tradingCurrency = (cellValues.get('Q') ?? '').trim();
+    const rmbCounter = (cellValues.get('R') ?? '').trim();
+
+    if (!stockCode || !name || !category || !subCategory) {
+      continue;
+    }
+
+    rows.push({
+      stockCode,
+      name,
+      category,
+      subCategory,
+      tradingCurrency,
+      rmbCounter
+    });
+  }
+
+  return rows;
+}
+
+function getWorkbookEntryText(workbook: WorkbookWithFiles, path: string): string {
+  const entry = workbook.files?.[path]?.content;
+  if (!entry) {
+    throw new Error(`Workbook is missing required entry: ${path}`);
+  }
+
+  if (typeof entry === 'string') {
+    return entry;
+  }
+
+  return Buffer.from(entry).toString('utf8');
+}
+
+function parseSharedStrings(sharedStringsXml: string): string[] {
+  const strings: string[] = [];
+  for (const match of sharedStringsXml.matchAll(/<[^:>]*:?si\b[^>]*>([\s\S]*?)<\/[^:>]*:?si>/g)) {
+    const fragment = match[1] ?? '';
+    const textParts = [...fragment.matchAll(/<[^:>]*:?t\b[^>]*>([\s\S]*?)<\/[^:>]*:?t>/g)].map(
+      (textMatch) => decodeXmlEntities(textMatch[1] ?? '')
+    );
+    strings.push(textParts.join(''));
+  }
+
+  return strings;
+}
+
+function parseWorksheetCellMap(rowXml: string, sharedStrings: string[]): Map<string, string> {
+  const values = new Map<string, string>();
+
+  for (const cellMatch of rowXml.matchAll(/<[^:>]*:?c\b([^>]*)>([\s\S]*?)<\/[^:>]*:?c>/g)) {
+    const attributes = cellMatch[1] ?? '';
+    const innerXml = cellMatch[2] ?? '';
+    const refMatch = attributes.match(/\br="([A-Z]+)\d+"/);
+    if (!refMatch) {
+      continue;
+    }
+
+    const cellType = attributes.match(/\bt="([^"]+)"/)?.[1] ?? null;
+    values.set(refMatch[1]!, extractCellText(innerXml, cellType, sharedStrings));
+  }
+
+  return values;
+}
+
+function extractCellText(
+  innerXml: string,
+  cellType: string | null,
+  sharedStrings: string[]
+): string {
+  if (cellType === 's') {
+    const rawIndex = innerXml.match(/<[^:>]*:?v\b[^>]*>([\s\S]*?)<\/[^:>]*:?v>/)?.[1] ?? '';
+    const index = Number.parseInt(rawIndex, 10);
+    return Number.isFinite(index) ? sharedStrings[index] ?? '' : '';
+  }
+
+  const inlineText = [...innerXml.matchAll(/<[^:>]*:?t\b[^>]*>([\s\S]*?)<\/[^:>]*:?t>/g)]
+    .map((match) => decodeXmlEntities(match[1] ?? ''))
+    .join('');
+  if (inlineText) {
+    return inlineText;
+  }
+
+  const rawValue = innerXml.match(/<[^:>]*:?v\b[^>]*>([\s\S]*?)<\/[^:>]*:?v>/)?.[1] ?? '';
+  return decodeXmlEntities(rawValue);
+}
+
+function decodeXmlEntities(text: string): string {
+  return text
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number.parseInt(code, 10)))
+    .replace(/&#x([\da-fA-F]+);/g, (_, code) => String.fromCodePoint(Number.parseInt(code, 16)))
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&');
+}
+
+async function loadCachedHistories(
+  csvPath: string,
+  allowedSymbols: Set<string>
+): Promise<Map<string, SymbolHistory>> {
+  const histories = new Map<string, SymbolHistory>();
+  if (!existsSync(csvPath)) {
+    return histories;
+  }
+
+  const input = createReadStream(csvPath, { encoding: 'utf8' });
+  const readline = createInterface({
+    input,
+    crlfDelay: Infinity
+  });
+
+  let seenHeader = false;
+  let hasVolume = false;
+  for await (const rawLine of readline) {
+    const line = rawLine.trim();
+    if (!line) {
+      continue;
+    }
+
+    if (!seenHeader) {
+      seenHeader = true;
+      hasVolume = line === 'tradeDate,symbol,adjClose,volume';
+      continue;
+    }
+
+    const parts = line.split(',');
+    const tradeDate = parts[0] ?? '';
+    const symbol = (parts[1] ?? '').toUpperCase();
+    if (!allowedSymbols.has(symbol)) {
+      continue;
+    }
+
+    const adjClose = Number(parts[2] ?? '');
+    const volumeText = hasVolume ? parts[3] ?? '' : '';
+    const history = histories.get(symbol) ?? {
+      symbol,
+      name: symbol,
+      prices: [],
+      lastTradeDate: ''
+    };
+
+    history.prices.push({
+      tradeDate,
+      adjClose,
+      volume: volumeText ? BigInt(volumeText) : null
+    });
+    history.lastTradeDate = tradeDate;
+    histories.set(symbol, history);
+  }
+
+  return histories;
+}
+
+async function loadCachedTaxonomy(
+  taxonomyPath: string,
+  allowedSymbols: Set<string>
+): Promise<Map<string, SecurityTaxonomySnapshot>> {
+  const snapshots = new Map<string, SecurityTaxonomySnapshot>();
+
+  if (!existsSync(taxonomyPath)) {
+    return snapshots;
+  }
+
+  const raw = await readFile(taxonomyPath, 'utf8');
+  const parsed = JSON.parse(raw) as SecurityTaxonomySnapshot[];
+
+  for (const snapshot of parsed) {
+    if (!allowedSymbols.has(snapshot.symbol)) {
+      continue;
+    }
+
+    snapshots.set(snapshot.symbol, snapshot);
+  }
+
+  return snapshots;
+}
+
+async function refreshOfficialTaxonomy(
+  officialEquities: OfficialSecurity[],
+  cachedSnapshots: Map<string, SecurityTaxonomySnapshot>
+): Promise<TaxonomyRefreshOutcome> {
+  const snapshots = await mapConcurrent(
+    officialEquities,
+    FETCH_CONCURRENCY,
+    async (official) => {
+      const cached = cachedSnapshots.get(official.symbol);
+      if (cached?.broadSector || cached?.rawSector || cached?.rawIndustry) {
+        return {
+          ...cached,
+          broadSector:
+            cached.broadSector ??
+            mapYahooTaxonomyToBroadSector(cached.rawSector, cached.rawIndustry) ??
+            inferBroadSectorFromName([official.name, cached.shortName]),
+          source: 'cache' as const
+        };
+      }
+
+      return fetchSecurityTaxonomy(official);
+    },
+    (completed) => {
+      if (completed % 200 === 0 || completed === officialEquities.length) {
+        console.log(`Resolved taxonomy for ${completed}/${officialEquities.length} official HK symbols.`);
       }
     }
+  );
 
-    if (accepted.length >= ACCEPTED_SYMBOL_TARGET) {
-      break;
-    }
-
-    if (scanned % 200 === 0) {
-      console.log(`Scanned ${scanned} symbols, accepted ${accepted.length}.`);
-    }
-  }
-
-  accepted.sort((left, right) => left.symbol.localeCompare(right.symbol));
-  return accepted;
+  return {
+    snapshots: snapshots.sort((left, right) => left.symbol.localeCompare(right.symbol)),
+    reusedSnapshotCount: snapshots.filter((snapshot) => snapshot.source === 'cache').length,
+    fetchedSnapshotCount: snapshots.filter((snapshot) => snapshot.source !== 'cache').length
+  };
 }
 
-async function fetchSymbolHistory(symbol: string): Promise<SymbolHistory | null> {
-  const url = buildYahooChartUrl(symbol, FETCH_START_DATE, FETCH_END_DATE);
-
+async function fetchSecurityTaxonomy(
+  official: OfficialSecurity
+): Promise<SecurityTaxonomySnapshot> {
   for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt += 1) {
     try {
-      const response = await fetch(url, {
+      const response = await fetch(buildYahooSearchUrl(official.symbol), {
         headers: {
           accept: 'application/json',
-          'user-agent': 'Mozilla/5.0 RiskAtlasBenchmark/1.0'
+          'user-agent': 'Mozilla/5.0 RiskAtlasTaxonomy/1.0'
         }
       });
 
@@ -215,18 +668,323 @@ async function fetchSymbolHistory(symbol: string): Promise<SymbolHistory | null>
       }
 
       if (!response.ok) {
-        return null;
+        break;
+      }
+
+      const payload = (await response.json()) as YahooSearchResponse;
+      const quote = selectYahooSearchQuote(payload, official.symbol);
+      const shortName = sanitizeNullableString(quote?.shortname ?? quote?.longname ?? null);
+      const rawSector = sanitizeNullableString(quote?.sectorDisp ?? quote?.sector ?? null);
+      const rawIndustry = sanitizeNullableString(quote?.industryDisp ?? quote?.industry ?? null);
+      const broadSector =
+        mapYahooTaxonomyToBroadSector(rawSector, rawIndustry) ??
+        inferBroadSectorFromName([official.name, shortName]);
+
+      return {
+        symbol: official.symbol,
+        shortName,
+        rawSector,
+        rawIndustry,
+        broadSector,
+        source:
+          rawSector || rawIndustry
+            ? 'yahoo_search'
+            : broadSector
+              ? 'name_heuristic'
+              : 'unmapped'
+      };
+    } catch {
+      await wait(200 * attempt);
+    }
+  }
+
+  return {
+    symbol: official.symbol,
+    shortName: null,
+    rawSector: null,
+    rawIndustry: null,
+    broadSector: inferBroadSectorFromName([official.name]),
+    source: inferBroadSectorFromName([official.name]) ? 'name_heuristic' : 'unmapped'
+  };
+}
+
+function buildYahooSearchUrl(query: string): string {
+  return `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}`;
+}
+
+function selectYahooSearchQuote(
+  payload: YahooSearchResponse,
+  symbol: string
+): YahooSearchQuote | null {
+  const quotes = payload.quotes ?? [];
+  const exactMatch = quotes.find((entry) => entry.symbol?.toUpperCase() === symbol.toUpperCase());
+  if (exactMatch) {
+    return exactMatch;
+  }
+
+  return (
+    quotes.find(
+      (entry) =>
+        entry.exchange === 'HKG' &&
+        (entry.quoteType === 'EQUITY' || entry.typeDisp?.toLowerCase() === 'equity')
+    ) ?? null
+  );
+}
+
+function sanitizeNullableString(value: string | null | undefined): string | null {
+  const nextValue = value?.trim();
+  return nextValue ? nextValue : null;
+}
+
+function mapYahooTaxonomyToBroadSector(
+  rawSector: string | null,
+  rawIndustry: string | null
+): Sector | null {
+  const sector = normalizeTaxonomyValue(rawSector);
+  const industry = normalizeTaxonomyValue(rawIndustry);
+
+  if (sector.includes('financial')) {
+    return 'financials';
+  }
+
+  if (sector.includes('real estate')) {
+    return 'property';
+  }
+
+  if (sector.includes('utilities')) {
+    return 'utilities';
+  }
+
+  if (sector.includes('energy')) {
+    return 'energy';
+  }
+
+  if (sector.includes('consumer')) {
+    return 'consumer';
+  }
+
+  if (sector.includes('industrial') || sector.includes('basic materials')) {
+    return 'industrial';
+  }
+
+  if (sector.includes('technology') || sector.includes('healthcare')) {
+    return 'tech';
+  }
+
+  if (sector.includes('communication services')) {
+    if (industry.includes('telecom')) {
+      return 'telecom';
+    }
+
+    return 'tech';
+  }
+
+  if (matchesKeyword(industry, ['bank', 'insurance', 'capital market', 'asset management', 'financial', 'stock exchange', 'credit'])) {
+    return 'financials';
+  }
+
+  if (matchesKeyword(industry, ['reit', 'real estate', 'property'])) {
+    return 'property';
+  }
+
+  if (matchesKeyword(industry, ['telecom', 'wireless'])) {
+    return 'telecom';
+  }
+
+  if (matchesKeyword(industry, ['oil', 'petroleum', 'coal', 'solar', 'renewable', 'exploration'])) {
+    return 'energy';
+  }
+
+  if (matchesKeyword(industry, ['utility', 'electric', 'water'])) {
+    return 'utilities';
+  }
+
+  if (matchesKeyword(industry, ['beverage', 'food', 'apparel', 'gaming', 'travel', 'retail', 'restaurant', 'hotel', 'lodging', 'household', 'packaged'])) {
+    return 'consumer';
+  }
+
+  if (matchesKeyword(industry, ['biotech', 'pharmaceutical', 'medical', 'health', 'software', 'internet', 'semiconductor', 'electronics', 'information', 'digital'])) {
+    return 'tech';
+  }
+
+  if (matchesKeyword(industry, ['auto', 'vehicle', 'shipping', 'port', 'logistics', 'construction', 'engineering', 'machinery', 'rail', 'airline', 'airport', 'manufacturing', 'industrial'])) {
+    return 'industrial';
+  }
+
+  return null;
+}
+
+function inferBroadSectorFromName(labels: Array<string | null | undefined>): Sector | null {
+  const normalized = normalizeTaxonomyValue(labels.filter(Boolean).join(' '));
+
+  if (matchesKeyword(normalized, ['bank', 'insurance', 'financial', 'securities', 'exchange', 'capital'])) {
+    return 'financials';
+  }
+
+  if (matchesKeyword(normalized, ['property', 'real estate', 'land', 'reit'])) {
+    return 'property';
+  }
+
+  if (matchesKeyword(normalized, ['telecom', 'mobile', 'unicom', 'communications'])) {
+    return 'telecom';
+  }
+
+  if (matchesKeyword(normalized, ['utility', 'power', 'electric', 'water', 'gas'])) {
+    return 'utilities';
+  }
+
+  if (matchesKeyword(normalized, ['oil', 'petroleum', 'coal', 'energy', 'solar'])) {
+    return 'energy';
+  }
+
+  if (matchesKeyword(normalized, ['tech', 'technology', 'internet', 'biotech', 'pharma', 'pharmaceutical', 'health', 'healthcare', 'medical', 'electronics', 'digital'])) {
+    return 'tech';
+  }
+
+  if (matchesKeyword(normalized, ['food', 'dairy', 'beer', 'sports', 'travel', 'retail', 'hotel', 'gaming', 'entertainment', 'beverage', 'consumer'])) {
+    return 'consumer';
+  }
+
+  if (matchesKeyword(normalized, ['auto', 'automobile', 'rail', 'shipping', 'port', 'logistics', 'construction', 'engineering', 'cement', 'infrastructure', 'glass', 'industrial', 'airline', 'airport'])) {
+    return 'industrial';
+  }
+
+  return null;
+}
+
+function normalizeTaxonomyValue(value: string): string {
+  return value.toLowerCase().replace(/[—–-]/g, ' ').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function matchesKeyword(value: string, fragments: string[]): boolean {
+  return fragments.some((fragment) => value.includes(fragment));
+}
+
+async function writeSecurityTaxonomyJson(
+  snapshots: SecurityTaxonomySnapshot[],
+  outputPath: string
+): Promise<void> {
+  await writeFile(outputPath, `${JSON.stringify(snapshots, null, 2)}\n`, 'utf8');
+}
+
+async function refreshOfficialUniverseHistories(
+  officialEquities: OfficialSecurity[],
+  cachedHistories: Map<string, SymbolHistory>
+): Promise<RefreshOutcome> {
+  const acceptedHistories = new Map<string, SymbolHistory>();
+  const rejections: FetchRejection[] = [];
+  let reusedSymbolCount = 0;
+  let fetchedSymbolCount = 0;
+  const activeMinLastTradeDate = computeActiveMinLastTradeDate(FETCH_END_DATE);
+
+  const outcomes = await mapConcurrent(
+    officialEquities,
+    FETCH_CONCURRENCY,
+    async (official) => {
+      const cached = cachedHistories.get(official.symbol);
+      if (
+        cached &&
+        cached.prices.length >= MIN_REQUIRED_PRICE_ROWS &&
+        cached.lastTradeDate >= activeMinLastTradeDate
+      ) {
+        reusedSymbolCount += 1;
+        return {
+          history: {
+            symbol: official.symbol,
+            name: official.name,
+            prices: cached.prices,
+            lastTradeDate: cached.lastTradeDate
+          },
+          rejection: null as FetchRejection | null
+        };
+      }
+
+      fetchedSymbolCount += 1;
+      return fetchSymbolHistory(official, activeMinLastTradeDate);
+    },
+    (completed) => {
+      if (completed % 100 === 0 || completed === officialEquities.length) {
+        console.log(
+          `Processed ${completed}/${officialEquities.length} official HK symbols. Reused ${reusedSymbolCount}, fetched ${fetchedSymbolCount}.`
+        );
+      }
+    }
+  );
+
+  for (const outcome of outcomes) {
+    if (outcome.history) {
+      acceptedHistories.set(outcome.history.symbol, outcome.history);
+    }
+
+    if (outcome.rejection) {
+      rejections.push(outcome.rejection);
+    }
+  }
+
+  return {
+    acceptedHistories: [...acceptedHistories.values()].sort((left, right) =>
+      left.symbol.localeCompare(right.symbol)
+    ),
+    rejections,
+    officialEquities,
+    reusedSymbolCount,
+    fetchedSymbolCount
+  };
+}
+
+async function fetchSymbolHistory(
+  official: OfficialSecurity,
+  activeMinLastTradeDate: string
+): Promise<{ history: SymbolHistory | null; rejection: FetchRejection | null }> {
+  const url = buildYahooChartUrl(official.symbol, FETCH_START_DATE, FETCH_END_DATE);
+
+  for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        headers: {
+          accept: 'application/json',
+          'user-agent': 'Mozilla/5.0 RiskAtlasBenchmark/2.0'
+        }
+      });
+
+      if (response.status === 429) {
+        await wait(300 * attempt);
+        continue;
+      }
+
+      if (!response.ok) {
+        return {
+          history: null,
+          rejection: {
+            symbol: official.symbol,
+            name: official.name,
+            reason: 'request_failed'
+          }
+        };
       }
 
       const payload = (await response.json()) as YahooChartResponse;
       const result = payload.chart?.result?.[0];
-
-      if (!result?.meta || result.meta.exchangeName !== 'HKG') {
-        return null;
+      if (!result?.meta) {
+        return {
+          history: null,
+          rejection: {
+            symbol: official.symbol,
+            name: official.name,
+            reason: 'missing_payload'
+          }
+        };
       }
 
-      if (result.meta.instrumentType !== 'EQUITY') {
-        return null;
+      if (result.meta.exchangeName !== 'HKG' || result.meta.instrumentType !== 'EQUITY') {
+        return {
+          history: null,
+          rejection: {
+            symbol: official.symbol,
+            name: official.name,
+            reason: 'not_hkg_equity'
+          }
+        };
       }
 
       const timestamps = result.timestamp ?? [];
@@ -246,73 +1004,131 @@ async function fetchSymbolHistory(symbol: string): Promise<SymbolHistory | null>
         prices.push({
           tradeDate: new Date(timestamp * 1000).toISOString().slice(0, 10),
           adjClose: Number(adjClose),
-          volume: Number.isFinite(volume) && (volume ?? 0) >= 0 ? BigInt(Math.round(volume!)) : null
+          volume:
+            Number.isFinite(volume) && (volume ?? 0) >= 0 ? BigInt(Math.round(volume!)) : null
         });
       }
 
       if (prices.length < MIN_REQUIRED_PRICE_ROWS) {
-        return null;
+        return {
+          history: null,
+          rejection: {
+            symbol: official.symbol,
+            name: official.name,
+            reason: 'insufficient_history'
+          }
+        };
       }
 
-      const lastTradeDate = prices[prices.length - 1]?.tradeDate ?? null;
-      if (!lastTradeDate || lastTradeDate < ACTIVE_MIN_LAST_TRADE_DATE) {
-        return null;
+      const lastTradeDate = prices[prices.length - 1]?.tradeDate ?? '';
+      if (!lastTradeDate || lastTradeDate < activeMinLastTradeDate) {
+        return {
+          history: null,
+          rejection: {
+            symbol: official.symbol,
+            name: official.name,
+            reason: 'inactive'
+          }
+        };
       }
 
       return {
-        symbol,
-        name: result.meta.longName?.trim() || symbol,
-        prices,
-        lastTradeDate
+        history: {
+          symbol: official.symbol,
+          name: official.name,
+          prices,
+          lastTradeDate
+        },
+        rejection: null
       };
     } catch {
       await wait(200 * attempt);
     }
   }
 
-  return null;
+  return {
+    history: null,
+    rejection: {
+      symbol: official.symbol,
+      name: official.name,
+      reason: 'request_failed'
+    }
+  };
+}
+
+async function upsertSecurityMaster(
+  officialEquities: OfficialSecurity[],
+  taxonomySnapshots: SecurityTaxonomySnapshot[]
+): Promise<void> {
+  console.log(
+    `Upserting ${officialEquities.length} official HK common-equity entries into security_master.`
+  );
+
+  const taxonomyBySymbol = new Map(
+    taxonomySnapshots.map((snapshot) => [snapshot.symbol, snapshot] as const)
+  );
+
+  for (const official of officialEquities) {
+    const taxonomy = taxonomyBySymbol.get(official.symbol);
+    await prisma.securityMaster.upsert({
+      where: { symbol: official.symbol },
+      update: {
+        name: official.name,
+        shortName: taxonomy?.shortName ?? undefined,
+        securityType: SecurityType.common_equity,
+        ...(taxonomy?.broadSector ? { sector: taxonomy.broadSector } : {}),
+        market: Market.HK
+      },
+      create: {
+        symbol: official.symbol,
+        name: official.name,
+        shortName: taxonomy?.shortName ?? null,
+        securityType: SecurityType.common_equity,
+        sector: taxonomy?.broadSector ?? null,
+        market: Market.HK
+      }
+    });
+  }
 }
 
 async function writeNormalizedCsv(histories: SymbolHistory[], outputPath: string): Promise<void> {
   await mkdir(resolve(outputPath, '..'), { recursive: true });
 
-  const lines = ['tradeDate,symbol,adjClose,volume'];
-  for (const history of histories) {
-    for (const price of history.prices) {
-      lines.push(
-        [
-          price.tradeDate,
-          history.symbol,
-          price.adjClose.toFixed(6),
-          price.volume?.toString() ?? ''
-        ].join(',')
-      );
-    }
-  }
+  await new Promise<void>((resolvePromise, rejectPromise) => {
+    const stream = createWriteStream(outputPath, { encoding: 'utf8' });
+    stream.on('error', rejectPromise);
+    stream.on('finish', () => resolvePromise());
+    stream.write('tradeDate,symbol,adjClose,volume\n');
 
-  await writeFile(outputPath, `${lines.join('\n')}\n`);
+    for (const history of histories) {
+      const sortedPrices = [...history.prices].sort((left, right) =>
+        left.tradeDate.localeCompare(right.tradeDate)
+      );
+      for (const price of sortedPrices) {
+        stream.write(
+          `${price.tradeDate},${history.symbol},${price.adjClose.toFixed(6)},${price.volume?.toString() ?? ''}\n`
+        );
+      }
+    }
+
+    stream.end();
+  });
 }
 
-async function upsertSecurityMaster(histories: SymbolHistory[]): Promise<void> {
-  for (const history of histories) {
-    await prisma.securityMaster.upsert({
-      where: { symbol: history.symbol },
-      update: {
-        name: history.name,
-        shortName: null,
-        securityType: SecurityType.common_equity,
-        market: Market.HK
-      },
-      create: {
-        symbol: history.symbol,
-        name: history.name,
-        shortName: null,
-        securityType: SecurityType.common_equity,
-        sector: null,
-        market: Market.HK
-      }
-    });
-  }
+async function writeAcceptedSymbolsJson(histories: SymbolHistory[], outputPath: string): Promise<void> {
+  await writeFile(
+    outputPath,
+    JSON.stringify(
+      histories.map((entry) => ({
+        symbol: entry.symbol,
+        name: entry.name,
+        lastTradeDate: entry.lastTradeDate,
+        rowCount: entry.prices.length
+      })),
+      null,
+      2
+    )
+  );
 }
 
 async function upsertStaticUniverse(
@@ -344,12 +1160,10 @@ async function upsertStaticUniverse(
   });
 }
 
-async function runBenchmarks(asOfDate: string): Promise<BenchmarkEntry[]> {
-  const plans = [
-    { universeId: UNIVERSE_300_ID, requestedSymbolCount: 300 },
-    { universeId: UNIVERSE_500_ID, requestedSymbolCount: 500 }
-  ];
-
+async function runBenchmarks(
+  asOfDate: string,
+  plans: ReadonlyArray<(typeof BENCHMARK_PLANS)[number]>
+): Promise<BenchmarkEntry[]> {
   const entries: BenchmarkEntry[] = [];
 
   for (const plan of plans) {
@@ -358,7 +1172,7 @@ async function runBenchmarks(asOfDate: string): Promise<BenchmarkEntry[]> {
         datasetId: DATASET_ID,
         universeId: plan.universeId,
         asOfDate,
-        windowDays: 252,
+        windowDays: WINDOW_DAYS,
         scoreMethod: 'pearson_corr'
       }
     });
@@ -378,15 +1192,23 @@ async function runBenchmarks(asOfDate: string): Promise<BenchmarkEntry[]> {
 
     entries.push({
       universeId: plan.universeId,
+      universeName: plan.universeName,
       requestedSymbolCount: plan.requestedSymbolCount,
       buildRunId: buildRun.id,
       status: completed.status,
-      durationMs: completed.finishedAt && completed.startedAt
-        ? completed.finishedAt.getTime() - completed.startedAt.getTime()
-        : elapsedMs,
-      matrixByteSize: completed.artifact?.matrixByteSize ? Number(completed.artifact.matrixByteSize) : null,
-      previewByteSize: completed.artifact?.previewByteSize ? Number(completed.artifact.previewByteSize) : null,
-      manifestByteSize: completed.artifact?.manifestByteSize ? Number(completed.artifact.manifestByteSize) : null,
+      durationMs:
+        completed.finishedAt && completed.startedAt
+          ? completed.finishedAt.getTime() - completed.startedAt.getTime()
+          : elapsedMs,
+      matrixByteSize: completed.artifact?.matrixByteSize
+        ? Number(completed.artifact.matrixByteSize)
+        : null,
+      previewByteSize: completed.artifact?.previewByteSize
+        ? Number(completed.artifact.previewByteSize)
+        : null,
+      manifestByteSize: completed.artifact?.manifestByteSize
+        ? Number(completed.artifact.manifestByteSize)
+        : null,
       minScore: completed.artifact?.minScore ?? null,
       maxScore: completed.artifact?.maxScore ?? null,
       startedAt: completed.startedAt?.toISOString() ?? null,
@@ -408,10 +1230,7 @@ async function selectBenchmarkEligibleSymbols(
         lte: asOfDate
       }
     },
-    orderBy: [
-      { symbol: 'asc' },
-      { tradeDate: 'asc' }
-    ],
+    orderBy: [{ symbol: 'asc' }, { tradeDate: 'asc' }],
     select: {
       symbol: true,
       adjClose: true
@@ -443,18 +1262,216 @@ function hasSufficientReturnVariance(prices: number[]): boolean {
   return variance > NEAR_ZERO_VARIANCE_THRESHOLD;
 }
 
-function buildRecommendation(entries: BenchmarkEntry[]): string {
-  const benchmark500 = entries.find((entry) => entry.requestedSymbolCount === 500);
+function computeActiveMinLastTradeDate(fetchEndDate: string): string {
+  const date = new Date(`${fetchEndDate}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() - 30);
+  return date.toISOString().slice(0, 10);
+}
 
-  if (!benchmark500 || benchmark500.status !== 'succeeded') {
-    return '500-name build did not succeed, so importer and universe-cap changes should wait until the failure is diagnosed.';
+function buildCoverageReport(args: {
+  officialEquities: OfficialSecurity[];
+  refreshOutcome: RefreshOutcome;
+  taxonomyOutcome: TaxonomyRefreshOutcome;
+  activeMinLastTradeDate: string;
+  importSummary: Awaited<ReturnType<typeof importEodCsv>>;
+  coverageAssessment: Awaited<ReturnType<typeof assessBuildRequestCoverage>>;
+  validation: Awaited<ReturnType<typeof getBuildRequestValidation>>;
+  alignmentAudit: Awaited<ReturnType<typeof measureAlignmentAudit>>;
+  benchmarkEligibleSymbols: string[];
+  benchmarkPlans: ReadonlyArray<(typeof BENCHMARK_PLANS)[number]>;
+  benchmarks: BenchmarkEntry[];
+}): RealCoverageReport {
+  const rejectionBreakdown = args.refreshOutcome.rejections.reduce<Record<string, number>>(
+    (acc, entry) => {
+      acc[entry.reason] = (acc[entry.reason] ?? 0) + 1;
+      return acc;
+    },
+    {}
+  );
+
+  const officialCommonEquityCount = args.officialEquities.length;
+  const coverageQualifiedSymbolCount = args.coverageAssessment.coverageQualifiedSymbols.length;
+  const matrixReadySymbolCount = args.coverageAssessment.matrixReadySymbols.length;
+  const sourceBreakdown = args.taxonomyOutcome.snapshots.reduce<Record<string, number>>((acc, snapshot) => {
+    acc[snapshot.source] = (acc[snapshot.source] ?? 0) + 1;
+    return acc;
+  }, {});
+  const broadSectorMappedCount = args.taxonomyOutcome.snapshots.filter(
+    (snapshot) => snapshot.broadSector !== null
+  ).length;
+  const rawSectorCount = args.taxonomyOutcome.snapshots.filter(
+    (snapshot) => snapshot.rawSector !== null
+  ).length;
+  const rawIndustryCount = args.taxonomyOutcome.snapshots.filter(
+    (snapshot) => snapshot.rawIndustry !== null
+  ).length;
+
+  return {
+    source: 'hkex_official_list + yahoo_chart_api + yahoo_search_taxonomy',
+    generatedAt: new Date().toISOString(),
+    officialUniverse: {
+      sourceUrl: HKEX_FULL_LIST_URL,
+      workbookPath: OUTPUT_HKEX_WORKBOOK_PATH,
+      filteredSymbolCount: officialCommonEquityCount,
+      filter: {
+        category: 'Equity',
+        subCategories: [...OFFICIAL_EQUITY_SUBCATEGORIES],
+        tradingCurrency: 'HKD',
+        excludeRmbCounter: true
+      }
+    },
+    fetch: {
+      startDate: FETCH_START_DATE,
+      endDate: FETCH_END_DATE,
+      activeMinLastTradeDate: args.activeMinLastTradeDate,
+      reusedSymbolCount: args.refreshOutcome.reusedSymbolCount,
+      fetchedSymbolCount: args.refreshOutcome.fetchedSymbolCount,
+      acceptedSymbolCount: args.refreshOutcome.acceptedHistories.length,
+      rejectedSymbolCount: args.refreshOutcome.rejections.length,
+      rejectionBreakdown,
+      sampleRejectedSymbols: args.refreshOutcome.rejections.slice(0, 100),
+      csvPath: OUTPUT_CSV_PATH,
+      symbolsPath: OUTPUT_SYMBOLS_PATH
+    },
+    dataset: {
+      datasetId: args.importSummary.datasetId,
+      datasetName: args.importSummary.datasetName,
+      rowCount: args.importSummary.rowCount,
+      symbolCount: args.importSummary.symbolCount,
+      minTradeDate: args.importSummary.minTradeDate,
+      maxTradeDate: args.importSummary.maxTradeDate
+    },
+    taxonomy: {
+      taxonomyPath: OUTPUT_TAXONOMY_PATH,
+      reusedSnapshotCount: args.taxonomyOutcome.reusedSnapshotCount,
+      fetchedSnapshotCount: args.taxonomyOutcome.fetchedSnapshotCount,
+      broadSectorMappedCount,
+      broadSectorMappedRate: roundRatio(broadSectorMappedCount, officialCommonEquityCount),
+      rawSectorCount,
+      rawIndustryCount,
+      sourceBreakdown,
+      sampleUnmappedSymbols: args.taxonomyOutcome.snapshots
+        .filter((snapshot) => snapshot.broadSector === null)
+        .slice(0, 100)
+        .map((snapshot) => ({
+          symbol: snapshot.symbol,
+          shortName: snapshot.shortName,
+          rawSector: snapshot.rawSector,
+          rawIndustry: snapshot.rawIndustry
+        }))
+    },
+    coverageAudit: {
+      targetDate: args.importSummary.maxTradeDate,
+      requiredRows: WINDOW_DAYS + 1,
+      officialCommonEquityCount,
+      datasetImportedSymbolCount: args.importSummary.symbolCount,
+      coverageQualifiedSymbolCount,
+      matrixReadySymbolCount,
+      filteredOutSymbolCount: args.coverageAssessment.filteredOutSymbols.length,
+      coverageQualifiedRate: roundRatio(coverageQualifiedSymbolCount, officialCommonEquityCount),
+      matrixReadyRate: roundRatio(matrixReadySymbolCount, officialCommonEquityCount),
+      latestWindowTradeDateCount: args.alignmentAudit.latestWindowTradeDateCount,
+      latestWindowFullSymbolCount: args.alignmentAudit.latestWindowFullSymbolCount,
+      latestWindowFullRate: roundRatio(
+        args.alignmentAudit.latestWindowFullSymbolCount,
+        officialCommonEquityCount
+      ),
+      sharedAlignedTradeDateCountAcrossCoverageQualified:
+        args.alignmentAudit.sharedAlignedTradeDateCountAcrossCoverageQualified,
+      currentValidation: {
+        valid: args.validation.valid,
+        reasonCode: args.validation.reasonCode,
+        message: args.validation.message
+      }
+    },
+    benchmarkEligibility: {
+      varianceEligibleSymbolCount: args.benchmarkEligibleSymbols.length,
+      requestedUniversePlans: args.benchmarkPlans.map((plan) => ({
+        universeId: plan.universeId,
+        universeName: plan.universeName,
+        requestedSymbolCount: plan.requestedSymbolCount
+      }))
+    },
+    benchmarks: args.benchmarks
+  };
+}
+
+function roundRatio(numerator: number, denominator: number): number {
+  if (denominator <= 0) {
+    return 0;
   }
 
-  if ((benchmark500.durationMs ?? Number.POSITIVE_INFINITY) <= 20_000) {
-    return '300 and 500-name builds succeeded. Importer adaptation is not required for Yahoo chart long-form CSV, and the current 500 cap is validated; raise the cap only after a second run on an even broader real universe.';
-  }
+  return Math.round((numerator / denominator) * 10000) / 10000;
+}
 
-  return '500-name build succeeded but latency is still material. Keep the importer as-is, keep the 500 cap for now, and optimize runtime before raising the cap.';
+async function measureAlignmentAudit(args: {
+  datasetId: string;
+  asOfDate: string;
+  requiredRows: number;
+}): Promise<{
+  latestWindowTradeDateCount: number;
+  latestWindowFullSymbolCount: number;
+  sharedAlignedTradeDateCountAcrossCoverageQualified: number;
+}> {
+  const [latestWindowRow, sharedAlignedRow] = await Promise.all([
+    prisma.$queryRaw<
+      Array<{
+        tradeDateCount: bigint | number;
+        fullSymbolCount: bigint | number;
+      }>
+    >(Prisma.sql`
+      WITH target_window AS (
+        SELECT "tradeDate"
+        FROM eod_prices
+        WHERE "datasetId" = ${args.datasetId}
+          AND "tradeDate" <= ${args.asOfDate}
+        GROUP BY "tradeDate"
+        ORDER BY "tradeDate" DESC
+        LIMIT ${args.requiredRows}
+      ),
+      symbol_target_window AS (
+        SELECT p.symbol
+        FROM eod_prices p
+        JOIN target_window d ON d."tradeDate" = p."tradeDate"
+        WHERE p."datasetId" = ${args.datasetId}
+        GROUP BY p.symbol
+        HAVING COUNT(DISTINCT p."tradeDate") = ${args.requiredRows}
+      )
+      SELECT
+        (SELECT COUNT(*) FROM target_window) AS "tradeDateCount",
+        COUNT(*) AS "fullSymbolCount"
+      FROM symbol_target_window
+    `),
+    prisma.$queryRaw<Array<{ alignedDateCount: bigint | number }>>(Prisma.sql`
+      WITH eligible_symbols AS (
+        SELECT symbol
+        FROM eod_prices
+        WHERE "datasetId" = ${args.datasetId}
+          AND "tradeDate" <= ${args.asOfDate}
+        GROUP BY symbol
+        HAVING COUNT(*) >= ${args.requiredRows}
+      ),
+      aligned_dates AS (
+        SELECT p."tradeDate"
+        FROM eod_prices p
+        JOIN eligible_symbols s ON s.symbol = p.symbol
+        WHERE p."datasetId" = ${args.datasetId}
+          AND p."tradeDate" <= ${args.asOfDate}
+        GROUP BY p."tradeDate"
+        HAVING COUNT(DISTINCT p.symbol) = (SELECT COUNT(*) FROM eligible_symbols)
+      )
+      SELECT COUNT(*) AS "alignedDateCount"
+      FROM aligned_dates
+    `)
+  ]);
+
+  return {
+    latestWindowTradeDateCount: Number(latestWindowRow?.[0]?.tradeDateCount ?? 0),
+    latestWindowFullSymbolCount: Number(latestWindowRow?.[0]?.fullSymbolCount ?? 0),
+    sharedAlignedTradeDateCountAcrossCoverageQualified: Number(
+      sharedAlignedRow?.[0]?.alignedDateCount ?? 0
+    )
+  };
 }
 
 function buildYahooChartUrl(symbol: string, startDate: string, endDate: string): string {
@@ -464,8 +1481,37 @@ function buildYahooChartUrl(symbol: string, startDate: string, endDate: string):
   return `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?period1=${period1}&period2=${period2}&interval=1d&includeAdjustedClose=true&events=div%2Csplits`;
 }
 
-function toHkSymbol(code: number): string {
-  return `${code.toString().padStart(4, '0')}.HK`;
+async function mapConcurrent<T, R>(
+  items: readonly T[],
+  concurrency: number,
+  worker: (item: T, index: number) => Promise<R>,
+  onProgress?: (completed: number) => void
+): Promise<R[]> {
+  if (items.length === 0) {
+    return [];
+  }
+
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  let completed = 0;
+
+  async function runWorker(): Promise<void> {
+    while (true) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      if (currentIndex >= items.length) {
+        return;
+      }
+
+      results[currentIndex] = await worker(items[currentIndex]!, currentIndex);
+      completed += 1;
+      onProgress?.(completed);
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, () => runWorker());
+  await Promise.all(workers);
+  return results;
 }
 
 function wait(ms: number): Promise<void> {
@@ -480,7 +1526,6 @@ type YahooChartResponse = {
       meta?: {
         exchangeName?: string;
         instrumentType?: string;
-        longName?: string;
       };
       timestamp?: number[];
       indicators?: {
@@ -493,6 +1538,23 @@ type YahooChartResponse = {
       };
     }>;
   };
+};
+
+type YahooSearchQuote = {
+  symbol?: string;
+  exchange?: string;
+  quoteType?: string;
+  typeDisp?: string;
+  shortname?: string;
+  longname?: string;
+  sector?: string;
+  sectorDisp?: string;
+  industry?: string;
+  industryDisp?: string;
+};
+
+type YahooSearchResponse = {
+  quotes?: YahooSearchQuote[];
 };
 
 main()

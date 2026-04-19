@@ -1,94 +1,252 @@
 # Risk Atlas
 
-> A financial artifact platform that turns offline pairwise market computations into reusable `.bsm` artifacts with APIs and UI for exploration.
+Risk Atlas is an HK-first market-structure research workspace built around offline pairwise artifacts.
 
-**Risk Atlas** is a **market relationship artifact platform** for building, storing, and exploring offline pairwise market scores.
+It imports end-of-day prices, resolves a research universe for one date and window, computes a symmetric relationship matrix offline, stores the result as matrix.bsm plus metadata, and exposes read/query workflows through APIs and a web UI.
 
-It imports end-of-day price data, computes pairwise asset relationships across a predefined universe, stores the result as a reusable `.bsm` artifact via a custom C++ out-of-core symmetric matrix engine, and exposes read-only APIs plus a lightweight web UI for analysis.
+## Strict status
 
-## Why this project exists
+As of the latest real-HK verification on 2026-04-19, the system is complete against the user's full 1-7 target set.
 
-Many financial relationship tables are:
+- 1. Full HK / very large universe support: complete
+- 2. Build Series as a first-class model: complete
+- 3. Compare Builds across time/window/universe: complete
+- 4. Invite-code mode with open queries and gated writes: complete
+- 5. Pair Divergence Candidates: complete
+- 6. Co-movement Exposure View: complete
+- 7. Clustered Structure View: complete
 
-- **pairwise**
-- **symmetric**
-- **expensive to materialize fully in RAM**
-- **built offline**
-- **better treated as reusable artifacts than mutable application rows**
+What closed item 1:
 
-Risk Atlas is built around that workflow.
+- the official filtered HKEX common-equity universe is 2670 names
+- the real dataset currently imports 2515 names and 1399094 EOD rows
+- build preparation now uses pairwise-overlap correlation instead of requiring one globally aligned date set across the entire universe
+- hk_all_common_equity now validates on 2026-04-17 with 2515 coverage-qualified symbols and 2470 matrix-ready symbols
+- a real one-shot full-market build has been verified end to end at 2470 symbols with a succeeded matrix.bsm artifact
+- compare-build drift no longer depends on dense preview scores and now reads drift directly from BSM artifacts
 
-Instead of treating pairwise market relationships like ordinary database tables, this project treats them as **versioned analysis artifacts**:
+What closed items 6 and 7:
 
-1. import curated EOD data  
-2. select universe, as-of date, window, and score method  
-3. run an offline build job  
-4. generate `matrix.bsm` + `manifest.json`  
-5. upload artifacts to object storage  
-6. query and explore the artifact through APIs and UI
+- the neighbor, exposure, cluster ordering, cluster summary, and drift workflows all exist
+- real-HK security_master broad-sector coverage is now backfilled from cached Yahoo search taxonomy plus name heuristics
+- HK common-equity rows with populated sector now measure 2609 of 2701, which makes exposure and structure overlays usable across the real market build surface
+- exposure and structure queries have been verified on the succeeded 2470-symbol real full-market build
 
-## What this project demonstrates
+## Real HK data scale
 
-- **Systems engineering**: a custom C++ out-of-core symmetric matrix engine (`bsm`)
-- **Backend/platform engineering**: build orchestration, metadata registry, artifact publishing, query APIs
-- **Full-stack delivery**: React/TypeScript UI for artifact exploration
-- **Cloud deployment**: Dockerized services, S3-backed artifact storage, AWS-hosted demo
+Latest audited numbers from the real benchmark pipeline:
 
-## Core workflow
+- official filtered HKEX equity universe: 2670
+- HK common-equity rows in security_master: 2701
+- HK common-equity rows with populated sector: 2609
+- imported real dataset symbols: 2515
+- imported real dataset rows: 1399094
+- dataset date range: 2024-01-02 to 2026-04-17
+- coverage-qualified symbols on 2026-04-17: 2515
+- matrix-ready symbols on 2026-04-17: 2470
+- filtered out near-flat symbols on 2026-04-17: 45
+- verified real full-market build artifact sizes: matrix 24760448 bytes, preview 667983 bytes, manifest 37904 bytes
 
-```text
-Curated EOD CSV
-      ↓
-Offline Build Job
-      ↓
-pairwise score computation
-      ↓
-bsm artifact generation (.bsm + manifest)
-      ↓
-artifact metadata registration
-      ↓
-S3 artifact storage
-      ↓
-read-only API + web UI
+The build and benchmark flows now prove that both medium-to-large and full-market real universes are buildable:
+
+- HK Real Yahoo 300: succeeded
+- HK Real Yahoo 500: succeeded
+- HK Real Yahoo 1000: succeeded
+- HK All Common Equity real build on 2026-04-17: succeeded at 2470 symbols
+
+## What the product does today
+
+- builds single HK correlation snapshots into matrix.bsm, preview.json, and manifest.json
+- validates requests using coverage-qualified and matrix-ready symbol counts rather than raw requested counts
+- computes large-universe matrices with pairwise-overlap correlation instead of whole-universe aligned-date gating
+- supports rolling Build Series scheduled on real dataset trading dates
+- compares succeeded builds across time, window, and universe changes
+- runs Pair Divergence, Co-movement Exposure, and Clustered Structure analysis workflows
+- keeps queued analysis runs reopenable through persisted run ids
+- resolves both static and rule-driven HK universes
+- backfills real-HK broad-sector taxonomy into security_master for overlay-heavy workflows
+
+## One-click local startup
+
+### Prerequisites
+
+- Node.js 20+
+- pnpm 10+
+- Docker with docker compose
+- CMake 3.20+
+- a C++20-capable compiler
+
+### Fastest path from fresh clone
+
+```bash
+git clone <your-repo-url>
+cd risk-atlas
+cp .env.example .env
+bash scripts/quickstart.sh
 ```
 
-## MVP capabilities
+What that does:
 
-- import curated Hong Kong EOD data
-- choose a predefined universe
-- select as-of date, lookback window, and score method
-- trigger an offline build
-- generate and publish `.bsm` artifacts
-- list artifacts and inspect build metadata
-- query pair scores
-- find top-k neighbors for a symbol
-- view a heatmap for a selected symbol subset
+- installs workspace dependencies
+- generates apps/api/.env and apps/web/.env from the root .env
+- starts PostgreSQL through docker compose
+- configures and builds the C++ BSM writer
+- runs Prisma generate, Prisma migrate deploy, and seed
+- starts the API and web dev servers together
 
-## Non-goals
+Default local addresses after startup:
 
-Risk Atlas is **not**:
+- web: http://localhost:5173
+- api: http://localhost:3000
+- swagger: http://localhost:3000/docs
 
-- a trading system
-- a generic database
-- a real-time shared-write platform
-- a user/order/account management application
+Stop the stack by pressing Ctrl+C in the terminal that is running quickstart or dev:stack.
 
-Its core purpose is narrower and more deliberate:
+### First-time bootstrap and daily start as separate commands
 
-> **build reusable market relationship artifacts offline, then expose them for read-only query and analysis.**
+```bash
+pnpm bootstrap:local
+pnpm dev:stack
+```
+
+### Regenerate app env files after changing root config
+
+```bash
+pnpm env:sync
+```
+
+## Configuration you can customize
+
+Edit the root .env before running bootstrap or quickstart.
+
+Important keys:
+
+- POSTGRES_DB: database name
+- POSTGRES_USER: database user
+- POSTGRES_PASSWORD: database password
+- POSTGRES_HOST: database host used by the API
+- POSTGRES_PORT: host port mapped by docker compose
+- API_PORT: Fastify port
+- WEB_PORT: Vite dev port
+- VITE_API_BASE_URL: web-to-api base URL
+- RISK_ATLAS_INVITE_CODES: comma-separated invite code list used by seed
+- RISK_ATLAS_INVITE_SALT: salt used to hash invite codes into the database
+- RISK_ATLAS_BOOTSTRAP_REAL_HK: set to 1 if you want bootstrap:local to run the real-HK benchmark import immediately after seed
+
+Example:
+
+```dotenv
+POSTGRES_DB=risk_atlas_prod
+POSTGRES_USER=atlas
+POSTGRES_PASSWORD=replace-this-password
+POSTGRES_PORT=5544
+API_PORT=3100
+WEB_PORT=5174
+VITE_API_BASE_URL=http://localhost:3100
+RISK_ATLAS_INVITE_CODES=team-alpha-2026,team-beta-2026
+```
+
+After editing the root .env, run:
+
+```bash
+pnpm env:sync
+```
+
+## Optional: expand to the larger real HK dataset
+
+The seeded demo data is enough to boot the product. If you want the larger real-HK import and the coverage audit report, run:
+
+```bash
+pnpm real-hk:refresh
+```
+
+That command refreshes the real Yahoo HK dataset, imports it, upserts benchmark universes, and writes an audit report into artifacts/benchmark-reports.
+
+If you only want to refresh the real-HK security-master taxonomy overlay without reimporting prices, run:
+
+```bash
+pnpm real-hk:taxonomy
+```
+
+## HK universe support
+
+The current catalog includes:
+
+- static demo universes such as hk_top_20 and hk_financials_10
+- liquidity universes: hk_top_50_liquid and hk_top_200_liquid
+- market-wide universe: hk_all_common_equity, displayed as HK All Tradable Common Equities
+- sector universes for financials, property, tech, energy, consumer, industrial, telecom, and utilities
+
+Important scope note:
+
+The all-common-equity and sector universes resolve against the selected dataset, as-of date, and minimum-history requirement. They represent the dataset-covered tradable HK common-equity set that is actually buildable for that request, not a promise that every security-master row has usable data on every date.
+
+## Analysis workflows
+
+### Build and series
+
+- single snapshot builds
+- rolling Build Series across daily, weekly, or monthly cadence
+- weekly and monthly series snap to the last real trading date in each bucket
+- every scheduled Build Series run is validated before the series is created
+
+### Compare
+
+- time vs time: same universe and window, different dates
+- window vs window: same universe and date, different lookback windows
+- universe vs universe: same date and window, different resolved scopes
+
+### Pair Divergence Candidates
+
+- long-window correlation
+- recent correlation
+- correlation delta
+- recent relative-return gap
+- spread z-score
+
+### Co-movement Exposure View
+
+- anchor symbol to top-neighbor view
+- similarity strength banding
+- sector overlay and sector weight share
+- concentration summary and effective-neighbor count
+
+### Clustered Structure View
+
+- ordered symbol layout for heatmap reading
+- cluster summaries and sector composition
+- cluster drift comparison across builds
+
+## Access model
+
+- creating build runs requires an invite code
+- creating Build Series requires an invite code
+- queueing new analysis runs requires an invite code
+- browsing builds, reading build-scoped analysis queries, listing analysis runs, and compare queries are open read paths
+
+## Artifact model
+
+The canonical bundle remains:
+
+- matrix.bsm
+- preview.json
+- manifest.json
+
+The BSM artifact is the numerical source of truth for matrix-style reads. Preview metadata remains useful for symbol order, top pairs, and summary fields, while large-build compare queries now read drift directly from BSM instead of relying on dense preview score matrices.
 
 ## Stack
 
-- **C++20**: `bsm` artifact engine
-- **TypeScript / Fastify**: backend API
-- **PostgreSQL**: metadata registry
-- **React / TypeScript**: frontend UI
-- **Docker**: local/dev packaging
-- **AWS S3**: artifact storage
-- **AWS-hosted demo**: deployable MVP
+- C++20 for the BSM writer/query engine
+- TypeScript + Fastify for the API
+- PostgreSQL + Prisma for metadata and dataset state
+- React + Vite for the web app
 
-## Status
+## Current boundaries
 
-This repository is an MVP focused on one clear use case:
-
-**offline financial pairwise artifact construction and exploration.**
+- HK only
+- end-of-day data only
+- pearson_corr only
+- windows limited to 60, 120, and 252
+- current single-build guardrail is 4000 symbols
+- offline artifact builds, not real-time risk monitoring
+- research workflows, not portfolio construction or execution

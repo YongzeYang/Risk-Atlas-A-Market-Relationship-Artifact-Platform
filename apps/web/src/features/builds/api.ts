@@ -27,7 +27,11 @@ import type {
   StructureResponse
 } from '../../types/api';
 
-function analysisHeaders(inviteCode: string): HeadersInit {
+function analysisHeaders(inviteCode?: string): HeadersInit | undefined {
+  if (!inviteCode) {
+    return undefined;
+  }
+
   return {
     'x-invite-code': inviteCode
   };
@@ -171,7 +175,7 @@ export async function getAnalysisRun(id: string): Promise<AnalysisRunDetailRespo
 export async function compareBuilds(
   leftId: string,
   rightId: string,
-  inviteCode: string
+  inviteCode?: string
 ): Promise<CompareBuildsResponse> {
   const search = new URLSearchParams({ leftId, rightId });
   return apiRequest<CompareBuildsResponse>(`/compare-builds?${search.toString()}`, {
@@ -187,7 +191,7 @@ export async function getPairDivergence(
     minLongCorrAbs: number;
     minCorrDeltaAbs: number;
   },
-  inviteCode: string
+  inviteCode?: string
 ): Promise<PairDivergenceResponse> {
   const search = new URLSearchParams({
     recentWindowDays: String(params.recentWindowDays),
@@ -207,7 +211,7 @@ export async function getPairDivergence(
 export async function getBuildRunExposure(
   id: string,
   params: { symbol: string; k: number },
-  inviteCode: string
+  inviteCode?: string
 ): Promise<ExposureResponse> {
   const search = new URLSearchParams({
     symbol: params.symbol,
@@ -222,7 +226,7 @@ export async function getBuildRunExposure(
 export async function getBuildRunStructure(
   id: string,
   params: { heatmapSize: number },
-  inviteCode: string
+  inviteCode?: string
 ): Promise<StructureResponse> {
   const search = new URLSearchParams({
     heatmapSize: String(params.heatmapSize)
@@ -236,7 +240,7 @@ export async function getBuildRunStructure(
 export async function compareBuildStructures(
   leftId: string,
   rightId: string,
-  inviteCode: string
+  inviteCode?: string
 ): Promise<CompareBuildStructuresResponse> {
   const search = new URLSearchParams({ leftId, rightId });
   return apiRequest<CompareBuildStructuresResponse>(

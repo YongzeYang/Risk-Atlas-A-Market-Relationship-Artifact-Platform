@@ -117,9 +117,18 @@ async function upsertDataset() {
   });
 }
 
-async function validateDatasetCoverage(datasetId: string) {
+async function validateDatasetCoverage(datasetId: string, staticUniverseIds: string[]) {
+  if (staticUniverseIds.length === 0) {
+    return;
+  }
+
   const universes = await prisma.universe.findMany({
-    where: { definitionKind: 'static' },
+    where: {
+      definitionKind: 'static',
+      id: {
+        in: staticUniverseIds
+      }
+    },
     orderBy: {
       id: 'asc'
     }
@@ -243,7 +252,12 @@ async function main() {
       `${importSummary.symbolCount} symbols, ${importSummary.minTradeDate}..${importSummary.maxTradeDate}.`
   );
 
-  await validateDatasetCoverage(DEMO_DATASET_ID);
+  await validateDatasetCoverage(
+    DEMO_DATASET_ID,
+    SEED_UNIVERSES.filter((universe) => universe.definitionKind === 'static').map(
+      (universe) => universe.id
+    )
+  );
 
   await seedInviteCode();
   console.log(`Seeded ${SEED_INVITE_CODES.length} invite codes.`);

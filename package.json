@@ -2,6 +2,12 @@
   "name": "risk-atlas",
   "private": true,
   "scripts": {
+    "env:sync": "bash ./scripts/sync-local-env.sh",
+    "bootstrap:local": "bash ./scripts/bootstrap-local.sh",
+    "dev:stack": "bash ./scripts/dev-stack.sh",
+    "quickstart": "bash ./scripts/quickstart.sh",
+    "real-hk:refresh": "bash ./scripts/real-hk-refresh.sh",
+    "real-hk:taxonomy": "pnpm --filter @risk-atlas/api db:refresh-real-hk-taxonomy",
     "deps:bsm": "git submodule update --init --recursive cpp/third_party/bsm",
     "cpp:configure": "cmake -S cpp -B cpp/build",
     "cpp:build": "cmake --build cpp/build --parallel",

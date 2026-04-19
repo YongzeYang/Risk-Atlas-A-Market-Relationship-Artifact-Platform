@@ -24,6 +24,7 @@ export type DatasetListItem = {
   priceRowCount: number;
   minTradeDate: string | null;
   maxTradeDate: string | null;
+  firstValidAsOfByWindowDays: Record<string, string | null>;
 };
 
 export type UniverseListItem = {
@@ -56,7 +57,7 @@ export async function listDatasets(): Promise<DatasetListItem[]> {
 
   return Promise.all(
     datasets.map(async (dataset) => {
-      const [priceRowCount, distinctSymbols, minTradeDateRow, maxTradeDateRow] = await Promise.all([
+      const [priceRowCount, distinctSymbols, minTradeDateRow, maxTradeDateRow, distinctTradeDates] = await Promise.all([
         prisma.eodPrice.count({
           where: {
             datasetId: dataset.id
@@ -92,8 +93,27 @@ export async function listDatasets(): Promise<DatasetListItem[]> {
           select: {
             tradeDate: true
           }
+        }),
+        prisma.eodPrice.findMany({
+          where: {
+            datasetId: dataset.id
+          },
+          distinct: ['tradeDate'],
+          orderBy: {
+            tradeDate: 'asc'
+          },
+          select: {
+            tradeDate: true
+          }
         })
       ]);
+
+      const firstValidAsOfByWindowDays = Object.fromEntries(
+        BUILD_RUN_WINDOW_DAYS.map((windowDays) => [
+          String(windowDays),
+          distinctTradeDates[windowDays]?.tradeDate ?? null
+        ])
+      );
 
       return {
         id: dataset.id,
@@ -104,7 +124,8 @@ export async function listDatasets(): Promise<DatasetListItem[]> {
         symbolCount: distinctSymbols.length,
         priceRowCount,
         minTradeDate: minTradeDateRow?.tradeDate ?? null,
-        maxTradeDate: maxTradeDateRow?.tradeDate ?? null
+        maxTradeDate: maxTradeDateRow?.tradeDate ?? null,
+        firstValidAsOfByWindowDays
       };
     })
   );

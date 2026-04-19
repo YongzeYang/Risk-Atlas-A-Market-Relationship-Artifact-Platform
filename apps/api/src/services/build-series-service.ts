@@ -14,7 +14,9 @@ import {
   type CreateBuildSeriesRequestBody
 } from '../contracts/build-runs.js';
 import { validateBuildRequestCoverage } from './build-request-validation-service.js';
+import { listDatasetTradeDatesInRange } from './dataset-trading-date-service.js';
 import { validateInviteCode } from './invite-code-service.js';
+import { collapseTradingDatesToSeriesDates } from './series-schedule.js';
 import { scheduleBuildRun } from './build-run-runner.js';
 
 export async function createBuildSeries(
@@ -67,17 +69,18 @@ export async function createBuildSeries(
     throw new ServiceError(400, 'startDate must be before endDate.');
   }
 
-  const asOfDates = generateSeriesDates(input.startDate, input.endDate, input.frequency);
+  const tradeDates = await listDatasetTradeDatesInRange(
+    input.datasetId,
+    input.startDate,
+    input.endDate
+  );
+  const asOfDates = collapseTradingDatesToSeriesDates(tradeDates, input.frequency);
+
   if (asOfDates.length === 0) {
     throw new ServiceError(400, 'No build dates in the given range.');
   }
 
-  const boundaryDates = new Set<string>([
-    asOfDates[0]!,
-    asOfDates[asOfDates.length - 1]!
-  ]);
-
-  for (const asOfDate of boundaryDates) {
+  for (const asOfDate of asOfDates) {
     await validateBuildRequestCoverage({
       datasetId: input.datasetId,
       universe,
@@ -172,48 +175,6 @@ export async function getBuildSeriesDetail(id: string): Promise<BuildSeriesDetai
     runs
   };
 }
-
-function generateSeriesDates(
-  startDate: string,
-  endDate: string,
-  frequency: string
-): string[] {
-  const dates: string[] = [];
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-
-  const current = new Date(start);
-  while (current <= end) {
-    // Skip weekends
-    const dayOfWeek = current.getDay();
-    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-      const dateStr = current.toISOString().split('T')[0]!;
-
-      if (frequency === 'daily') {
-        dates.push(dateStr);
-      } else if (frequency === 'weekly' && dayOfWeek === 5) {
-        // Fridays only for weekly
-        dates.push(dateStr);
-      } else if (frequency === 'monthly' && isLastBusinessDayOfMonth(current)) {
-        dates.push(dateStr);
-      }
-    }
-
-    current.setDate(current.getDate() + 1);
-  }
-
-  return dates;
-}
-
-function isLastBusinessDayOfMonth(date: Date): boolean {
-  const nextDay = new Date(date);
-  nextDay.setDate(nextDay.getDate() + 1);
-  while (nextDay.getDay() === 0 || nextDay.getDay() === 6) {
-    nextDay.setDate(nextDay.getDate() + 1);
-  }
-  return nextDay.getMonth() !== date.getMonth();
-}
-
 type BuildSeriesRow = {
   id: string;
   name: string;

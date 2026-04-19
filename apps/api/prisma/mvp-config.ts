@@ -36,12 +36,41 @@ export const MIN_REQUIRED_PRICE_ROWS = MAX_WINDOW_DAYS + 1;
 export const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 export const HK_SYMBOL_PATTERN = /^\d{4}\.HK$/;
 
-export const SEED_INVITE_CODE = 'risk-atlas-demo-2026';
-export const SEED_INVITE_SALT = 'risk_atlas_v2_invite_salt';
+const DEFAULT_SEED_INVITE_CODE = 'risk-atlas-demo-2026';
+const DEFAULT_SEED_INVITE_SALT = 'risk_atlas_v2_invite_salt';
+
+function parseInviteCodeList(rawValue: string | undefined): string[] {
+  if (!rawValue) {
+    return [];
+  }
+
+  const deduped = new Set<string>();
+  for (const entry of rawValue.split(',')) {
+    const trimmed = entry.trim();
+    if (trimmed) {
+      deduped.add(trimmed);
+    }
+  }
+
+  return [...deduped];
+}
+
+const configuredInviteCodes = parseInviteCodeList(process.env.RISK_ATLAS_INVITE_CODES);
+
+export const SEED_INVITE_CODE = configuredInviteCodes[0] ?? DEFAULT_SEED_INVITE_CODE;
+export const SEED_INVITE_SALT =
+  process.env.RISK_ATLAS_INVITE_SALT?.trim() || DEFAULT_SEED_INVITE_SALT;
 
 export const SEED_INVITE_CODES = [
-  { code: 'risk-atlas-demo-2026', label: 'demo-2026' },
-  { code: '3191-4b0d-8461', label: 'user-private' }
+  ...(configuredInviteCodes.length > 0
+    ? configuredInviteCodes.map((code, index) => ({
+        code,
+        label: index === 0 ? 'primary' : `custom-${index + 1}`
+      }))
+    : [
+        { code: DEFAULT_SEED_INVITE_CODE, label: 'demo-2026' },
+        { code: '3191-4b0d-8461', label: 'user-private' }
+      ])
 ] as const;
 
 export const SECURITY_MASTER: SeedSecurityMasterEntry[] = [
@@ -135,8 +164,14 @@ export const SEED_UNIVERSES: SeedUniverse[] = [
     definitionParams: { topN: 50, advDays: 20 }
   },
   {
+    id: 'hk_top_200_liquid',
+    name: 'HK Top 200 Liquid',
+    definitionKind: 'liquidity_top_n',
+    definitionParams: { topN: 200, advDays: 20 }
+  },
+  {
     id: 'hk_all_common_equity',
-    name: 'HK All Common Equities',
+    name: 'HK All Tradable Common Equities',
     definitionKind: 'all_common_equity',
     definitionParams: {}
   },
@@ -163,6 +198,30 @@ export const SEED_UNIVERSES: SeedUniverse[] = [
     name: 'HK Energy',
     definitionKind: 'sector_filter',
     definitionParams: { sectors: ['energy'] }
+  },
+  {
+    id: 'hk_consumer',
+    name: 'HK Consumer',
+    definitionKind: 'sector_filter',
+    definitionParams: { sectors: ['consumer'] }
+  },
+  {
+    id: 'hk_industrials',
+    name: 'HK Industrials',
+    definitionKind: 'sector_filter',
+    definitionParams: { sectors: ['industrial'] }
+  },
+  {
+    id: 'hk_telecom',
+    name: 'HK Telecom',
+    definitionKind: 'sector_filter',
+    definitionParams: { sectors: ['telecom'] }
+  },
+  {
+    id: 'hk_utilities',
+    name: 'HK Utilities',
+    definitionKind: 'sector_filter',
+    definitionParams: { sectors: ['utilities'] }
   }
 ];
 

@@ -87,6 +87,14 @@ export type BsmSubmatrixResult = {
   scores: number[][];
 };
 
+export type BsmCompareTopDriftEntry = {
+  leftPos: number;
+  rightPos: number;
+  leftScore: number;
+  rightScore: number;
+  delta: number;
+};
+
 export async function queryBsmMetadata(bsmPath: string): Promise<BsmMetadata> {
   const output = await runBsmQuery(['--file', bsmPath, '--command', 'metadata']);
   return JSON.parse(output) as BsmMetadata;
@@ -141,4 +149,29 @@ export async function queryBsmSubmatrix(
     indices.join(',')
   ]);
   return JSON.parse(output) as BsmSubmatrixResult;
+}
+
+export async function queryBsmCompareTopDrift(args: {
+  leftBsmPath: string;
+  rightBsmPath: string;
+  leftIndices: number[];
+  rightIndices: number[];
+  limit: number;
+}): Promise<BsmCompareTopDriftEntry[]> {
+  const output = await runBsmQuery([
+    '--file',
+    args.leftBsmPath,
+    '--other-file',
+    args.rightBsmPath,
+    '--command',
+    'compare-top-drift',
+    '--left-indices',
+    args.leftIndices.join(','),
+    '--right-indices',
+    args.rightIndices.join(','),
+    '--limit',
+    String(args.limit)
+  ]);
+
+  return JSON.parse(output) as BsmCompareTopDriftEntry[];
 }

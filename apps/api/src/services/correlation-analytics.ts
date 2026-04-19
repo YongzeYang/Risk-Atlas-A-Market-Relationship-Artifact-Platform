@@ -4,6 +4,8 @@ export type PriceRow = {
   adjClose: number;
 };
 
+const NEAR_ZERO_VARIANCE_THRESHOLD = 1e-20;
+
 export function buildRowsBySymbol(
   rows: PriceRow[],
   symbolOrder: string[]
@@ -132,11 +134,15 @@ export function computeLogReturns(prices: number[]): number[] {
   return returns;
 }
 
-export function buildCorrelationMatrix(
-  symbolOrder: string[],
-  returnSeriesBySymbol: Map<string, number[]>
-): number[][] {
-  const n = symbolOrder.length;
+export function buildCorrelationMatrix(args: {
+  symbolOrder: string[];
+  returnVectorsBySymbol: Map<string, Float64Array>;
+  windowDays: number;
+  minimumPairOverlapCount?: number;
+}): number[][] {
+  const minimumPairOverlapCount =
+    args.minimumPairOverlapCount ?? getMinimumPairwiseOverlapCount(args.windowDays);
+  const n = args.symbolOrder.length;
   const scores = Array.from({ length: n }, () => Array<number>(n).fill(0));
 
   for (let i = 0; i < n; i += 1) {
@@ -144,28 +150,95 @@ export function buildCorrelationMatrix(
   }
 
   for (let i = 0; i < n; i += 1) {
-    const leftSymbol = symbolOrder[i]!;
-    const leftReturns = returnSeriesBySymbol.get(leftSymbol);
+    const leftSymbol = args.symbolOrder[i]!;
+    const leftReturns = args.returnVectorsBySymbol.get(leftSymbol);
 
     if (!leftReturns) {
-      throw new Error(`Missing return series for symbol "${leftSymbol}".`);
+      throw new Error(`Missing return vector for symbol "${leftSymbol}".`);
     }
 
     for (let j = i + 1; j < n; j += 1) {
-      const rightSymbol = symbolOrder[j]!;
-      const rightReturns = returnSeriesBySymbol.get(rightSymbol);
+      const rightSymbol = args.symbolOrder[j]!;
+      const rightReturns = args.returnVectorsBySymbol.get(rightSymbol);
 
       if (!rightReturns) {
-        throw new Error(`Missing return series for symbol "${rightSymbol}".`);
+        throw new Error(`Missing return vector for symbol "${rightSymbol}".`);
       }
 
-      const score = pearsonCorrelation(leftReturns, rightReturns);
+      const score = computeTrailingOverlapPearsonCorrelation(
+        leftReturns,
+        rightReturns,
+        args.windowDays,
+        minimumPairOverlapCount
+      );
       scores[i]![j] = score;
       scores[j]![i] = score;
     }
   }
 
   return scores;
+}
+
+export function getMinimumPairwiseOverlapCount(windowDays: number): number {
+  if (windowDays >= 252) {
+    return 60;
+  }
+
+  if (windowDays >= 120) {
+    return 40;
+  }
+
+  return 20;
+}
+
+export function computeTrailingOverlapPearsonCorrelation(
+  left: Float64Array,
+  right: Float64Array,
+  windowDays: number,
+  minimumPairOverlapCount: number
+): number {
+  if (left.length !== right.length) {
+    throw new Error('Return vector length mismatch while computing pairwise Pearson correlation.');
+  }
+
+  let observationCount = 0;
+  let meanLeft = 0;
+  let meanRight = 0;
+  let covariance = 0;
+  let varianceLeft = 0;
+  let varianceRight = 0;
+
+  for (let index = left.length - 1; index >= 0 && observationCount < windowDays; index -= 1) {
+    const leftValue = left[index]!;
+    const rightValue = right[index]!;
+
+    if (Number.isNaN(leftValue) || Number.isNaN(rightValue)) {
+      continue;
+    }
+
+    observationCount += 1;
+
+    const leftDelta = leftValue - meanLeft;
+    meanLeft += leftDelta / observationCount;
+
+    const rightDelta = rightValue - meanRight;
+    meanRight += rightDelta / observationCount;
+
+    covariance += leftDelta * (rightValue - meanRight);
+    varianceLeft += leftDelta * (leftValue - meanLeft);
+    varianceRight += rightDelta * (rightValue - meanRight);
+  }
+
+  if (observationCount < minimumPairOverlapCount) {
+    return 0;
+  }
+
+  if (varianceLeft <= NEAR_ZERO_VARIANCE_THRESHOLD || varianceRight <= NEAR_ZERO_VARIANCE_THRESHOLD) {
+    return 0;
+  }
+
+  const raw = covariance / Math.sqrt(varianceLeft * varianceRight);
+  return clamp(raw, -1, 1);
 }
 
 export function pearsonCorrelation(left: number[], right: number[]): number {
@@ -193,7 +266,7 @@ export function pearsonCorrelation(left: number[], right: number[]): number {
     varianceRight += centeredRight * centeredRight;
   }
 
-  if (varianceLeft <= 1e-20 || varianceRight <= 1e-20) {
+  if (varianceLeft <= NEAR_ZERO_VARIANCE_THRESHOLD || varianceRight <= NEAR_ZERO_VARIANCE_THRESHOLD) {
     throw new Error('Encountered a near-zero-variance return series.');
   }
 

@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 
 import { ActiveAnalysisRunPanel, RecentAnalysisRunsPanel } from '../../../components/analysis/AnalysisRunPanels';
 import Panel from '../../../components/ui/Panel';
+import Modal from '../../../components/ui/Modal';
 import SectionHeader from '../../../components/ui/SectionHeader';
 import { createExposureAnalysisRun, getNeighbors } from '../../../features/builds/api';
 import {
@@ -31,8 +32,10 @@ export default function ExposurePage() {
   const [k, setK] = useState(searchParams.get('k') ?? DEFAULT_K);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [preview, setPreview] = useState<NeighborsResponse | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const { inviteCode, setInviteCode } = useInviteCode();
 
   const { buildRuns, loading: buildRunsLoading } = useBuildRunsData(5000);
@@ -49,7 +52,7 @@ export default function ExposurePage() {
   );
 
   useEffect(() => {
-    if (comparableBuilds.length === 0 || buildId) {
+    if (comparableBuilds.length === 0 || buildId || (runId && !run && !runError)) {
       return;
     }
 
@@ -62,7 +65,7 @@ export default function ExposurePage() {
     if (nextBuildId) {
       setBuildId(nextBuildId);
     }
-  }, [buildId, comparableBuilds, searchParams]);
+  }, [buildId, comparableBuilds, run, runError, runId, searchParams]);
 
   useEffect(() => {
     if (!detail || detail.symbolOrder.length === 0) {
@@ -86,14 +89,16 @@ export default function ExposurePage() {
 
   useEffect(() => {
     const parsedK = Number(k);
-    if (!buildId || !symbol || !Number.isFinite(parsedK)) {
+    if (!previewOpen || !buildId || !symbol || !Number.isFinite(parsedK)) {
       setPreview(null);
       setPreviewError(null);
+      setPreviewLoading(false);
       return;
     }
 
     let cancelled = false;
     setPreviewError(null);
+    setPreviewLoading(true);
 
     void getNeighbors(buildId, {
       symbol,
@@ -109,12 +114,17 @@ export default function ExposurePage() {
           setPreview(null);
           setPreviewError(nextError instanceof Error ? nextError.message : 'Preview lookup failed.');
         }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setPreviewLoading(false);
+        }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [buildId, k, symbol]);
+  }, [buildId, k, previewOpen, symbol]);
 
   const selectedBuild = useMemo(
     () => comparableBuilds.find((item) => item.id === buildId) ?? null,
@@ -252,6 +262,16 @@ export default function ExposurePage() {
             <SectionHeader
               title="Exposure settings"
               subtitle="Queue the run, then revisit the saved result later by run id."
+              action={
+                <button
+                  type="button"
+                  className="button button--secondary button--sm"
+                  onClick={() => setPreviewOpen(true)}
+                  disabled={!selectedBuild || !symbol}
+                >
+                  Open preview
+                </button>
+              }
             />
 
             {comparableBuilds.length === 0 && !buildRunsLoading ? (
@@ -266,7 +286,10 @@ export default function ExposurePage() {
                 <select
                   className="field__control mono"
                   value={buildId}
-                  onChange={(event) => setBuildId(event.target.value)}
+                  onChange={(event) => {
+                    setBuildId(event.target.value);
+                    setRunId('');
+                  }}
                   disabled={submitting || buildRunsLoading || comparableBuilds.length === 0}
                 >
                   {comparableBuilds.map((buildRun) => (
@@ -333,21 +356,6 @@ export default function ExposurePage() {
             </form>
           </Panel>
 
-          <Panel variant="utility">
-            <SectionHeader
-              title="Run preview"
-              subtitle="Preview the scope and a small live neighbor slice before you queue the full exposure run."
-            />
-            <ExposurePreview
-              selectedBuild={selectedBuild}
-              symbol={symbol}
-              k={k}
-              universeSize={detail?.symbolOrder.length ?? 0}
-              preview={preview}
-              previewError={previewError}
-            />
-          </Panel>
-
           <Panel variant="primary">
             <SectionHeader
               title="Active run"
@@ -377,7 +385,11 @@ export default function ExposurePage() {
               runs={recentRuns}
               loading={recentRunsLoading}
               activeRunId={runId}
-              emptyCopy="No exposure runs yet for the selected build."
+              emptyCopy={
+                buildId
+                  ? 'No exposure runs yet for the selected build.'
+                  : 'Select a build to load recent exposure runs.'
+              }
               formatSummary={formatExposureRunSummary}
               onSelect={(nextRunId) => {
                 const next = recentRuns.find((item) => item.id === nextRunId);
@@ -403,6 +415,23 @@ export default function ExposurePage() {
           </Panel>
         </div>
       </div>
+
+      <Modal
+        open={previewOpen}
+        title="Run preview"
+        subtitle="Preview the scope and a small live neighbor slice before you queue the full exposure run."
+        onClose={() => setPreviewOpen(false)}
+      >
+        <ExposurePreview
+          selectedBuild={selectedBuild}
+          symbol={symbol}
+          k={k}
+          universeSize={detail?.symbolOrder.length ?? 0}
+          preview={preview}
+          previewError={previewError}
+          previewLoading={previewLoading}
+        />
+      </Modal>
     </div>
   );
 }
@@ -413,7 +442,8 @@ function ExposurePreview({
   k,
   universeSize,
   preview,
-  previewError
+  previewError,
+  previewLoading
 }: {
   selectedBuild: BuildRunListItem | null;
   symbol: string;
@@ -421,9 +451,14 @@ function ExposurePreview({
   universeSize: number;
   preview: NeighborsResponse | null;
   previewError: string | null;
+  previewLoading: boolean;
 }) {
   if (!selectedBuild) {
     return <div className="state-note">Select one succeeded build to preview this run.</div>;
+  }
+
+  if (previewLoading && !preview) {
+    return <div className="state-note">Loading neighbor preview…</div>;
   }
 
   const averagePreviewScore =

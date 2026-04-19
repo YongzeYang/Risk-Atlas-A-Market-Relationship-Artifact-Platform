@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 
 import Panel from '../../../components/ui/Panel';
 import SectionHeader from '../../../components/ui/SectionHeader';
-import { useBuildRunsData, useInviteCode } from '../../../features/builds/hooks';
+import { useBuildRunsData } from '../../../features/builds/hooks';
 import { formatDateOnly } from '../../../lib/format';
 import { compareBuilds } from '../../../features/builds/api';
 import type { BuildRunListItem, CompareBuildsResponse } from '../../../types/api';
@@ -16,7 +16,6 @@ export default function ComparePage() {
   const [result, setResult] = useState<CompareBuildsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { inviteCode, setInviteCode } = useInviteCode();
   const { buildRuns, loading: buildRunsLoading } = useBuildRunsData(5000);
   const comparableBuilds = useMemo(
     () => buildRuns.filter((item) => item.status === 'succeeded'),
@@ -56,18 +55,12 @@ export default function ComparePage() {
       e.preventDefault();
       if (!leftId || !rightId) return;
 
-      if (!inviteCode) {
-        setError('Invite code is required before running build comparison.');
-        setResult(null);
-        return;
-      }
-
       setLoading(true);
       setError(null);
       setResult(null);
 
       try {
-        const data = await compareBuilds(leftId.trim(), rightId.trim(), inviteCode);
+        const data = await compareBuilds(leftId.trim(), rightId.trim());
         setResult(data);
         setSearchParams({ left: leftId.trim(), right: rightId.trim() });
       } catch (err) {
@@ -76,7 +69,7 @@ export default function ComparePage() {
         setLoading(false);
       }
     },
-    [inviteCode, leftId, rightId, setSearchParams]
+    [leftId, rightId, setSearchParams]
   );
 
   const comparisonMode = inferComparisonMode(leftBuild, rightBuild);
@@ -128,19 +121,6 @@ export default function ComparePage() {
             </select>
           </label>
 
-          <label className="field">
-            <span className="field__label">Invite code</span>
-            <input
-              className="field__control mono"
-              type="text"
-              placeholder="Required for analysis runs"
-              value={inviteCode}
-              onChange={(event) => setInviteCode(event.target.value)}
-              autoComplete="off"
-              disabled={loading}
-            />
-          </label>
-
           <div className="query-form__action query-form__action--stack">
             <button
               type="button"
@@ -157,12 +137,16 @@ export default function ComparePage() {
             <button
               type="submit"
               className="button button--primary"
-              disabled={loading || !leftId || !rightId || !inviteCode || leftId === rightId || comparableBuilds.length < 2}
+              disabled={loading || !leftId || !rightId || leftId === rightId || comparableBuilds.length < 2}
             >
               {loading ? 'Comparing…' : 'Compare'}
             </button>
           </div>
         </form>
+
+        <div className="field__hint">
+          Query access is open here. Invite codes are only required when you queue new analysis runs elsewhere in the workspace.
+        </div>
 
         {leftId && rightId && leftId === rightId ? (
           <div className="state-note state-note--error">

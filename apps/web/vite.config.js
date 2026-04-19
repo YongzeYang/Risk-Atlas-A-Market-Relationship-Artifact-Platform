@@ -1,20 +1,33 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
-export default defineConfig({
-    plugins: [react()],
-    server: {
-        port: 5173,
-        proxy: {
-            '/datasets': 'http://localhost:3000',
-            '/universes': 'http://localhost:3000',
-            '/security-master': 'http://localhost:3000',
-            '/build-runs': 'http://localhost:3000',
-            '/build-series': 'http://localhost:3000',
-            '/analysis-runs': 'http://localhost:3000',
-            '/compare-builds': 'http://localhost:3000',
-            '/compare-build-structures': 'http://localhost:3000',
-            '/docs': 'http://localhost:3000',
-            '/health': 'http://localhost:3000'
-        }
+const proxyPrefixes = [
+    '/datasets',
+    '/universes',
+    '/security-master',
+    '/build-runs',
+    '/build-series',
+    '/analysis-runs',
+    '/compare-builds',
+    '/compare-build-structures',
+    '/docs',
+    '/health'
+];
+function normalizeTarget(rawValue) {
+    const trimmed = rawValue?.trim();
+    if (!trimmed) {
+        return 'http://localhost:3000';
     }
+    return trimmed.replace(/\/+$/, '');
+}
+export default defineConfig(({ mode }) => {
+    const env = loadEnv(mode, process.cwd(), '');
+    const proxyTarget = normalizeTarget(env.VITE_API_BASE_URL);
+    const webPort = Number(env.WEB_PORT || 5173);
+    return {
+        plugins: [react()],
+        server: {
+            port: Number.isFinite(webPort) ? webPort : 5173,
+            proxy: Object.fromEntries(proxyPrefixes.map((prefix) => [prefix, proxyTarget]))
+        }
+    };
 });

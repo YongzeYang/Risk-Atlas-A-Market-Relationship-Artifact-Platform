@@ -1571,6 +1571,58 @@ select {
   font-size: 13px;
 }
 
+.modal-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: clamp(20px, 4vw, 40px);
+  overflow-y: auto;
+  background: rgba(10, 14, 20, 0.74);
+  backdrop-filter: blur(8px);
+}
+
+.modal-panel {
+  width: min(1080px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: calc(var(--radius-panel) + 4px);
+  background:
+    linear-gradient(180deg, rgba(24, 31, 43, 0.96), rgba(14, 19, 28, 0.98)),
+    rgba(9, 12, 18, 0.96);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+  padding: clamp(18px, 3vw, 28px);
+}
+
+.modal-panel__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.modal-panel__title {
+  margin: 0;
+  font-size: 24px;
+  letter-spacing: -0.02em;
+}
+
+.modal-panel__subtitle {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  max-width: 64ch;
+}
+
+.modal-panel__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
 @media (max-width: 1120px) {
   .hero-band,
   .home-showcase-grid,
@@ -1587,6 +1639,14 @@ select {
   .meta-header__hero,
   .selection-groups {
     grid-template-columns: 1fr;
+  }
+
+  .modal-shell {
+    padding: 16px;
+  }
+
+  .modal-panel__header {
+    flex-direction: column;
   }
 
   .hero-band__metric-grid,

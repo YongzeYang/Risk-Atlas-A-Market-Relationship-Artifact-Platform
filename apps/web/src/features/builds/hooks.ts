@@ -436,7 +436,8 @@ export function useAnalysisRunData(runId: string | undefined, pollMs = 2000) {
 export function useAnalysisRunListData(
   kind: AnalysisRunKind | undefined,
   buildRunId: string | undefined,
-  pollMs = 5000
+  pollMs = 5000,
+  enabled = Boolean(kind && buildRunId)
 ) {
   const [runs, setRuns] = useState<AnalysisRunListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -445,6 +446,14 @@ export function useAnalysisRunListData(
 
   const refresh = useCallback(
     async (mode: 'initial' | 'refresh' = 'refresh') => {
+      if (!enabled || !kind || !buildRunId) {
+        setRuns([]);
+        setLoading(false);
+        setRefreshing(false);
+        setError(null);
+        return;
+      }
+
       if (mode === 'initial') {
         setLoading(true);
       } else {
@@ -463,10 +472,18 @@ export function useAnalysisRunListData(
         setRefreshing(false);
       }
     },
-    [buildRunId, kind]
+    [buildRunId, enabled, kind]
   );
 
   useEffect(() => {
+    if (!enabled || !kind || !buildRunId) {
+      setRuns([]);
+      setLoading(false);
+      setRefreshing(false);
+      setError(null);
+      return;
+    }
+
     let active = true;
     let timerId: number | undefined;
 
@@ -493,7 +510,7 @@ export function useAnalysisRunListData(
         window.clearTimeout(timerId);
       }
     };
-  }, [pollMs, refresh]);
+  }, [buildRunId, enabled, kind, pollMs, refresh]);
 
   return {
     runs,

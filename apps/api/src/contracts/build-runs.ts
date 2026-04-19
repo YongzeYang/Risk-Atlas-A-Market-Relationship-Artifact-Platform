@@ -26,7 +26,7 @@ export const ARTIFACT_OBJECT_PREFIX_ROOT = 'build-runs' as const;
 export const MATRIX_ARTIFACT_MEDIA_TYPE = 'application/octet-stream' as const;
 
 export const MIN_BUILD_UNIVERSE_SIZE = 2;
-export const MAX_BUILD_UNIVERSE_SIZE = 1000;
+export const MAX_BUILD_UNIVERSE_SIZE = 4000;
 
 export const DEFAULT_NEIGHBOR_K = 10;
 export const MAX_NEIGHBOR_K = 20;
@@ -432,7 +432,7 @@ export type PreviewV1 = {
   windowDays: BuildRunWindowDays;
   scoreMethod: BuildRunScoreMethod;
   symbolOrder: string[];
-  scores: number[][];
+  scores?: number[][];
   topPairs: TopPairItem[];
   minScore: number;
   maxScore: number;

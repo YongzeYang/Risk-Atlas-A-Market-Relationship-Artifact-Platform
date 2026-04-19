@@ -9,6 +9,7 @@ import {
   type BuildRequestValidationResponse,
   type BuildRunWindowDays
 } from '../contracts/build-runs.js';
+import { prepareCorrelationInputs } from './correlation-preparation-service.js';
 import { resolveUniverseSymbols } from './universe-resolver.js';
 
 type UniverseValidationRow = {
@@ -30,9 +31,12 @@ type InsufficientSymbol = {
 };
 
 type BuildRequestCoverageAssessment = {
-  resolvedSymbols: string[];
+  coverageQualifiedSymbols: string[];
+  matrixReadySymbols: string[];
   requiredRows: number;
   insufficientSymbols: InsufficientSymbol[];
+  filteredOutSymbols: string[];
+  matrixPreparationError: string | null;
 };
 
 export async function getBuildRequestValidation(args: {
@@ -104,24 +108,6 @@ export async function getBuildRequestValidationForResolvedUniverse(args: {
     windowDays: args.windowDays
   });
 
-  if (
-    assessment.resolvedSymbols.length < MIN_BUILD_UNIVERSE_SIZE ||
-    assessment.resolvedSymbols.length > MAX_BUILD_UNIVERSE_SIZE
-  ) {
-    return makeInvalidValidationResponse({
-      datasetId: args.dataset.id,
-      universeId: args.universe.id,
-      asOfDate: args.asOfDate,
-      windowDays: args.windowDays,
-      reasonCode: 'universe_size',
-      message:
-        `Universe symbol count must be between ${MIN_BUILD_UNIVERSE_SIZE} and ${MAX_BUILD_UNIVERSE_SIZE}. ` +
-        `Resolved ${assessment.resolvedSymbols.length} symbols for this selection.`,
-      resolvedSymbolCount: assessment.resolvedSymbols.length,
-      requiredRows: assessment.requiredRows
-    });
-  }
-
   if (assessment.insufficientSymbols.length > 0) {
     const preview = assessment.insufficientSymbols
       .slice(0, 5)
@@ -137,7 +123,44 @@ export async function getBuildRequestValidationForResolvedUniverse(args: {
       message:
         `Dataset "${args.dataset.id}" does not have enough history for universe "${args.universe.id}" at ${args.asOfDate}. ` +
         `Need ${assessment.requiredRows} rows per symbol. First insufficient symbols: ${preview}.`,
-      resolvedSymbolCount: assessment.resolvedSymbols.length,
+      requiredRows: assessment.requiredRows
+    });
+  }
+
+  if (assessment.matrixPreparationError) {
+    return makeInvalidValidationResponse({
+      datasetId: args.dataset.id,
+      universeId: args.universe.id,
+      asOfDate: args.asOfDate,
+      windowDays: args.windowDays,
+      reasonCode: 'insufficient_history',
+      message:
+        `Dataset "${args.dataset.id}" does not provide enough usable trading history for universe "${args.universe.id}" at ${args.asOfDate}. ` +
+        assessment.matrixPreparationError,
+      requiredRows: assessment.requiredRows
+    });
+  }
+
+  if (
+    assessment.matrixReadySymbols.length < MIN_BUILD_UNIVERSE_SIZE ||
+    assessment.matrixReadySymbols.length > MAX_BUILD_UNIVERSE_SIZE
+  ) {
+    const filteredOutCount = assessment.filteredOutSymbols.length;
+    const coverageQualifiedCount = assessment.coverageQualifiedSymbols.length;
+
+    return makeInvalidValidationResponse({
+      datasetId: args.dataset.id,
+      universeId: args.universe.id,
+      asOfDate: args.asOfDate,
+      windowDays: args.windowDays,
+      reasonCode: 'universe_size',
+      message:
+        `Universe symbol count must be between ${MIN_BUILD_UNIVERSE_SIZE} and ${MAX_BUILD_UNIVERSE_SIZE}. ` +
+        `Resolved ${assessment.matrixReadySymbols.length} matrix-ready symbols for this selection.` +
+        (filteredOutCount > 0
+          ? ` ${coverageQualifiedCount} coverage-qualified symbols were available before filtering ${filteredOutCount} flat or unusable return series.`
+          : ''),
+      resolvedSymbolCount: assessment.matrixReadySymbols.length,
       requiredRows: assessment.requiredRows
     });
   }
@@ -150,7 +173,7 @@ export async function getBuildRequestValidationForResolvedUniverse(args: {
     universeId: args.universe.id,
     asOfDate: args.asOfDate,
     windowDays: args.windowDays,
-    resolvedSymbolCount: assessment.resolvedSymbols.length,
+    resolvedSymbolCount: assessment.matrixReadySymbols.length,
     requiredRows: assessment.requiredRows
   };
 }
@@ -168,9 +191,12 @@ export async function assessBuildRequestCoverage(args: {
 
   if (resolvedSymbols.length === 0) {
     return {
-      resolvedSymbols,
+      coverageQualifiedSymbols: [],
+      matrixReadySymbols: [],
       requiredRows,
-      insufficientSymbols: []
+      insufficientSymbols: [],
+      filteredOutSymbols: [],
+      matrixPreparationError: null
     };
   }
 
@@ -198,11 +224,47 @@ export async function assessBuildRequestCoverage(args: {
     }))
     .filter((entry) => entry.rowCount < requiredRows);
 
-  return {
-    resolvedSymbols,
-    requiredRows,
-    insufficientSymbols
-  };
+  const coverageQualifiedSymbols = resolvedSymbols.filter(
+    (symbol) => (countsBySymbol.get(symbol) ?? 0) >= requiredRows
+  );
+
+  if (insufficientSymbols.length > 0 || coverageQualifiedSymbols.length === 0) {
+    return {
+      coverageQualifiedSymbols,
+      matrixReadySymbols: [],
+      requiredRows,
+      insufficientSymbols,
+      filteredOutSymbols: [],
+      matrixPreparationError: null
+    };
+  }
+
+  try {
+    const preparedInputs = await prepareCorrelationInputs({
+      datasetId: args.datasetId,
+      symbolOrder: coverageQualifiedSymbols,
+      asOfDate: args.asOfDate,
+      windowDays: args.windowDays
+    });
+
+    return {
+      coverageQualifiedSymbols,
+      matrixReadySymbols: preparedInputs.matrixReadySymbolOrder,
+      requiredRows,
+      insufficientSymbols,
+      filteredOutSymbols: preparedInputs.filteredOutSymbols,
+      matrixPreparationError: null
+    };
+  } catch (error) {
+    return {
+      coverageQualifiedSymbols,
+      matrixReadySymbols: [],
+      requiredRows,
+      insufficientSymbols,
+      filteredOutSymbols: [],
+      matrixPreparationError: toAssessmentErrorMessage(error)
+    };
+  }
 }
 
 export async function validateBuildRequestCoverage(args: {
@@ -212,16 +274,6 @@ export async function validateBuildRequestCoverage(args: {
   windowDays: BuildRunWindowDays;
 }): Promise<string[]> {
   const assessment = await assessBuildRequestCoverage(args);
-
-  if (
-    assessment.resolvedSymbols.length < MIN_BUILD_UNIVERSE_SIZE ||
-    assessment.resolvedSymbols.length > MAX_BUILD_UNIVERSE_SIZE
-  ) {
-    throw new ServiceError(
-      400,
-      `Universe symbol count must be between ${MIN_BUILD_UNIVERSE_SIZE} and ${MAX_BUILD_UNIVERSE_SIZE}.`
-    );
-  }
 
   if (assessment.insufficientSymbols.length > 0) {
     const preview = assessment.insufficientSymbols
@@ -236,7 +288,40 @@ export async function validateBuildRequestCoverage(args: {
     );
   }
 
-  return assessment.resolvedSymbols;
+  if (assessment.matrixPreparationError) {
+    throw new ServiceError(
+      400,
+      `Dataset "${args.datasetId}" does not provide enough usable trading history for universe "${args.universe.id}" at ${args.asOfDate}. ` +
+        assessment.matrixPreparationError
+    );
+  }
+
+  if (
+    assessment.matrixReadySymbols.length < MIN_BUILD_UNIVERSE_SIZE ||
+    assessment.matrixReadySymbols.length > MAX_BUILD_UNIVERSE_SIZE
+  ) {
+    const filteredOutCount = assessment.filteredOutSymbols.length;
+    const coverageQualifiedCount = assessment.coverageQualifiedSymbols.length;
+
+    throw new ServiceError(
+      400,
+      `Universe symbol count must be between ${MIN_BUILD_UNIVERSE_SIZE} and ${MAX_BUILD_UNIVERSE_SIZE}. ` +
+        `Resolved ${assessment.matrixReadySymbols.length} matrix-ready symbols for this selection.` +
+        (filteredOutCount > 0
+          ? ` ${coverageQualifiedCount} coverage-qualified symbols were available before filtering ${filteredOutCount} flat or unusable return series.`
+          : '')
+    );
+  }
+
+  return assessment.matrixReadySymbols;
+}
+
+function toAssessmentErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return 'Unknown build-preparation failure.';
 }
 
 function makeInvalidValidationResponse(args: {

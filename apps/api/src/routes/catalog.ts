@@ -26,7 +26,17 @@ const datasetItemSchema = {
     symbolCount: { type: 'integer' },
     priceRowCount: { type: 'integer' },
     minTradeDate: nullableIsoDateSchema,
-    maxTradeDate: nullableIsoDateSchema
+    maxTradeDate: nullableIsoDateSchema,
+    firstValidAsOfByWindowDays: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        '60': nullableIsoDateSchema,
+        '120': nullableIsoDateSchema,
+        '252': nullableIsoDateSchema
+      },
+      required: ['60', '120', '252']
+    }
   },
   required: [
     'id',
@@ -37,7 +47,8 @@ const datasetItemSchema = {
     'symbolCount',
     'priceRowCount',
     'minTradeDate',
-    'maxTradeDate'
+    'maxTradeDate',
+    'firstValidAsOfByWindowDays'
   ]
 } as const;
 

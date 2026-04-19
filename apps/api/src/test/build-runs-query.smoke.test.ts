@@ -20,6 +20,8 @@ import type {
   BuildRequestValidationResponse,
   BuildRunDetailResponse,
   BuildRunListItem,
+  BuildSeriesDetailResponse,
+  BuildSeriesListItem,
   CompareBuildStructuresResponse,
   ExposureResponse,
   HeatmapSubsetResponse,
@@ -148,6 +150,43 @@ test('build-runs query API smoke', async (t) => {
       assert.equal(invalid.reasonCode, 'insufficient_history');
       assert.match(invalid.message ?? '', /does not have enough history/i);
       assert.equal(invalid.requiredRows, 253);
+    });
+
+    await t.test('build series uses real trading dates for weekly cadence', async () => {
+      const createResponse = await app.inject({
+        method: 'POST',
+        url: '/build-series',
+        payload: {
+          name: 'smoke-weekly-series',
+          datasetId: BUILD_REQUEST.datasetId,
+          universeId: BUILD_REQUEST.universeId,
+          windowDays: BUILD_REQUEST.windowDays,
+          scoreMethod: BUILD_REQUEST.scoreMethod,
+          startDate: '2026-04-08',
+          endDate: '2026-04-15',
+          frequency: 'weekly',
+          inviteCode: INVITE_CODE
+        }
+      });
+
+      assert.equal(createResponse.statusCode, 202, createResponse.body);
+
+      const created = parseJson<BuildSeriesListItem>(createResponse.body);
+      assert.equal(created.frequency, 'weekly');
+      assert.equal(created.totalRunCount, 2);
+
+      const detailResponse = await app.inject({
+        method: 'GET',
+        url: `/build-series/${created.id}`
+      });
+
+      assert.equal(detailResponse.statusCode, 200, detailResponse.body);
+
+      const detail = parseJson<BuildSeriesDetailResponse>(detailResponse.body);
+      assert.deepEqual(
+        detail.runs.map((run) => run.asOfDate),
+        ['2026-04-10', '2026-04-15']
+      );
     });
 
     await t.test('pair-score endpoint is correct, self score = 1, and pair symmetry holds', async () => {
@@ -288,8 +327,7 @@ test('build-runs query API smoke', async (t) => {
         method: 'GET',
         url:
           `/build-runs/${buildRunId}/pair-divergence?recentWindowDays=20&limit=10` +
-          `&minLongCorrAbs=0.15&minCorrDeltaAbs=0.05`,
-        headers: ANALYSIS_HEADERS
+          `&minLongCorrAbs=0.15&minCorrDeltaAbs=0.05`
       });
 
       assert.equal(divergenceResponse.statusCode, 200, divergenceResponse.body);
@@ -363,8 +401,7 @@ test('build-runs query API smoke', async (t) => {
     await t.test('exposure returns sector aggregation and concentration metrics', async () => {
       const exposureResponse = await app.inject({
         method: 'GET',
-        url: `/build-runs/${buildRunId}/exposure?symbol=0700.HK&k=10`,
-        headers: ANALYSIS_HEADERS
+        url: `/build-runs/${buildRunId}/exposure?symbol=0700.HK&k=10`
       });
 
       assert.equal(exposureResponse.statusCode, 200, exposureResponse.body);
@@ -411,8 +448,7 @@ test('build-runs query API smoke', async (t) => {
     await t.test('structure returns ordered heatmap metadata and cluster summaries', async () => {
       const structureResponse = await app.inject({
         method: 'GET',
-        url: `/build-runs/${buildRunId}/structure?heatmapSize=12`,
-        headers: ANALYSIS_HEADERS
+        url: `/build-runs/${buildRunId}/structure?heatmapSize=12`
       });
 
       assert.equal(structureResponse.statusCode, 200, structureResponse.body);
@@ -459,14 +495,7 @@ test('build-runs query API smoke', async (t) => {
       assert.ok(completed.result.heatmapSymbols.length > 0);
     });
 
-    await t.test('compare-builds requires invite and returns pair drift with invite', async () => {
-      const missingInviteResponse = await app.inject({
-        method: 'GET',
-        url: `/compare-builds?leftId=${buildRunId}&rightId=${buildRunId}`
-      });
-
-      assert.equal(missingInviteResponse.statusCode, 400, missingInviteResponse.body);
-
+    await t.test('compare-builds is query-only and returns pair drift without invite', async () => {
       const createResponse = await app.inject({
         method: 'POST',
         url: '/build-runs',
@@ -479,8 +508,7 @@ test('build-runs query API smoke', async (t) => {
 
       const compareResponse = await app.inject({
         method: 'GET',
-        url: `/compare-builds?leftId=${buildRunId}&rightId=${secondBuildRunId}`,
-        headers: ANALYSIS_HEADERS
+        url: `/compare-builds?leftId=${buildRunId}&rightId=${secondBuildRunId}`
       });
 
       assert.equal(compareResponse.statusCode, 200, compareResponse.body);
@@ -513,8 +541,7 @@ test('build-runs query API smoke', async (t) => {
 
       const compareResponse = await app.inject({
         method: 'GET',
-        url: `/compare-build-structures?leftId=${buildRunId}&rightId=${secondBuildRunId}`,
-        headers: ANALYSIS_HEADERS
+        url: `/compare-build-structures?leftId=${buildRunId}&rightId=${secondBuildRunId}`
       });
 
       assert.equal(compareResponse.statusCode, 200, compareResponse.body);

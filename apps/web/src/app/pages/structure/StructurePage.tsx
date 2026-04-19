@@ -4,6 +4,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { ActiveAnalysisRunPanel, RecentAnalysisRunsPanel } from '../../../components/analysis/AnalysisRunPanels';
 import HeatmapGrid from '../../../components/data-display/HeatmapGrid';
 import Panel from '../../../components/ui/Panel';
+import Modal from '../../../components/ui/Modal';
 import SectionHeader from '../../../components/ui/SectionHeader';
 import {
   compareBuildStructures,
@@ -40,14 +41,24 @@ export default function StructurePage() {
   const [compareResult, setCompareResult] = useState<CompareBuildStructuresResponse | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [compareLoading, setCompareLoading] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [compareError, setCompareError] = useState<string | null>(null);
   const [previewHeatmap, setPreviewHeatmap] = useState<HeatmapSubsetResponse | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewHeatmapLoading, setPreviewHeatmapLoading] = useState(false);
   const { inviteCode, setInviteCode } = useInviteCode();
   const { buildRuns, loading: buildRunsLoading } = useBuildRunsData(5000);
-  const { detail: leftDetail } = useBuildDetailData(buildId || undefined, 5000);
-  const { detail: rightDetail } = useBuildDetailData(compareRightId || undefined, 5000);
+  const {
+    detail: leftDetail,
+    loading: leftDetailLoading,
+    error: leftDetailError
+  } = useBuildDetailData(previewOpen ? buildId || undefined : undefined, 5000);
+  const {
+    detail: rightDetail,
+    loading: rightDetailLoading,
+    error: rightDetailError
+  } = useBuildDetailData(previewOpen && compareRightId ? compareRightId : undefined, 5000);
   const { run, loading: runLoading, error: runError } = useAnalysisRunData(runId || undefined, 1500);
   const { runs: recentRuns, loading: recentRunsLoading } = useAnalysisRunListData(
     'structure',
@@ -61,7 +72,7 @@ export default function StructurePage() {
   );
 
   useEffect(() => {
-    if (comparableBuilds.length === 0 || buildId) {
+    if (comparableBuilds.length === 0 || buildId || (runId && !run && !runError)) {
       return;
     }
 
@@ -73,7 +84,7 @@ export default function StructurePage() {
     if (nextBuildId) {
       setBuildId(nextBuildId);
     }
-  }, [buildId, comparableBuilds, searchParams]);
+  }, [buildId, comparableBuilds, run, runError, runId, searchParams]);
 
   useEffect(() => {
     if (comparableBuilds.length < 2) {
@@ -140,14 +151,16 @@ export default function StructurePage() {
   }, [heatmapSize, leftDetail]);
 
   useEffect(() => {
-    if (!buildId || previewSymbols.length < 2) {
+    if (!previewOpen || !buildId || previewSymbols.length < 2) {
       setPreviewHeatmap(null);
       setPreviewError(null);
+      setPreviewHeatmapLoading(false);
       return;
     }
 
     let cancelled = false;
     setPreviewError(null);
+    setPreviewHeatmapLoading(true);
 
     void getHeatmapSubset(buildId, previewSymbols)
       .then((data) => {
@@ -160,12 +173,17 @@ export default function StructurePage() {
           setPreviewHeatmap(null);
           setPreviewError(nextError instanceof Error ? nextError.message : 'Preview heatmap lookup failed.');
         }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setPreviewHeatmapLoading(false);
+        }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [buildId, previewSymbols]);
+  }, [buildId, previewOpen, previewSymbols]);
 
   const activeResult = run?.kind === 'structure' ? run.result : null;
 
@@ -262,18 +280,12 @@ export default function StructurePage() {
         return;
       }
 
-      if (!inviteCode) {
-        setCompareError('Invite code is required before comparing structure drift.');
-        setCompareResult(null);
-        return;
-      }
-
       setCompareLoading(true);
       setCompareError(null);
       setCompareResult(null);
 
       try {
-        const data = await compareBuildStructures(buildId, compareRightId, inviteCode);
+        const data = await compareBuildStructures(buildId, compareRightId);
         setCompareResult(data);
         persistQuery({
           buildId,
@@ -287,7 +299,7 @@ export default function StructurePage() {
         setCompareLoading(false);
       }
     },
-    [buildId, compareRightId, heatmapSize, inviteCode, persistQuery, runId]
+    [buildId, compareRightId, heatmapSize, persistQuery, runId]
   );
 
   return (
@@ -336,6 +348,16 @@ export default function StructurePage() {
             <SectionHeader
               title="Structure settings"
               subtitle="Queue the ordered structure run first, then compare cluster drift only when you need the second pass."
+              action={
+                <button
+                  type="button"
+                  className="button button--secondary button--sm"
+                  onClick={() => setPreviewOpen(true)}
+                  disabled={!selectedBuild}
+                >
+                  Open preview
+                </button>
+              }
             />
 
             <form className="query-form query-form--wide" onSubmit={handleAnalyze}>
@@ -344,7 +366,11 @@ export default function StructurePage() {
                 <select
                   className="field__control mono"
                   value={buildId}
-                  onChange={(event) => setBuildId(event.target.value)}
+                  onChange={(event) => {
+                    setBuildId(event.target.value);
+                    setRunId('');
+                    setCompareResult(null);
+                  }}
                   disabled={submitting || buildRunsLoading || comparableBuilds.length === 0}
                 >
                   {comparableBuilds.map((buildRun) => (
@@ -394,22 +420,6 @@ export default function StructurePage() {
             </form>
           </Panel>
 
-          <Panel variant="utility">
-            <SectionHeader
-              title="Run preview"
-              subtitle="Preview the clustered slice and comparison scope before you queue the heavier structure pass."
-            />
-            <StructurePreview
-              selectedBuild={selectedBuild}
-              compareRightId={compareRightId}
-              heatmapSize={heatmapSize}
-              leftSymbolCount={leftDetail?.symbolOrder.length ?? 0}
-              rightSymbolCount={rightDetail?.symbolOrder.length ?? 0}
-              previewHeatmap={previewHeatmap}
-              previewError={previewError}
-            />
-          </Panel>
-
           <Panel variant="primary">
             <SectionHeader
               title="Active run"
@@ -440,7 +450,11 @@ export default function StructurePage() {
                 <select
                   className="field__control mono"
                   value={buildId}
-                  onChange={(event) => setBuildId(event.target.value)}
+                  onChange={(event) => {
+                    setBuildId(event.target.value);
+                    setRunId('');
+                    setCompareResult(null);
+                  }}
                   disabled={compareLoading || comparableBuilds.length < 2}
                 >
                   {comparableBuilds.map((buildRun) => (
@@ -467,24 +481,11 @@ export default function StructurePage() {
                 </select>
               </label>
 
-              <label className="field">
-                <span className="field__label">Invite code</span>
-                <input
-                  className="field__control mono"
-                  type="text"
-                  placeholder="Required for structure compare"
-                  value={inviteCode}
-                  onChange={(event) => setInviteCode(event.target.value)}
-                  autoComplete="off"
-                  disabled={compareLoading}
-                />
-              </label>
-
               <div className="query-form__action query-form__action--stack">
                 <button
                   type="submit"
                   className="button button--primary"
-                  disabled={compareLoading || !buildId || !compareRightId || !inviteCode || buildId === compareRightId}
+                  disabled={compareLoading || !buildId || !compareRightId || buildId === compareRightId}
                 >
                   {compareLoading ? 'Comparing…' : 'Compare structure'}
                 </button>
@@ -506,7 +507,11 @@ export default function StructurePage() {
               runs={recentRuns}
               loading={recentRunsLoading}
               activeRunId={runId}
-              emptyCopy="No structure runs yet for the selected build."
+              emptyCopy={
+                buildId
+                  ? 'No structure runs yet for the selected build.'
+                  : 'Select a build to load recent structure runs.'
+              }
               formatSummary={formatStructureRunSummary}
               onSelect={(nextRunId) => {
                 const next = recentRuns.find((item) => item.id === nextRunId);
@@ -524,7 +529,7 @@ export default function StructurePage() {
             />
 
             <div className="workspace-note-list">
-              <div className="workspace-note-list__item">Browsing build metadata stays open; queue creation and compare require an invite code.</div>
+              <div className="workspace-note-list__item">Browsing and compare queries stay open; only queue creation requires an invite code.</div>
               <div className="workspace-note-list__item">Use the ordered heatmap to see whether similar names now appear in block-like groups instead of a noisy matrix.</div>
               <div className="workspace-note-list__item">Use cluster summaries to interpret size, dominant sector, and cohesion.</div>
               <div className="workspace-note-list__item">Use cluster drift compare to identify which symbols moved across groups, not just which pairs drifted.</div>
@@ -532,6 +537,26 @@ export default function StructurePage() {
           </Panel>
         </div>
       </div>
+
+      <Modal
+        open={previewOpen}
+        title="Run preview"
+        subtitle="Preview the clustered slice and comparison scope before you queue the heavier structure pass."
+        onClose={() => setPreviewOpen(false)}
+      >
+        <StructurePreview
+          selectedBuild={selectedBuild}
+          compareRightId={compareRightId}
+          heatmapSize={heatmapSize}
+          leftSymbolCount={leftDetail?.symbolOrder.length ?? 0}
+          rightSymbolCount={rightDetail?.symbolOrder.length ?? 0}
+          previewHeatmap={previewHeatmap}
+          previewError={previewError ?? leftDetailError ?? rightDetailError}
+          previewLoading={
+            previewHeatmapLoading || leftDetailLoading || (Boolean(compareRightId) && rightDetailLoading)
+          }
+        />
+      </Modal>
     </div>
   );
 }
@@ -543,7 +568,8 @@ function StructurePreview({
   leftSymbolCount,
   rightSymbolCount,
   previewHeatmap,
-  previewError
+  previewError,
+  previewLoading
 }: {
   selectedBuild: BuildRunListItem | null;
   compareRightId: string;
@@ -552,9 +578,14 @@ function StructurePreview({
   rightSymbolCount: number;
   previewHeatmap: HeatmapSubsetResponse | null;
   previewError: string | null;
+  previewLoading: boolean;
 }) {
   if (!selectedBuild) {
     return <div className="state-note">Select one succeeded build to preview this run.</div>;
+  }
+
+  if (previewLoading && !previewHeatmap && leftSymbolCount === 0) {
+    return <div className="state-note">Loading structure preview…</div>;
   }
 
   return (

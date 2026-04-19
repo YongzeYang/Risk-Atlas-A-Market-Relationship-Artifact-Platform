@@ -24,14 +24,9 @@ import {
   writeManifestJsonStable
 } from './local-artifact-store.js';
 import {
-  buildAlignedPriceSeries,
   buildCorrelationMatrix,
-  buildRowsBySymbol,
-  computeLogReturns,
-  hasSufficientVariance,
-  selectAlignedWindowDates,
-  type PriceRow
 } from './correlation-analytics.js';
+import { prepareCorrelationInputs } from './correlation-preparation-service.js';
 import { computeBuildStructureSummary } from './structure-service.js';
 import { resolveUniverseSymbols } from './universe-resolver.js';
 
@@ -163,7 +158,6 @@ async function runBuildInternal(buildRunId: string): Promise<void> {
       windowDays,
       scoreMethod: 'pearson_corr',
       symbolOrder: prepared.symbolOrder,
-      scores: prepared.scores,
       topPairs: prepared.topPairs,
       minScore: prepared.minScore,
       maxScore: prepared.maxScore,
@@ -309,71 +303,24 @@ async function buildCorrelationArtifactData(args: {
   asOfDate: string;
   windowDays: number;
 }): Promise<PreparedCorrelationBuild> {
-  const priceRows = await prisma.eodPrice.findMany({
-    where: {
-      datasetId: args.datasetId,
-      symbol: {
-        in: args.symbolOrder
-      },
-      tradeDate: {
-        lte: args.asOfDate
-      }
-    },
-    orderBy: [
-      {
-        tradeDate: 'asc'
-      }
-    ],
-    select: {
-      symbol: true,
-      tradeDate: true,
-      adjClose: true
-    }
-  });
+  const preparedInputs = await prepareCorrelationInputs(args);
 
-  const rowsBySymbol = buildRowsBySymbol(priceRows, args.symbolOrder);
-  const selectedDates = selectAlignedWindowDates(
-    rowsBySymbol,
-    args.symbolOrder,
-    args.asOfDate,
-    args.windowDays
-  );
-  const alignedPriceSeries = buildAlignedPriceSeries(
-    rowsBySymbol,
-    args.symbolOrder,
-    selectedDates
-  );
-
-  const returnSeriesBySymbol = new Map<string, number[]>();
-  const filteredSymbolOrder: string[] = [];
-
-  for (const symbol of args.symbolOrder) {
-    const alignedPrices = alignedPriceSeries.get(symbol);
-    if (!alignedPrices) {
-      throw new Error(`Missing aligned price series for symbol "${symbol}".`);
-    }
-
-    const returns = computeLogReturns(alignedPrices);
-    if (!hasSufficientVariance(returns)) {
-      continue;
-    }
-
-    returnSeriesBySymbol.set(symbol, returns);
-    filteredSymbolOrder.push(symbol);
-  }
-
-  if (filteredSymbolOrder.length < MIN_BUILD_UNIVERSE_SIZE) {
+  if (preparedInputs.matrixReadySymbolOrder.length < MIN_BUILD_UNIVERSE_SIZE) {
     throw new Error(
-      `Only ${filteredSymbolOrder.length} symbols remain after filtering near-zero-variance return series.`
+      `Only ${preparedInputs.matrixReadySymbolOrder.length} symbols remain after filtering near-zero-variance return series.`
     );
   }
 
-  const scores = buildCorrelationMatrix(filteredSymbolOrder, returnSeriesBySymbol);
+  const scores = buildCorrelationMatrix({
+    symbolOrder: preparedInputs.matrixReadySymbolOrder,
+    returnVectorsBySymbol: preparedInputs.returnVectorsBySymbol,
+    windowDays: args.windowDays
+  });
   const { minScore, maxScore } = computeMatrixScoreRange(scores);
-  const topPairs = computeTopPairs(filteredSymbolOrder, scores);
+  const topPairs = computeTopPairs(preparedInputs.matrixReadySymbolOrder, scores);
 
   return {
-    symbolOrder: filteredSymbolOrder,
+    symbolOrder: preparedInputs.matrixReadySymbolOrder,
     scores,
     topPairs,
     minScore,
@@ -414,24 +361,29 @@ function computeTopPairs(symbolOrder: string[], scores: number[][]): TopPairItem
         right: symbolOrder[j]!,
         score: scores[i]![j]!
       });
+
+      pairs.sort(compareTopPairPriority);
+      if (pairs.length > TOP_PAIR_LIMIT) {
+        pairs.pop();
+      }
     }
   }
 
-  pairs.sort((a, b) => {
-    const absDiff = Math.abs(b.score) - Math.abs(a.score);
-    if (absDiff !== 0) {
-      return absDiff;
-    }
+  return pairs;
+}
 
-    const leftCompare = a.left.localeCompare(b.left);
-    if (leftCompare !== 0) {
-      return leftCompare;
-    }
+function compareTopPairPriority(a: TopPairItem, b: TopPairItem): number {
+  const absDiff = Math.abs(b.score) - Math.abs(a.score);
+  if (absDiff !== 0) {
+    return absDiff;
+  }
 
-    return a.right.localeCompare(b.right);
-  });
+  const leftCompare = a.left.localeCompare(b.left);
+  if (leftCompare !== 0) {
+    return leftCompare;
+  }
 
-  return pairs.slice(0, TOP_PAIR_LIMIT);
+  return a.right.localeCompare(b.right);
 }
 
 function toErrorMessage(error: unknown): string {

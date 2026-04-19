@@ -19,6 +19,7 @@ export type BuildSeriesStatus =
   | 'failed';
 export type AnalysisRunKind = 'pair_divergence' | 'exposure' | 'structure';
 export type AnalysisRunStatus = 'pending' | 'running' | 'succeeded' | 'failed';
+export type DatasetFirstValidAsOfByWindowDays = Record<`${BuildRunWindowDays}`, string | null>;
 
 export type DatasetListItem = {
   id: string;
@@ -30,6 +31,7 @@ export type DatasetListItem = {
   priceRowCount: number;
   minTradeDate: string | null;
   maxTradeDate: string | null;
+  firstValidAsOfByWindowDays: DatasetFirstValidAsOfByWindowDays;
 };
 
 export type UniverseListItem = {
