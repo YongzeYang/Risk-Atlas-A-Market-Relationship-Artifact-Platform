@@ -7,6 +7,7 @@ import BoundaryNote from '../../../components/ui/BoundaryNote';
 import Panel from '../../../components/ui/Panel';
 import Modal from '../../../components/ui/Modal';
 import SectionHeader from '../../../components/ui/SectionHeader';
+import WorkflowStrip from '../../../components/ui/WorkflowStrip';
 import {
   compareBuildStructures,
   createStructureAnalysisRun,
@@ -19,6 +20,7 @@ import {
   useBuildRunsData,
   useInviteCode
 } from '../../../features/builds/hooks';
+import { buildAnalysisWorkflowItems } from '../../../lib/analysis-workflow';
 import { formatDateOnly, formatInteger, formatScore } from '../../../lib/format';
 import { formatLookbackLabel, formatSnapshotOptionLabel } from '../../../lib/snapshot-language';
 import type {
@@ -188,6 +190,12 @@ export default function StructurePage() {
   }, [buildId, previewOpen, previewSymbols]);
 
   const activeResult = run?.kind === 'structure' ? run.result : null;
+  const workflowItems = buildAnalysisWorkflowItems('groups', {
+    groupsTo: buildId ? `/structure?build=${buildId}` : '/structure',
+    compareTo: buildId ? `/compare?left=${buildId}` : '/compare',
+    relationshipsTo: buildId ? `/divergence?build=${buildId}` : '/divergence',
+    spilloverTo: buildId ? `/exposure?build=${buildId}` : '/exposure'
+  });
 
   const persistQuery = useCallback(
     (next: {
@@ -306,14 +314,49 @@ export default function StructurePage() {
 
   return (
     <div className="page page--structure">
-      <section className="workspace-hero">
+      <section className="workspace-hero workspace-hero--structure">
         <div className="workspace-hero__copy">
-          <h1 className="workspace-hero__title">What hidden groups exist in this basket?</h1>
-          <p className="workspace-hero__description">
-            Reorder the basket into groups so the market structure becomes easier to read.
-          </p>
-          <BoundaryNote variant="accent">
-            These groups describe this snapshot only. They are not permanent labels.
+          <div className="workspace-hero__intro">
+            <div className="workspace-hero__lead">
+              <div className="workspace-hero__eyebrow">Hidden groups</div>
+              <h1 className="workspace-hero__title">Which names keep acting like one bloc?</h1>
+              <p className="workspace-hero__description">
+                Reorder the basket into hidden groups so concentration, outliers, and loose edges show up at a glance.
+              </p>
+              <p className="workspace-hero__subline">
+                Use this after the basket read when the label looks flatter than the behaviour underneath it.
+              </p>
+            </div>
+
+            <div className="workspace-hero__summary">
+              <div className="workspace-hero__summary-label">Quick read</div>
+              <div className="workspace-hero__stats">
+                <article className="workspace-hero__stat-card">
+                  <div className="workspace-hero__stat-value mono">{formatInteger(comparableBuilds.length)}</div>
+                  <div className="workspace-hero__stat-label">Finished reads</div>
+                </article>
+                <article className="workspace-hero__stat-card">
+                  <div className="workspace-hero__stat-value mono">{selectedBuild ? formatDateOnly(selectedBuild.asOfDate) : '—'}</div>
+                  <div className="workspace-hero__stat-label">Anchor date</div>
+                </article>
+                <article className={`workspace-hero__stat-card${activeResult?.clusterCount ? ' workspace-hero__stat-card--highlight' : ''}`}>
+                  <div className="workspace-hero__stat-value mono">{formatInteger(activeResult?.clusterCount ?? 0)}</div>
+                  <div className="workspace-hero__stat-label">Hidden groups</div>
+                </article>
+                <article className="workspace-hero__stat-card">
+                  <div className="workspace-hero__stat-value mono">{activeResult ? formatScore(activeResult.clusterThreshold, 2) : '—'}</div>
+                  <div className="workspace-hero__stat-label">Group strictness</div>
+                </article>
+
+                <div className="workspace-hero__stat-note">
+                  <strong>Best setup:</strong> use this when you want to see blocs and outliers before deciding whether a second snapshot compare is worth it.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <BoundaryNote className="workspace-hero__note" variant="accent">
+            These groups describe one snapshot window only. They are not permanent labels or taxonomies.
           </BoundaryNote>
           <div className="workspace-hero__actions">
             <Link to="/exposure" className="button button--secondary">
@@ -324,33 +367,22 @@ export default function StructurePage() {
             </Link>
           </div>
         </div>
-
-        <div className="workspace-hero__stats">
-          <article className="workspace-hero__stat-card">
-            <div className="workspace-hero__stat-value mono">{formatInteger(comparableBuilds.length)}</div>
-            <div className="workspace-hero__stat-label">Ready snapshots</div>
-          </article>
-          <article className="workspace-hero__stat-card">
-            <div className="workspace-hero__stat-value mono">{selectedBuild ? formatDateOnly(selectedBuild.asOfDate) : '—'}</div>
-            <div className="workspace-hero__stat-label">Snapshot date</div>
-          </article>
-          <article className="workspace-hero__stat-card">
-            <div className="workspace-hero__stat-value mono">{formatInteger(activeResult?.clusterCount ?? 0)}</div>
-            <div className="workspace-hero__stat-label">Clusters</div>
-          </article>
-          <article className="workspace-hero__stat-card">
-            <div className="workspace-hero__stat-value mono">{activeResult ? formatScore(activeResult.clusterThreshold, 2) : '—'}</div>
-            <div className="workspace-hero__stat-label">Group strictness</div>
-          </article>
-        </div>
       </section>
+
+      <WorkflowStrip
+        title="Follow the question, not the tool list"
+        subtitle="Stay broad here first. Only move into Compare, Relationships, or Spillover when the hidden-group read already tells you which narrower question matters next."
+        items={workflowItems}
+        className="analysis-flow-strip"
+        compact
+      />
 
       <div className="workspace-layout">
         <div className="workspace-layout__main">
           <Panel variant="primary">
             <SectionHeader
-              title="Groups settings"
-              subtitle="Prepare the groups analysis, then revisit or compare later."
+              title="Prepare a saved groups read"
+              subtitle="Queue the grouped read once, then revisit or compare later."
               action={
                 <button
                   type="button"
@@ -358,7 +390,7 @@ export default function StructurePage() {
                   onClick={() => setPreviewOpen(true)}
                   disabled={!selectedBuild}
                 >
-                  Open preview
+                  Preview groups
                 </button>
               }
             />
@@ -425,8 +457,8 @@ export default function StructurePage() {
 
           <Panel variant="primary">
             <SectionHeader
-              title="Current result"
-              subtitle="Results are saved and available after page reload."
+              title="Latest groups read"
+              subtitle="Saved results stay available after reload, so the same ordered view can be reopened later."
             />
             <ActiveAnalysisRunPanel
               run={run}
@@ -444,7 +476,7 @@ export default function StructurePage() {
           <Panel variant="primary">
             <SectionHeader
               title="Group drift compare"
-              subtitle="Use this after you already know both snapshots are worth comparing."
+              subtitle="Use this only after both snapshots already deserve a structural compare."
             />
 
             <form className="query-form query-form--wide" onSubmit={handleCompare}>
@@ -503,8 +535,8 @@ export default function StructurePage() {
         <div className="workspace-layout__side">
           <Panel variant="utility">
             <SectionHeader
-              title="Saved analyses"
-              subtitle="Reopen finished results without rerunning them."
+              title="Saved group reads"
+              subtitle="Reopen finished results without rerunning the worker."
             />
             <RecentAnalysisRunsPanel
               runs={recentRuns}
@@ -527,14 +559,14 @@ export default function StructurePage() {
 
           <Panel variant="utility">
             <SectionHeader
-              title="Reading guide"
-              subtitle="The ordered heatmap is a summary of hidden groups, not a replacement for deeper drill-down."
+              title="Read the group map"
+              subtitle="The ordered heatmap is a summary of blocs and outliers, not a replacement for deeper drill-down."
             />
 
             <div className="workspace-note-list">
-              <div className="workspace-note-list__item">Use this page to see whether names in your basket form distinct behavioural blocs.</div>
+              <div className="workspace-note-list__item">Use this page to see whether names in the basket form distinct behavioural blocs.</div>
               <div className="workspace-note-list__item">Single-name groups usually mean loose connections rather than hidden overlap.</div>
-              <div className="workspace-note-list__item">These groups reflect one snapshot period — compare two snapshots to see drift.</div>
+              <div className="workspace-note-list__item">These groups belong to one snapshot window. Compare two snapshots to see the drift.</div>
             </div>
           </Panel>
         </div>
@@ -543,7 +575,7 @@ export default function StructurePage() {
       <Modal
         open={previewOpen}
         title="Run preview"
-        subtitle="Preview the grouped slice and comparison scope before you queue the heavier groups pass."
+        subtitle="Preview the grouped slice and compare scope before you queue the saved groups read."
         onClose={() => setPreviewOpen(false)}
       >
         <StructurePreview
@@ -635,8 +667,8 @@ function StructureResult({ data }: { data: StructureResponse }) {
   return (
     <Panel variant="primary">
       <SectionHeader
-        title="Hidden groups summary"
-        subtitle="The heatmap shows the leading ordered slice, while the group list carries the full grouping summary."
+        title="How the basket reorganizes"
+        subtitle="The heatmap shows the leading ordered slice, while the list below carries the full hidden-group summary."
       />
 
       <div className="plain-summary">
@@ -651,7 +683,7 @@ function StructureResult({ data }: { data: StructureResponse }) {
 
       <div className="stat-grid">
         <div className="stat-card">
-          <div className="stat-card__label">Clusters</div>
+          <div className="stat-card__label">Hidden groups</div>
           <div className="stat-card__value mono">{formatInteger(data.clusterCount)}</div>
         </div>
         <div className="stat-card">
@@ -671,7 +703,7 @@ function StructureResult({ data }: { data: StructureResponse }) {
 
       {data.heatmapSymbols.length > 0 ? (
         <div style={{ marginTop: '1.5rem' }}>
-          <div className="workspace-note-list__item" style={{ marginBottom: '0.5rem' }}>How the basket looks when reordered by hidden groups</div>
+          <div className="workspace-note-list__item" style={{ marginBottom: '0.5rem' }}>How the basket looks once the hidden groups are pulled into the same view.</div>
           <HeatmapGrid symbols={data.heatmapSymbols} scores={data.heatmapScores} />
         </div>
       ) : null}

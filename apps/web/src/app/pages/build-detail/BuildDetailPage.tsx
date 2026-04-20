@@ -6,8 +6,10 @@ import Panel from '../../../components/ui/Panel';
 import ResearchDetails from '../../../components/ui/ResearchDetails';
 import SectionHeader from '../../../components/ui/SectionHeader';
 import StatCard from '../../../components/ui/StatCard';
+import WorkflowStrip from '../../../components/ui/WorkflowStrip';
 import { useBuildDetailData } from '../../../features/builds/hooks';
 import { formatDateTime, formatInteger, formatScore, formatScoreRange } from '../../../lib/format';
+import { buildSnapshotWorkflowItems } from '../../../lib/analysis-workflow';
 import { formatLookbackLabel } from '../../../lib/snapshot-language';
 import BuildMetaHeader from './sections/BuildMetaHeader';
 import HeatmapPanel from './sections/HeatmapPanel';
@@ -71,6 +73,13 @@ export default function BuildDetailPage() {
     detail.symbolOrder.length > 0 &&
     detail.artifact !== null;
   const strongestPair = detail?.topPairs[0] ?? null;
+  const workflowItems = buildSnapshotWorkflowItems('snapshot', {
+    snapshotTo: `/builds/${id}`,
+    groupsTo: `/structure?build=${id}`,
+    compareTo: `/compare?left=${id}`,
+    relationshipsTo: `/divergence?build=${id}`,
+    spilloverTo: `/exposure?build=${id}`
+  });
 
   return (
     <div className="page page--detail">
@@ -89,10 +98,18 @@ export default function BuildDetailPage() {
             whether the pattern will persist, or what to trade next.
           </BoundaryNote>
 
+          <WorkflowStrip
+            title="Move from the base read into the next question"
+            subtitle="Stay with one snapshot until the question truly changes. Then move one step narrower."
+            items={workflowItems}
+            className="analysis-flow-strip"
+            compact
+          />
+
           <Panel variant="secondary">
             <SectionHeader
-              title="How to read this snapshot"
-              subtitle="Start with the shape of the basket, then move to specific relationships, spillover from one name, hidden groups, and finally comparison."
+              title="Read the basket before you explain it"
+              subtitle="Start from concentration and overlap, then move toward pairs, one-name spillover, hidden groups, and only then cross-snapshot comparison."
             />
 
             <div className="analysis-overview-grid">
@@ -182,7 +199,7 @@ export default function BuildDetailPage() {
               <Panel variant="utility">
                 <SectionHeader
                   title="Question-led next steps"
-                  subtitle="This page gives the first read. Use the linked screens when the question becomes more specific."
+                  subtitle="This page is the broad read. Use the linked screens only when the question becomes narrower or explicitly changes."
                 />
 
                 <div className="workspace-note-list">

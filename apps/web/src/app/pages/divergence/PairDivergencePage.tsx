@@ -7,6 +7,7 @@ import Panel from '../../../components/ui/Panel';
 import Modal from '../../../components/ui/Modal';
 import ResearchDetails from '../../../components/ui/ResearchDetails';
 import SectionHeader from '../../../components/ui/SectionHeader';
+import WorkflowStrip from '../../../components/ui/WorkflowStrip';
 import { createPairDivergenceAnalysisRun } from '../../../features/builds/api';
 import {
   useAnalysisRunData,
@@ -15,6 +16,7 @@ import {
   useBuildRunsData,
   useInviteCode
 } from '../../../features/builds/hooks';
+import { buildAnalysisWorkflowItems } from '../../../lib/analysis-workflow';
 import { formatDateOnly, formatInteger, formatScore } from '../../../lib/format';
 import { formatLookbackLabel, formatSnapshotOptionLabel } from '../../../lib/snapshot-language';
 import type {
@@ -101,6 +103,12 @@ export default function PairDivergencePage() {
   );
 
   const activeResult = run?.kind === 'pair_divergence' ? run.result : null;
+  const workflowItems = buildAnalysisWorkflowItems('relationships', {
+    groupsTo: buildId ? `/structure?build=${buildId}` : '/structure',
+    compareTo: buildId ? `/compare?left=${buildId}` : '/compare',
+    relationshipsTo: buildId ? `/divergence?build=${buildId}` : '/divergence',
+    spilloverTo: buildId ? `/exposure?build=${buildId}` : '/exposure'
+  });
 
   const persistQuery = useCallback(
     (next: {
@@ -214,14 +222,49 @@ export default function PairDivergencePage() {
 
   return (
     <div className="page page--divergence">
-      <section className="workspace-hero">
+      <section className="workspace-hero workspace-hero--divergence">
         <div className="workspace-hero__copy">
-          <h1 className="workspace-hero__title">Which relationships deserve a second look?</h1>
-          <p className="workspace-hero__description">
-            Find pairs whose relationship looks unusually stronger, weaker, or newly stretched.
-          </p>
-          <BoundaryNote variant="accent">
-            Use as follow-up research, not a trade instruction.
+          <div className="workspace-hero__intro">
+            <div className="workspace-hero__lead">
+              <div className="workspace-hero__eyebrow">Relationship drift</div>
+              <h1 className="workspace-hero__title">Which pairs no longer behave the way the basket expects?</h1>
+              <p className="workspace-hero__description">
+                Scan for pairs whose fresh relationship is meaningfully stronger, weaker, or newly stretched relative to the anchor window.
+              </p>
+              <p className="workspace-hero__subline">
+                Use this after the basket read or broad compare when you need the pairs behind the move.
+              </p>
+            </div>
+
+            <div className="workspace-hero__summary">
+              <div className="workspace-hero__summary-label">Quick read</div>
+              <div className="workspace-hero__stats">
+                <article className="workspace-hero__stat-card">
+                  <div className="workspace-hero__stat-value mono">{formatInteger(comparableBuilds.length)}</div>
+                  <div className="workspace-hero__stat-label">Finished reads</div>
+                </article>
+                <article className="workspace-hero__stat-card">
+                  <div className="workspace-hero__stat-value mono">{selectedBuild ? formatDateOnly(selectedBuild.asOfDate) : '—'}</div>
+                  <div className="workspace-hero__stat-label">Anchor date</div>
+                </article>
+                <article className="workspace-hero__stat-card">
+                  <div className="workspace-hero__stat-value mono">{selectedBuild ? formatLookbackLabel(selectedBuild.windowDays) : '—'}</div>
+                  <div className="workspace-hero__stat-label">Anchor window</div>
+                </article>
+                <article className={`workspace-hero__stat-card${activeResult?.candidateCount ? ' workspace-hero__stat-card--highlight' : ''}`}>
+                  <div className="workspace-hero__stat-value mono">{formatInteger(activeResult?.candidateCount ?? 0)}</div>
+                  <div className="workspace-hero__stat-label">Pairs surfaced</div>
+                </article>
+
+                <div className="workspace-hero__stat-note">
+                  <strong>Best setup:</strong> use a long anchor window you trust, then let the fresh window tell you where that intuition is slipping.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <BoundaryNote className="workspace-hero__note" variant="accent">
+            Relationship drift is a research prompt, not a trade trigger on its own.
           </BoundaryNote>
           <div className="workspace-hero__actions">
             <Link to="/compare" className="button button--secondary">
@@ -232,33 +275,22 @@ export default function PairDivergencePage() {
             </Link>
           </div>
         </div>
-
-        <div className="workspace-hero__stats">
-          <article className="workspace-hero__stat-card">
-            <div className="workspace-hero__stat-value mono">{formatInteger(comparableBuilds.length)}</div>
-            <div className="workspace-hero__stat-label">Ready snapshots</div>
-          </article>
-          <article className="workspace-hero__stat-card">
-            <div className="workspace-hero__stat-value mono">{selectedBuild ? formatDateOnly(selectedBuild.asOfDate) : '—'}</div>
-            <div className="workspace-hero__stat-label">Snapshot date</div>
-          </article>
-          <article className="workspace-hero__stat-card">
-            <div className="workspace-hero__stat-value mono">{selectedBuild ? formatLookbackLabel(selectedBuild.windowDays) : '—'}</div>
-            <div className="workspace-hero__stat-label">Anchor lookback</div>
-          </article>
-          <article className="workspace-hero__stat-card">
-            <div className="workspace-hero__stat-value mono">{formatInteger(activeResult?.candidateCount ?? 0)}</div>
-            <div className="workspace-hero__stat-label">Candidates</div>
-          </article>
-        </div>
       </section>
+
+      <WorkflowStrip
+        title="Follow the question, not the tool list"
+        subtitle="Use Compare for broad drift, then stay here only when the real follow-up is pair-level behaviour inside one saved snapshot."
+        items={workflowItems}
+        className="analysis-flow-strip"
+        compact
+      />
 
       <div className="workspace-layout">
         <div className="workspace-layout__main">
           <Panel variant="primary">
             <SectionHeader
-              title="Relationship screen settings"
-              subtitle="Prepare a persisted view. The result stays available so you can reopen it later."
+              title="Prepare a saved relationship screen"
+              subtitle="Queue a persisted drift read so you can reopen the same result later."
               action={
                 <button
                   type="button"
@@ -266,7 +298,7 @@ export default function PairDivergencePage() {
                   onClick={() => setPreviewOpen(true)}
                   disabled={!selectedBuild}
                 >
-                  Open preview
+                  Preview snapshot
                 </button>
               }
             />
@@ -381,8 +413,8 @@ export default function PairDivergencePage() {
 
           <Panel variant="primary">
             <SectionHeader
-              title="Current result"
-              subtitle="Results are saved. You can reload the page later and reopen the same analysis."
+              title="Latest relationship screen"
+              subtitle="Saved results reopen cleanly, so you can return without rerunning the scan."
             />
             <ActiveAnalysisRunPanel
               run={run}
@@ -401,8 +433,8 @@ export default function PairDivergencePage() {
         <div className="workspace-layout__side">
           <Panel variant="utility">
             <SectionHeader
-              title="Saved analyses"
-              subtitle="Reopen finished results without rerunning them."
+              title="Saved relationship screens"
+              subtitle="Reopen finished results without rerunning the worker."
             />
             <RecentAnalysisRunsPanel
               runs={recentRuns}
@@ -425,14 +457,14 @@ export default function PairDivergencePage() {
 
           <Panel variant="utility">
             <SectionHeader
-              title="How to read it"
-              subtitle="This screen is for pairs that deserve a closer look, not for proving a trade thesis on its own."
+              title="How to read the list"
+              subtitle="Treat these pairs as a shortlist for inspection, not a thesis by themselves."
             />
 
             <div className="workspace-note-list">
-              <div className="workspace-note-list__item">Start with the largest relationship changes.</div>
-              <div className="workspace-note-list__item">Use return gaps and spread z-scores as context, not as standalone trading rules.</div>
-              <div className="workspace-note-list__item">Use sector labels to separate local moves from broader cross-sector shifts.</div>
+              <div className="workspace-note-list__item">Start with the largest deltas, then check whether the fresh window is genuinely breaking the old pattern.</div>
+              <div className="workspace-note-list__item">Use return gaps and spread z-scores as context, not as standalone rules.</div>
+              <div className="workspace-note-list__item">Use sector labels to separate local cracks from broader cross-sector shifts.</div>
             </div>
           </Panel>
         </div>
@@ -441,7 +473,7 @@ export default function PairDivergencePage() {
       <Modal
         open={previewOpen}
         title="Run preview"
-        subtitle="Use this to judge scope before you queue the relationships screen."
+        subtitle="Use this to judge scope before you queue the saved relationship screen."
         onClose={() => setPreviewOpen(false)}
       >
         <DivergencePreview
@@ -563,8 +595,8 @@ function PairDivergenceResult({ data }: { data: PairDivergenceResponse }) {
   return (
     <Panel variant="primary">
       <SectionHeader
-        title="Relationships worth a closer look"
-        subtitle="Ranked first by change in relationship strength, then by fresh return gap and spread dislocation."
+        title="Pairs that broke, tightened, or stretched"
+        subtitle="Ranked first by relationship change, then by the fresh return gap and spread dislocation around it."
       />
 
       <div className="plain-summary">
@@ -581,11 +613,11 @@ function PairDivergenceResult({ data }: { data: PairDivergenceResponse }) {
 
       <div className="stat-grid">
         <div className="stat-card">
-          <div className="stat-card__label">Relationships found</div>
+          <div className="stat-card__label">Pairs surfaced</div>
           <div className="stat-card__value mono">{formatInteger(data.candidateCount)}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-card__label">Fresh lookback</div>
+          <div className="stat-card__label">Fresh window</div>
           <div className="stat-card__value mono">{data.recentWindowDays}d</div>
         </div>
         <div className="stat-card">
@@ -597,14 +629,14 @@ function PairDivergenceResult({ data }: { data: PairDivergenceResponse }) {
           </div>
         </div>
         <div className="stat-card">
-          <div className="stat-card__label">Top relationship</div>
+          <div className="stat-card__label">Lead pair</div>
           <div className="stat-card__value">{strongest ? `${strongest.left} ↔ ${strongest.right}` : '—'}</div>
         </div>
       </div>
 
       <div className="filter-summary-row">
         <span className="filter-summary-row__item">Thresholds: |long corr| ≥ {formatScore(data.minLongCorrAbs, 2)} and |corr delta| ≥ {formatScore(data.minCorrDeltaAbs, 2)}.</span>
-        <span className="filter-summary-row__item">Returned {formatInteger(data.candidates.length)} rows out of {formatInteger(data.candidateCount)} total candidates.</span>
+        <span className="filter-summary-row__item">Showing {formatInteger(data.candidates.length)} rows out of {formatInteger(data.candidateCount)} surfaced candidates.</span>
       </div>
 
       {data.candidates.length > 0 ? (

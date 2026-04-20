@@ -1,11 +1,12 @@
 // apps/web/src/app/pages/series-detail/BuildSeriesDetailPage.tsx
 import { Link, useParams } from 'react-router-dom';
 
+import BoundaryNote from '../../../components/ui/BoundaryNote';
 import Panel from '../../../components/ui/Panel';
 import SectionHeader from '../../../components/ui/SectionHeader';
 import StatusBadge from '../../../components/ui/StatusBadge';
 import { useBuildSeriesDetailData } from '../../../features/builds/hooks';
-import { formatDateOnly, formatDateTime } from '../../../lib/format';
+import { formatDateOnly, formatDateTime, formatInteger } from '../../../lib/format';
 import { formatLookbackLabel } from '../../../lib/snapshot-language';
 import type { BuildSeriesRunItem } from '../../../types/api';
 
@@ -52,29 +53,62 @@ export default function BuildSeriesDetailPage() {
 
   return (
     <div className="page page--series-detail">
+      <section className="workspace-hero workspace-hero--series-detail">
+        <div className="workspace-hero__copy">
+          <div className="workspace-hero__eyebrow">Series detail</div>
+          <h1 className="workspace-hero__title">{detail.name || 'Snapshot series'}</h1>
+          <p className="workspace-hero__description">
+            Review how one repeated basket program progressed across time before reopening the individual snapshots inside it.
+          </p>
+          <p className="workspace-hero__subline">
+            {detail.frequency} cadence · {formatDateOnly(detail.startDate)} → {formatDateOnly(detail.endDate)}
+          </p>
+          <BoundaryNote className="workspace-hero__note" variant="accent">
+            Reopen the underlying snapshots when you need interpretation. This page is the time-path ledger for one repeated program.
+          </BoundaryNote>
+          <div className="workspace-hero__actions">
+            <Link to="/series" className="button button--secondary">
+              Back to series
+            </Link>
+            <Link to="/builds" className="button button--ghost">
+              Browse snapshots
+            </Link>
+          </div>
+        </div>
+
+        <div className="workspace-hero__stats">
+          <article className="workspace-hero__stat-card workspace-hero__stat-card--highlight">
+            <div className="workspace-hero__stat-value mono">{progress}%</div>
+            <div className="workspace-hero__stat-label">Program progress</div>
+          </article>
+          <article className="workspace-hero__stat-card">
+            <div className="workspace-hero__stat-value mono">{formatInteger(detail.completedRunCount)}</div>
+            <div className="workspace-hero__stat-label">Completed reads</div>
+          </article>
+          <article className="workspace-hero__stat-card">
+            <div className="workspace-hero__stat-value mono">{formatInteger(detail.totalRunCount)}</div>
+            <div className="workspace-hero__stat-label">Scheduled reads</div>
+          </article>
+          <article className="workspace-hero__stat-card">
+            <div className="workspace-hero__stat-value mono">{formatLookbackLabel(detail.windowDays)}</div>
+            <div className="workspace-hero__stat-label">Lookback</div>
+          </article>
+
+          <div className="workspace-hero__stat-note">
+            <strong>Status:</strong> <StatusBadge status={detail.status} />
+            {detail.failedRunCount > 0 ? ` ${detail.failedRunCount} failed read${detail.failedRunCount === 1 ? '' : 's'} are waiting for review.` : ' No failed reads in this program so far.'}
+          </div>
+        </div>
+      </section>
+
       <Panel variant="primary">
         <SectionHeader
-          title={detail.name || detail.id}
-          subtitle={`Snapshot series · ${detail.frequency} · ${formatDateOnly(detail.startDate)} → ${formatDateOnly(detail.endDate)}`}
+          title="Program metadata"
+          subtitle="The cadence, lookback, and creation details that define this repeated read."
         />
 
         <div className="series-detail__meta">
           <div className="series-detail__meta-row">
-            <StatusBadge status={detail.status} />
-            <span className="mono">
-              {detail.completedRunCount}/{detail.totalRunCount} snapshots completed ({progress}%)
-            </span>
-            {detail.failedRunCount > 0 && (
-              <span className="mono" style={{ color: 'var(--color-danger, #ef4444)' }}>
-                {detail.failedRunCount} failed
-              </span>
-            )}
-          </div>
-          <div className="series-detail__meta-row">
-            <span>
-              <span className="build-stream__meta-label">Lookback</span>
-              <span className="mono">{formatLookbackLabel(detail.windowDays)}</span>
-            </span>
             <span>
               <span className="build-stream__meta-label">Score method</span>
               <span className="mono">{detail.scoreMethod}</span>
@@ -89,12 +123,12 @@ export default function BuildSeriesDetailPage() {
 
       <Panel variant="primary">
         <SectionHeader
-          title="Snapshots"
-          subtitle={`${detail.runs.length} scheduled snapshots in this series`}
+          title="Scheduled snapshots"
+          subtitle={`${detail.runs.length} snapshot${detail.runs.length === 1 ? '' : 's'} are attached to this repeated program.`}
         />
 
         {detail.runs.length === 0 ? (
-          <div className="state-note">No snapshots yet.</div>
+          <div className="state-note">No snapshots have been scheduled in this series yet.</div>
         ) : (
           <div className="build-stream">
             {detail.runs.map((run) => (

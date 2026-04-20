@@ -6,6 +6,7 @@ import BoundaryNote from '../../../components/ui/BoundaryNote';
 import Panel from '../../../components/ui/Panel';
 import Modal from '../../../components/ui/Modal';
 import SectionHeader from '../../../components/ui/SectionHeader';
+import WorkflowStrip from '../../../components/ui/WorkflowStrip';
 import { createExposureAnalysisRun, getNeighbors } from '../../../features/builds/api';
 import {
   useAnalysisRunData,
@@ -14,6 +15,7 @@ import {
   useBuildRunsData,
   useInviteCode
 } from '../../../features/builds/hooks';
+import { buildAnalysisWorkflowItems } from '../../../lib/analysis-workflow';
 import { formatDateOnly, formatInteger, formatScore } from '../../../lib/format';
 import { formatLookbackLabel, formatSnapshotOptionLabel } from '../../../lib/snapshot-language';
 import type {
@@ -134,6 +136,12 @@ export default function ExposurePage() {
   );
 
   const activeResult = run?.kind === 'exposure' ? run.result : null;
+  const workflowItems = buildAnalysisWorkflowItems('spillover', {
+    groupsTo: buildId ? `/structure?build=${buildId}` : '/structure',
+    compareTo: buildId ? `/compare?left=${buildId}` : '/compare',
+    relationshipsTo: buildId ? `/divergence?build=${buildId}` : '/divergence',
+    spilloverTo: buildId ? `/exposure?build=${buildId}` : '/exposure'
+  });
 
   const persistQuery = useCallback(
     (next: {
@@ -220,51 +228,75 @@ export default function ExposurePage() {
 
   return (
     <div className="page page--exposure">
-      <section className="workspace-hero">
+      <section className="workspace-hero workspace-hero--exposure">
         <div className="workspace-hero__copy">
-          <h1 className="workspace-hero__title">If this stock drops, who tends to move with it?</h1>
-          <p className="workspace-hero__description">
-            Start from one stock and inspect its historical co-movement circle.
-          </p>
-          <BoundaryNote variant="accent">
-            Historical co-movement, not causality.
+          <div className="workspace-hero__intro">
+            <div className="workspace-hero__lead">
+              <div className="workspace-hero__eyebrow">Spillover map</div>
+              <h1 className="workspace-hero__title">If one name slips, who usually echoes the move?</h1>
+              <p className="workspace-hero__description">
+                Start from one stock and trace the circle of names that tend to travel with it.
+              </p>
+              <p className="workspace-hero__subline">
+                The point is not causality. It is to see whether the pressure stays local or bleeds wider into the basket.
+              </p>
+            </div>
+
+            <div className="workspace-hero__summary">
+              <div className="workspace-hero__summary-label">Quick read</div>
+              <div className="workspace-hero__stats">
+                <article className="workspace-hero__stat-card">
+                  <div className="workspace-hero__stat-value mono">{formatInteger(comparableBuilds.length)}</div>
+                  <div className="workspace-hero__stat-label">Finished reads</div>
+                </article>
+                <article className="workspace-hero__stat-card">
+                  <div className="workspace-hero__stat-value mono">{selectedBuild ? formatDateOnly(selectedBuild.asOfDate) : '—'}</div>
+                  <div className="workspace-hero__stat-label">Anchor date</div>
+                </article>
+                <article className={`workspace-hero__stat-card${symbol ? ' workspace-hero__stat-card--highlight' : ''}`}>
+                  <div className="workspace-hero__stat-value mono">{symbol || '—'}</div>
+                  <div className="workspace-hero__stat-label">Anchor name</div>
+                </article>
+                <article className="workspace-hero__stat-card">
+                  <div className="workspace-hero__stat-value mono">{formatInteger(activeResult?.neighborCount ?? 0)}</div>
+                  <div className="workspace-hero__stat-label">Names surfaced</div>
+                </article>
+
+                <div className="workspace-hero__stat-note">
+                  <strong>Best setup:</strong> use this when you already know the anchor name and want to see whether its risk circle is narrow, broad, or sector-heavy.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <BoundaryNote className="workspace-hero__note" variant="accent">
+            Historical co-movement only. Use this page to map spillover shape, not to prove cause.
           </BoundaryNote>
           <div className="workspace-hero__actions">
-            <Link to="/builds" className="button button--secondary">
-              Browse snapshots
-            </Link>
             <Link to="/structure" className="button button--ghost">
               Open groups
             </Link>
+            <Link to="/builds" className="button button--secondary">
+              Browse snapshots
+            </Link>
           </div>
         </div>
-
-        <div className="workspace-hero__stats">
-          <article className="workspace-hero__stat-card">
-            <div className="workspace-hero__stat-value mono">{formatInteger(comparableBuilds.length)}</div>
-            <div className="workspace-hero__stat-label">Ready snapshots</div>
-          </article>
-          <article className="workspace-hero__stat-card">
-            <div className="workspace-hero__stat-value mono">{selectedBuild ? formatDateOnly(selectedBuild.asOfDate) : '—'}</div>
-            <div className="workspace-hero__stat-label">Snapshot date</div>
-          </article>
-          <article className="workspace-hero__stat-card">
-            <div className="workspace-hero__stat-value mono">{symbol || '—'}</div>
-            <div className="workspace-hero__stat-label">Anchor name</div>
-          </article>
-          <article className="workspace-hero__stat-card">
-            <div className="workspace-hero__stat-value mono">{formatInteger(activeResult?.neighborCount ?? 0)}</div>
-            <div className="workspace-hero__stat-label">Related names returned</div>
-          </article>
-        </div>
       </section>
+
+      <WorkflowStrip
+        title="Follow the question, not the tool list"
+        subtitle="Groups shows the broad shape, Relationships isolates the broken pair, and Spillover traces the names around one chosen anchor."
+        items={workflowItems}
+        className="analysis-flow-strip"
+        compact
+      />
 
       <div className="workspace-layout">
         <div className="workspace-layout__main">
           <Panel variant="primary">
             <SectionHeader
-              title="Spillover settings"
-              subtitle="Prepare the analysis, then revisit the saved result later."
+              title="Prepare a saved spillover read"
+              subtitle="Queue the read once, then reopen the same spillover result later."
               action={
                 <button
                   type="button"
@@ -272,7 +304,7 @@ export default function ExposurePage() {
                   onClick={() => setPreviewOpen(true)}
                   disabled={!selectedBuild || !symbol}
                 >
-                  Open preview
+                  Preview circle
                 </button>
               }
             />
@@ -361,8 +393,8 @@ export default function ExposurePage() {
 
           <Panel variant="primary">
             <SectionHeader
-              title="Current result"
-              subtitle="Results are saved and available after page reload."
+              title="Latest spillover read"
+              subtitle="Saved results stay available after reload, so you can come back to the same circle later."
             />
             <ActiveAnalysisRunPanel
               run={run}
@@ -381,8 +413,8 @@ export default function ExposurePage() {
         <div className="workspace-layout__side">
           <Panel variant="utility">
             <SectionHeader
-              title="Saved analyses"
-              subtitle="Reopen finished results without rerunning them."
+              title="Saved spillover reads"
+              subtitle="Reopen finished results without rerunning the worker."
             />
             <RecentAnalysisRunsPanel
               runs={recentRuns}
@@ -405,14 +437,14 @@ export default function ExposurePage() {
 
           <Panel variant="utility">
             <SectionHeader
-              title="How to read it"
-              subtitle="This page asks whether co-movement from one name is broad, narrow, and sector-concentrated."
+              title="How to read the circle"
+              subtitle="This page asks whether co-movement around one name is broad, narrow, and sector-concentrated."
             />
 
             <div className="workspace-note-list">
-              <div className="workspace-note-list__item">Use this page to see whether co-movement around one name is broad or narrow.</div>
+              <div className="workspace-note-list__item">Start with the anchor, then ask whether the surrounding circle is tight or diffuse.</div>
               <div className="workspace-note-list__item">Same-sector concentration helps separate local overlap from broader market structure.</div>
-              <div className="workspace-note-list__item">This is a historical relationship read, not a guarantee of future contagion.</div>
+              <div className="workspace-note-list__item">This is a historical relationship map, not a guarantee of future contagion.</div>
             </div>
           </Panel>
         </div>
@@ -421,7 +453,7 @@ export default function ExposurePage() {
       <Modal
         open={previewOpen}
         title="Run preview"
-        subtitle="Preview the scope and a small live neighbor slice before you queue the full spillover run."
+        subtitle="Preview the scope and a small live neighbor slice before you queue the saved spillover read."
         onClose={() => setPreviewOpen(false)}
       >
         <ExposurePreview
@@ -526,8 +558,8 @@ function ExposureResult({ data }: { data: ExposureResponse }) {
   return (
     <Panel variant="primary">
       <SectionHeader
-        title="Spillover summary"
-        subtitle="The anchor name is shown with related names, sector mix, and concentration metrics in one place."
+        title="Where the move tends to spread"
+        subtitle="The anchor name is shown with its related names, sector mix, and concentration in one read."
       />
 
       <div className="plain-summary">
@@ -544,11 +576,11 @@ function ExposureResult({ data }: { data: ExposureResponse }) {
           <div className="stat-card__value">{data.anchorSector ?? 'unclassified'}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-card__label">Average relationship</div>
+          <div className="stat-card__label">Avg co-movement</div>
           <div className="stat-card__value mono">{formatScore(data.averageNeighborScore, 3)}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-card__label">Risk circle breadth</div>
+          <div className="stat-card__label">Circle breadth</div>
           <div className="stat-card__value mono">{formatScore(data.concentrationIndex, 3)}</div>
           <div className="stat-card__helper">Lower values mean risk is spread across more names</div>
         </div>
@@ -587,7 +619,7 @@ function ExposureResult({ data }: { data: ExposureResponse }) {
 
         <div className="workspace-layout__side">
           <Panel variant="utility">
-            <SectionHeader title="Where the related names cluster" />
+            <SectionHeader title="Where the circle clusters" />
             <div className="workspace-note-list">
               {data.sectors.map((entry) => (
                 <div key={entry.sector ?? 'unclassified'} className="workspace-note-list__item">
@@ -598,7 +630,7 @@ function ExposureResult({ data }: { data: ExposureResponse }) {
           </Panel>
 
           <Panel variant="utility">
-            <SectionHeader title="How strong the related names are" />
+            <SectionHeader title="How tight the circle is" />
             <div className="workspace-note-list">
               {data.bands.map((entry) => (
                 <div key={entry.band} className="workspace-note-list__item">

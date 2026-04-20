@@ -155,6 +155,22 @@ function buildBundleNote(detail: BuildRunDetailResponse, symbolCount: number | n
   return message;
 }
 
+function buildSubline(detail: BuildRunDetailResponse): string {
+  if (detail.status === 'succeeded') {
+    return 'Use this page as the base read before you branch into pair drift, spillover, hidden groups, or snapshot-to-snapshot change.';
+  }
+
+  if (detail.status === 'running') {
+    return 'The base read is still assembling. Wait for the snapshot to finish before moving into follow-up questions.';
+  }
+
+  if (detail.status === 'pending') {
+    return 'The system is still preparing this snapshot before any interpretation becomes useful.';
+  }
+
+  return 'This run did not finish cleanly, so the follow-up screens are not yet useful.';
+}
+
 export default function BuildMetaHeader({
   detail,
   loading,
@@ -234,7 +250,9 @@ export default function BuildMetaHeader({
 
         <div className="meta-header__hero">
           <div className="meta-header__copy">
-            <h1 className="meta-header__title">Snapshot</h1>
+            <div className="meta-header__eyebrow">Snapshot read</div>
+
+            <h1 className="meta-header__title">{detail.universeId}</h1>
 
             <p className="meta-header__summary">
               {summaryItems.map((item, index) => (
@@ -246,10 +264,10 @@ export default function BuildMetaHeader({
             </p>
 
             <p className="meta-header__insight">{buildInsight(detail, symbolCount)}</p>
+            <p className="meta-header__subline">{buildSubline(detail)}</p>
 
             <BoundaryNote variant="accent">
-              Use this page for the first read: hidden concentration, strong relationships, name-level spillover,
-              and whether you should move on to groups or comparison.
+              Start broad here. Move into Groups, What changed, Relationships, or Spillover only after this single snapshot already says something worth following.
             </BoundaryNote>
           </div>
 

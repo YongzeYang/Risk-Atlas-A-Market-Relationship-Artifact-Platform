@@ -12,7 +12,7 @@ import {
   pickFeaturedBuild
 } from '../../../lib/build-run-language';
 import { formatLookbackLabel } from '../../../lib/snapshot-language';
-import HomeIntroBand from './sections/HomeIntroBand';
+import HomeHeroBand from './sections/HomeHeroBand';
 
 export default function HomePage() {
   const {
@@ -107,7 +107,7 @@ export default function HomePage() {
 
   return (
     <div className="page page--home">
-      <HomeIntroBand
+      <HomeHeroBand
         exampleLoading={buildRunsLoading}
         exampleSnapshot={exampleSnapshot}
         comparisonSummary={comparisonSummary}
@@ -153,7 +153,7 @@ export default function HomePage() {
             </div>
           </article>
 
-          <article className="home-editorial-card home-editorial-card--signal">
+          <article className="home-editorial-card home-editorial-card--signal home-editorial-card--drift">
             <div className="home-editorial-card__eyebrow">Relationship drift</div>
             <h3 className="home-editorial-card__title">
               See the break before consensus updates.
@@ -177,7 +177,7 @@ export default function HomePage() {
             </div>
           </article>
 
-          <article className="home-editorial-card home-editorial-card--signal">
+          <article className="home-editorial-card home-editorial-card--signal home-editorial-card--spillover">
             <div className="home-editorial-card__eyebrow">Spillover map</div>
             <h3 className="home-editorial-card__title">
               Find who inherits the move.

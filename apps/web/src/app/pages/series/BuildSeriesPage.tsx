@@ -15,7 +15,7 @@ import {
 } from '../../../features/builds/hooks';
 import { useCatalogData } from '../../../features/catalog/hooks';
 import { getEarliestBuildableAsOfDate } from '../../../lib/build-dates';
-import { formatDateOnly, formatDateTime } from '../../../lib/format';
+import { formatDateOnly, formatDateTime, formatInteger } from '../../../lib/format';
 import {
   describeBasketKind,
   describeCoverageCount,
@@ -234,33 +234,58 @@ export default function BuildSeriesPage() {
 
   return (
     <div className="page page--series">
-      <section className="workspace-hero">
+      <section className="workspace-hero workspace-hero--series">
         <div className="workspace-hero__copy">
-          <div className="workspace-hero__eyebrow">Snapshot series</div>
-          <h1 className="workspace-hero__title">Watch one basket through time.</h1>
-          <p className="workspace-hero__description">
-            A snapshot series is for repeated reads of the same setup across time. Use it when the question is not one day,
-            but the path of the basket across many dates.
-          </p>
-        </div>
+          <div className="workspace-hero__intro">
+            <div className="workspace-hero__lead">
+              <div className="workspace-hero__eyebrow">Snapshot series</div>
+              <h1 className="workspace-hero__title">Watch one basket loosen, tighten, or reorganize across time.</h1>
+              <p className="workspace-hero__description">
+                Queue repeated snapshots from the same basket, cadence, and lookback when the question is regime drift rather than one date by itself.
+              </p>
+              <p className="workspace-hero__subline">
+                A series is the right entry only after one single snapshot already deserves ongoing attention.
+              </p>
+            </div>
 
-        <div className="workspace-hero__stats">
-          <article className="workspace-hero__stat-card">
-            <div className="workspace-hero__stat-value mono">{series.length}</div>
-            <div className="workspace-hero__stat-label">Total series</div>
-          </article>
-          <article className="workspace-hero__stat-card">
-            <div className="workspace-hero__stat-value mono">{activeSeries.length}</div>
-            <div className="workspace-hero__stat-label">Running now</div>
-          </article>
-          <article className="workspace-hero__stat-card">
-            <div className="workspace-hero__stat-value mono">{completedSeries.length}</div>
-            <div className="workspace-hero__stat-label">Completed</div>
-          </article>
-          <article className="workspace-hero__stat-card">
-            <div className="workspace-hero__stat-value mono">{failedSeries.length}</div>
-            <div className="workspace-hero__stat-label">With failures</div>
-          </article>
+            <div className="workspace-hero__summary">
+              <div className="workspace-hero__summary-label">Quick read</div>
+              <div className="workspace-hero__stats">
+                <article className="workspace-hero__stat-card">
+                  <div className="workspace-hero__stat-value mono">{formatInteger(series.length)}</div>
+                  <div className="workspace-hero__stat-label">Total series</div>
+                </article>
+                <article className="workspace-hero__stat-card">
+                  <div className="workspace-hero__stat-value mono">{formatInteger(activeSeries.length)}</div>
+                  <div className="workspace-hero__stat-label">Running now</div>
+                </article>
+                <article className="workspace-hero__stat-card">
+                  <div className="workspace-hero__stat-value mono">{formatInteger(completedSeries.length)}</div>
+                  <div className="workspace-hero__stat-label">Completed</div>
+                </article>
+                <article className="workspace-hero__stat-card">
+                  <div className="workspace-hero__stat-value mono">{formatInteger(failedSeries.length)}</div>
+                  <div className="workspace-hero__stat-label">With failures</div>
+                </article>
+
+                <div className="workspace-hero__stat-note">
+                  <strong>Best use:</strong> queue a series only when one basket is already worth revisiting across many dates.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <BoundaryNote className="workspace-hero__note" variant="accent">
+            A series produces many descriptive reads. It helps you watch drift; it does not decide what matters for you.
+          </BoundaryNote>
+          <div className="workspace-hero__actions">
+            <Link to="/builds" className="button button--secondary">
+              Browse snapshots
+            </Link>
+            <Link to="/compare" className="button button--ghost">
+              Open What changed
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -268,12 +293,12 @@ export default function BuildSeriesPage() {
         <div className="workspace-layout__main">
           <Panel variant="primary">
             <SectionHeader
-              title="Active snapshot series"
-              subtitle="Use this area to monitor repeated snapshot programs still in flight."
+              title="Programs still in flight"
+              subtitle="Monitor the repeated reads that are currently building their time path."
             />
 
             {!seriesLoading && activeSeries.length === 0 ? (
-              <div className="state-note">No active series right now. Create one from the side rail.</div>
+              <div className="state-note">No series are running right now. Launch one from the side rail when a basket deserves ongoing tracking.</div>
             ) : null}
 
             {activeSeries.length > 0 ? (
@@ -287,8 +312,8 @@ export default function BuildSeriesPage() {
 
           <Panel variant="primary">
             <SectionHeader
-              title="All snapshot series"
-              subtitle="Completed, failed, and active programs in one rolling ledger."
+              title="Series ledger"
+              subtitle="Completed, failed, and active programs in one time-ordered queue."
             />
 
             {seriesLoading ? <div className="state-note">Loading…</div> : null}
@@ -310,13 +335,12 @@ export default function BuildSeriesPage() {
         <div className="workspace-layout__side">
           <Panel variant="primary">
             <SectionHeader
-              title="Create snapshot series"
-              subtitle="Define a repeated snapshot program with an explicit date range, lookback, and cadence."
+              title="Launch a repeated read"
+              subtitle="Define the basket, date span, and cadence once, then let the system build the same read through time."
             />
 
             <BoundaryNote title="What this does" variant="accent">
-              This creates many snapshots from the same basket setup across time. It is useful for drift tracking,
-              regime checks, and monitoring whether hidden groups stay stable.
+              This queues the same basket read across many dates. Use it for drift tracking, regime checks, and watching whether hidden groups stay stable or start to reorganize.
             </BoundaryNote>
 
             <form className="form-grid" onSubmit={handleSubmit}>

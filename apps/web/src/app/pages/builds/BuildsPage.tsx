@@ -76,45 +76,68 @@ export default function BuildsPage() {
 
   return (
     <div className="page page--builds">
-      <section className="workspace-hero">
+      <section className="workspace-hero workspace-hero--builds">
         <div className="workspace-hero__copy">
-          <div className="workspace-hero__eyebrow">Snapshots</div>
-          <h1 className="workspace-hero__title">Snapshots</h1>
-          <p className="workspace-hero__description">
-            Browse saved market reads, open one snapshot when your question is about a single basket,
-            and use comparison only when your real question is what changed.
-          </p>
+          <div className="workspace-hero__intro">
+            <div className="workspace-hero__lead">
+              <div className="workspace-hero__eyebrow">Snapshot browser</div>
+              <h1 className="workspace-hero__title">Open the finished read that actually answers the basket question.</h1>
+              <p className="workspace-hero__description">
+                Browse ready market reads first, anchor on one strong snapshot, and only branch into comparison or follow-up analysis when the question truly changes.
+              </p>
+              <p className="workspace-hero__subline">
+                This page is for selection, not interpretation. Pick the strongest finished snapshot, then move into the single page that matches the next research question.
+              </p>
+            </div>
+
+            <div className="workspace-hero__summary">
+              <div className="workspace-hero__summary-label">Quick read</div>
+              <div className="workspace-hero__stats">
+                <article className="workspace-hero__stat-card">
+                  <div className="workspace-hero__stat-value mono">{formatInteger(succeededCount)}</div>
+                  <div className="workspace-hero__stat-label">Ready snapshots</div>
+                </article>
+                <article className="workspace-hero__stat-card">
+                  <div className="workspace-hero__stat-value mono">{formatInteger(readyBasketCount)}</div>
+                  <div className="workspace-hero__stat-label">Baskets in browser</div>
+                </article>
+                <article className="workspace-hero__stat-card">
+                  <div className="workspace-hero__stat-value mono">
+                    {latestReadyDate ? formatDateOnly(latestReadyDate) : '—'}
+                  </div>
+                  <div className="workspace-hero__stat-label">Latest ready date</div>
+                </article>
+                <article className={`workspace-hero__stat-card${featuredBuild ? ' workspace-hero__stat-card--highlight' : ''}`}>
+                  <div className="workspace-hero__stat-value mono">
+                    {featuredBuild ? formatLookbackLabel(featuredBuild.windowDays) : '—'}
+                  </div>
+                  <div className="workspace-hero__stat-label">Suggested first window</div>
+                </article>
+
+                <div className="workspace-hero__stat-note">
+                  <strong>Suggested first move:</strong> {featuredUniverseLabel ?? 'Open one finished snapshot'} before comparing dates, lookbacks, or drilling into one name.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <BoundaryNote className="workspace-hero__note" variant="accent">
+            One finished snapshot is the base object for What changed, Relationships, Spillover, and Groups.
+          </BoundaryNote>
           <div className="workspace-hero__actions">
             <Link
               to={featuredBuild ? `/builds/${featuredBuild.id}` : '/builds/new'}
               className="button button--primary"
             >
-              {featuredBuild ? 'Open latest ready snapshot' : 'Create snapshot'}
+              {featuredBuild ? 'Open the suggested snapshot' : 'Create snapshot'}
             </Link>
-            <Link to="/builds/new" className="button button--secondary">
-              Create snapshot
+            <Link to="/series" className="button button--secondary">
+              Open snapshot series
             </Link>
             <Link to={comparisonTo} className="button button--ghost">
-              What changed
+              Open What changed
             </Link>
           </div>
-        </div>
-
-        <div className="workspace-hero__stats">
-          <article className="workspace-hero__stat-card">
-            <div className="workspace-hero__stat-value mono">{succeededCount}</div>
-            <div className="workspace-hero__stat-label">Ready snapshots</div>
-          </article>
-          <article className="workspace-hero__stat-card">
-            <div className="workspace-hero__stat-value mono">{readyBasketCount}</div>
-            <div className="workspace-hero__stat-label">Baskets in browser</div>
-          </article>
-          <article className="workspace-hero__stat-card">
-            <div className="workspace-hero__stat-value mono">
-              {latestReadyDate ? formatDateOnly(latestReadyDate) : '—'}
-            </div>
-            <div className="workspace-hero__stat-label">Latest ready date</div>
-          </article>
         </div>
       </section>
 
@@ -124,7 +147,7 @@ export default function BuildsPage() {
             <Panel variant="primary">
               <SectionHeader
                 title="Start with a useful result"
-                subtitle="If you landed here first, open one finished snapshot before digging through the full history."
+                subtitle="If you land here first, anchor on one finished snapshot before scanning the whole ledger."
               />
 
               <div className="featured-snapshot-card">
@@ -154,7 +177,7 @@ export default function BuildsPage() {
           <Panel variant="utility">
             <SectionHeader
               title="Search snapshots"
-              subtitle="Filter by basket, status, date, or lookback. Ready results stay on top by default."
+              subtitle="Filter by basket, status, date, or lookback. Ready results stay in front so the research signal beats the operational noise."
             />
 
             <div className="query-form query-form--wide">
@@ -239,7 +262,7 @@ export default function BuildsPage() {
           <Panel variant="utility">
             <SectionHeader
               title="What this page is for"
-              subtitle="Keep this page in a browsing mindset: find a useful finished result quickly, then open it."
+              subtitle="Stay in browse mode here: find the right finished read quickly, then leave the ledger and work inside that snapshot."
             />
 
             <div className="workspace-note-list">
@@ -257,7 +280,7 @@ export default function BuildsPage() {
           <Panel variant="utility">
             <SectionHeader
               title="Comparison shortcut"
-              subtitle="Use compare only when change is the real question."
+              subtitle="Only use compare when change, not a single basket read, is the actual research question."
             />
 
             {comparisonPair ? (

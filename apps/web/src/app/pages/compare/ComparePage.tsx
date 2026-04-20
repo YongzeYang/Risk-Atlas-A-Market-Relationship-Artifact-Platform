@@ -5,9 +5,11 @@ import { Link, useSearchParams } from 'react-router-dom';
 import BoundaryNote from '../../../components/ui/BoundaryNote';
 import Panel from '../../../components/ui/Panel';
 import SectionHeader from '../../../components/ui/SectionHeader';
+import WorkflowStrip from '../../../components/ui/WorkflowStrip';
 import { compareBuilds } from '../../../features/builds/api';
 import { useCatalogData } from '../../../features/catalog/hooks';
 import { useBuildRunsData } from '../../../features/builds/hooks';
+import { buildAnalysisWorkflowItems } from '../../../lib/analysis-workflow';
 import { formatDateOnly, formatInteger } from '../../../lib/format';
 import { formatLookbackLabel } from '../../../lib/snapshot-language';
 import type { BuildRunListItem, CompareBuildsResponse } from '../../../types/api';
@@ -82,54 +84,85 @@ export default function ComparePage() {
 
   const comparisonMode = inferComparisonMode(leftBuild, rightBuild);
   const comparisonModeCopy = describeComparisonMode(comparisonMode);
+  const followUpBuild = rightBuild ?? leftBuild;
+  const workflowItems = buildAnalysisWorkflowItems('compare', {
+    groupsTo: followUpBuild ? `/structure?build=${followUpBuild.id}` : '/structure',
+    compareTo: leftBuild && rightBuild ? `/compare?left=${leftBuild.id}&right=${rightBuild.id}` : '/compare',
+    relationshipsTo: followUpBuild ? `/divergence?build=${followUpBuild.id}` : '/divergence',
+    spilloverTo: followUpBuild ? `/exposure?build=${followUpBuild.id}` : '/exposure'
+  });
 
   return (
     <div className="page page--compare">
-      <section className="workspace-hero">
+      <section className="workspace-hero workspace-hero--compare">
         <div className="workspace-hero__copy">
-          <h1 className="workspace-hero__title">What changed between two snapshots?</h1>
-          <p className="workspace-hero__description">
-            Use this page after you already have two finished snapshots and the real question is change.
-          </p>
-          <BoundaryNote variant="accent">
-            Open comparison only. You do not create anything here.
+          <div className="workspace-hero__intro">
+            <div className="workspace-hero__lead">
+              <div className="workspace-hero__eyebrow">Compare one dimension</div>
+              <h1 className="workspace-hero__title">See what actually changed between two finished reads.</h1>
+              <p className="workspace-hero__description">
+                Hold basket, date, or lookback steady and inspect where the structure really drifted.
+              </p>
+              <p className="workspace-hero__subline">
+                The cleanest compare changes one thing on purpose instead of changing everything at once.
+              </p>
+            </div>
+
+            <div className="workspace-hero__summary">
+              <div className="workspace-hero__summary-label">Quick read</div>
+              <div className="workspace-hero__stats">
+                <article className="workspace-hero__stat-card">
+                  <div className="workspace-hero__stat-value mono">{formatInteger(comparableBuilds.length)}</div>
+                  <div className="workspace-hero__stat-label">Finished reads</div>
+                </article>
+                <article className="workspace-hero__stat-card">
+                  <div className="workspace-hero__stat-value mono">{leftBuild ? formatDateOnly(leftBuild.asOfDate) : '—'}</div>
+                  <div className="workspace-hero__stat-label">Baseline date</div>
+                </article>
+                <article className="workspace-hero__stat-card">
+                  <div className="workspace-hero__stat-value mono">{rightBuild ? formatDateOnly(rightBuild.asOfDate) : '—'}</div>
+                  <div className="workspace-hero__stat-label">Challenger date</div>
+                </article>
+                <article className={`workspace-hero__stat-card${comparisonMode !== 'mixed' ? ' workspace-hero__stat-card--highlight' : ''}`}>
+                  <div className="workspace-hero__stat-value">{comparisonModeCopy.label}</div>
+                  <div className="workspace-hero__stat-label">Reading</div>
+                </article>
+
+                <div className="workspace-hero__stat-note">
+                  <strong>Best setup:</strong> same basket and same lookback for time drift, or same basket and same date for horizon drift.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <BoundaryNote className="workspace-hero__note" variant="accent">
+            Use after two snapshots are already worth trusting. This page isolates change; it does not create a new read.
           </BoundaryNote>
           <div className="workspace-hero__actions">
             <Link to="/builds" className="button button--secondary">
               Browse snapshots
             </Link>
-            <Link to="/builds/new" className="button button--ghost">
-              Create snapshot
+            <Link to="/divergence" className="button button--ghost">
+              Open Relationships
             </Link>
           </div>
         </div>
-
-        <div className="workspace-hero__stats">
-          <article className="workspace-hero__stat-card">
-            <div className="workspace-hero__stat-value mono">{formatInteger(comparableBuilds.length)}</div>
-            <div className="workspace-hero__stat-label">Ready snapshots</div>
-          </article>
-          <article className="workspace-hero__stat-card">
-            <div className="workspace-hero__stat-value mono">{leftBuild ? formatDateOnly(leftBuild.asOfDate) : '—'}</div>
-            <div className="workspace-hero__stat-label">Left date</div>
-          </article>
-          <article className="workspace-hero__stat-card">
-            <div className="workspace-hero__stat-value mono">{rightBuild ? formatDateOnly(rightBuild.asOfDate) : '—'}</div>
-            <div className="workspace-hero__stat-label">Right date</div>
-          </article>
-          <article className="workspace-hero__stat-card">
-            <div className="workspace-hero__stat-value">{comparisonModeCopy.label}</div>
-            <div className="workspace-hero__stat-label">Comparison type</div>
-          </article>
-        </div>
       </section>
+
+      <WorkflowStrip
+        title="Follow the question, not the tool list"
+        subtitle="Groups shows the single-snapshot shape first, compare checks broad drift, then Relationships and Spillover narrow the follow-up."
+        items={workflowItems}
+        className="analysis-flow-strip"
+        compact
+      />
 
       <div className="workspace-layout">
         <div className="workspace-layout__main">
           <Panel variant="primary">
             <SectionHeader
-              title="Choose two snapshots"
-              subtitle="Pick two finished reads. Start with the same basket when you want the cleanest time comparison."
+              title="Choose the baseline and the challenger"
+              subtitle="Pick two finished reads. The cleanest compare keeps three things steady and changes one on purpose."
             />
 
             {comparableBuilds.length < 2 && !buildRunsLoading ? (
@@ -199,7 +232,7 @@ export default function ComparePage() {
             {leftBuild && rightBuild ? (
               <div className="compare-selection-grid">
                 <article className="compare-selection-card">
-                  <div className="compare-selection-card__label">Left snapshot</div>
+                  <div className="compare-selection-card__label">Baseline</div>
                   <div className="compare-selection-card__title">
                     {universeLabelById[leftBuild.universeId] ?? leftBuild.universeId}
                   </div>
@@ -209,7 +242,7 @@ export default function ComparePage() {
                 </article>
 
                 <article className="compare-selection-card">
-                  <div className="compare-selection-card__label">Right snapshot</div>
+                  <div className="compare-selection-card__label">Challenger</div>
                   <div className="compare-selection-card__title">
                     {universeLabelById[rightBuild.universeId] ?? rightBuild.universeId}
                   </div>
@@ -221,7 +254,7 @@ export default function ComparePage() {
             ) : null}
 
             <div className="field__hint">
-              Use the same basket for a time comparison, the same date for a lookback comparison, or the same date and lookback for a basket comparison.
+              Same basket for time drift. Same basket and date for lookback drift. Same date and lookback for basket drift.
             </div>
 
             {leftId && rightId && leftId === rightId ? (
@@ -250,21 +283,21 @@ export default function ComparePage() {
         <div className="workspace-layout__side">
           <Panel variant="utility">
             <SectionHeader
-              title="How to use this page"
-              subtitle="Compare after single-snapshot reading, not before."
+              title="Compare cleanly"
+              subtitle="This page works best after you already understand each snapshot on its own."
             />
 
             <div className="workspace-note-list">
-              <div className="workspace-note-list__item">Open one snapshot first when the question is about one basket on one date.</div>
-              <div className="workspace-note-list__item">Use comparison only when you really need to see what changed between two finished reads.</div>
-              <div className="workspace-note-list__item">If you want pair follow-up instead of broad drift, move to Relationships after you compare.</div>
+              <div className="workspace-note-list__item">Start from one snapshot when the question is still about one basket on one date.</div>
+              <div className="workspace-note-list__item">Use compare only when the question is explicitly about change between two finished reads.</div>
+              <div className="workspace-note-list__item">If the change looks local rather than broad, move into Relationships for the pair-level follow-up.</div>
             </div>
           </Panel>
 
           {leftBuild && rightBuild ? (
             <Panel variant="utility">
               <SectionHeader
-                title="What this comparison is testing"
+                title="What this setup is isolating"
                 subtitle={comparisonModeCopy.copy}
               />
 
@@ -332,7 +365,7 @@ function CompareResult({
   return (
     <Panel variant="primary">
       <SectionHeader
-        title="What changed"
+        title="Where the structure drifted"
         subtitle={`${leftLabel} versus ${rightLabel}. These are the relationships with the biggest score changes between the two snapshots.`}
       />
 
@@ -345,19 +378,19 @@ function CompareResult({
 
       <div className="stat-grid">
         <div className="stat-card">
-          <div className="stat-card__label">Common names</div>
+          <div className="stat-card__label">Overlapping names</div>
           <div className="stat-card__value">{data.commonSymbols.length}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-card__label">Left date</div>
+          <div className="stat-card__label">Baseline date</div>
           <div className="stat-card__value mono">{formatDateOnly(data.left.asOfDate)}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-card__label">Right date</div>
+          <div className="stat-card__label">Challenger date</div>
           <div className="stat-card__value mono">{formatDateOnly(data.right.asOfDate)}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-card__label">Changes shown</div>
+          <div className="stat-card__label">Pairs surfaced</div>
           <div className="stat-card__value">{data.topDriftPairs.length}</div>
         </div>
       </div>
@@ -395,9 +428,9 @@ function CompareResult({
         </div>
       ) : (
         <div className="compare-empty-state">
-          <div className="compare-empty-state__title">No strong drift stood out here.</div>
+          <div className="compare-empty-state__title">No clear drift stood out here.</div>
           <div className="compare-empty-state__copy">
-            The overlapping names look fairly stable across these two snapshots. Try a wider time gap, a different lookback, or move into Relationships for a more targeted follow-up.
+            The overlapping names look fairly stable across these two reads. Try a wider time gap, a different lookback, or move into Relationships for a tighter follow-up.
           </div>
           <div className="next-steps">
             <Link to="/builds/new" className="button button--secondary">Create snapshot</Link>
