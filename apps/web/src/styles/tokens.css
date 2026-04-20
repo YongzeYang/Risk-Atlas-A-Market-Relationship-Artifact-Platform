@@ -24,15 +24,21 @@
   --accent: #8fa4c1;
   --accent-strong: #b4c3d8;
   --accent-surface: rgba(143, 164, 193, 0.12);
+  --accent-home: #a8d4f0;
+  --accent-home-strong: #e8f5ff;
+  --accent-home-surface: rgba(168, 212, 240, 0.14);
+  --accent-editorial: #c8a56d;
+  --accent-editorial-surface: rgba(200, 165, 109, 0.14);
 
   --success: #79a88d;
   --warning: #b69a62;
   --danger: #b97a7a;
   --running: #7d95b8;
 
-  --data-positive: #6f8eab;
-  --data-negative: #8e6b60;
-  --data-neutral: #444c59;
+  --data-positive: #7aa9cf;
+  --data-negative: #c28678;
+  --data-neutral: #384454;
+  --data-diagonal: #586a82;
 
   --shadow-soft: 0 12px 28px rgba(0, 0, 0, 0.16);
 

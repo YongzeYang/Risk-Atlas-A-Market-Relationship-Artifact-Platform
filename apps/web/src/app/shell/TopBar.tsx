@@ -6,14 +6,15 @@ import { appConfig } from '../../lib/config';
 export default function TopBar() {
   const location = useLocation();
   const path = location.pathname;
+  const isHome = path === '/';
 
-  const buildsActive = path === '/builds' || /^\/builds\/[^/]+$/.test(path);
-
-  const navClassName = ({ isActive }: { isActive: boolean }) =>
-    `topbar__link${isActive ? ' topbar__link--active' : ''}`;
+  const navClassName = (
+    { isActive }: { isActive: boolean },
+    secondary = false
+  ) => `topbar__link${isActive ? ' topbar__link--active' : ''}${secondary ? ' topbar__link--secondary' : ''}`;
 
   return (
-    <header className="topbar">
+    <header className={`topbar${isHome ? ' topbar--home' : ''}`}>
       <div className="topbar__brand">
         <Link to="/" className="topbar__brand-link">
           {appConfig.title}
@@ -26,11 +27,11 @@ export default function TopBar() {
             Home
           </NavLink>
 
-          <NavLink className={`topbar__link${buildsActive ? ' topbar__link--active' : ''}`} to="/builds">
+          <NavLink className={navClassName} to="/builds">
             Snapshots
           </NavLink>
 
-          <NavLink className={navClassName} to="/series">
+          <NavLink className={(args) => navClassName(args, true)} to="/series">
             Snapshot series
           </NavLink>
 
@@ -38,22 +39,22 @@ export default function TopBar() {
             What changed
           </NavLink>
 
-          <NavLink className={navClassName} to="/divergence">
+          <NavLink className={(args) => navClassName(args, true)} to="/divergence">
             Relationships
           </NavLink>
 
-          <NavLink className={navClassName} to="/exposure">
+          <NavLink className={(args) => navClassName(args, true)} to="/exposure">
             Spillover
           </NavLink>
 
-          <NavLink className={navClassName} to="/structure">
+          <NavLink className={(args) => navClassName(args, true)} to="/structure">
             Groups
           </NavLink>
         </nav>
 
         <div className="topbar__utility">
           <a
-            className="topbar__link"
+            className="topbar__utility-link"
             href={appConfig.apiDocsPath}
             target="_blank"
             rel="noreferrer"
@@ -63,7 +64,7 @@ export default function TopBar() {
 
           {appConfig.repositoryUrl ? (
             <a
-              className="topbar__link"
+              className="topbar__utility-link"
               href={appConfig.repositoryUrl}
               target="_blank"
               rel="noreferrer"

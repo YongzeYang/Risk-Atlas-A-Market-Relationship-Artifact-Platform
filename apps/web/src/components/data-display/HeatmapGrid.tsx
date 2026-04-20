@@ -17,8 +17,14 @@ type ScoreScale = {
   negativeMaxAbs: number;
 };
 
+const HEATMAP_BASE = '#0b1017';
+
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+function mixColor(variableName: string, percentage: number): string {
+  return `color-mix(in srgb, var(${variableName}) ${Math.round(percentage)}%, ${HEATMAP_BASE})`;
 }
 
 function normalize(value: number, min: number, max: number): number {
@@ -62,25 +68,37 @@ function scoreToColor(score: number, scale: ScoreScale, diagonal: boolean): stri
   const value = clamp(score, -1, 1);
 
   if (diagonal) {
-    return 'hsl(215 24% 34%)';
+    return mixColor('--data-diagonal', 86);
   }
 
   if (Math.abs(value) < 0.02) {
-    return 'hsl(220 14% 24%)';
+    return mixColor('--data-neutral', 74);
   }
 
   if (value > 0) {
     const emphasis = normalize(value, scale.positiveMin, scale.positiveMax);
-    const saturation = 28 + emphasis * 22;
-    const lightness = 18 + emphasis * 26;
-    return `hsl(208 ${saturation}% ${lightness}%)`;
+    return mixColor('--data-positive', 44 + emphasis * 44);
   }
 
   const magnitude = Math.abs(value);
   const emphasis = normalize(magnitude, scale.negativeMinAbs, scale.negativeMaxAbs);
-  const saturation = 20 + emphasis * 22;
-  const lightness = 18 + emphasis * 24;
-  return `hsl(18 ${saturation}% ${lightness}%)`;
+  return mixColor('--data-negative', 42 + emphasis * 44);
+}
+
+function describeScore(score: number, diagonal: boolean): string {
+  if (diagonal) {
+    return 'self relationship';
+  }
+
+  if (score > 0.12) {
+    return 'moving together';
+  }
+
+  if (score < -0.12) {
+    return 'pulling apart';
+  }
+
+  return 'roughly mixed';
 }
 
 function scoreClass(score: number): string {
@@ -93,22 +111,26 @@ export default function HeatmapGrid({ symbols, scores }: HeatmapGridProps) {
   return (
     <div className="heatmap">
       <div className="heatmap__legend">
-        <span className="heatmap__legend-label">Subset-scaled correlation contrast</span>
+        <div className="heatmap__legend-copy">
+          <span className="heatmap__legend-label">Visible co-movement range</span>
+          <span className="heatmap__legend-note">
+            Coral means the names pull apart, slate is mixed, and blue means they move together.
+            Contrast rescales to this visible slice.
+          </span>
+        </div>
 
         <div className="heatmap__legend-scale">
           <span className="heatmap__legend-value mono">{formatScore(scale.min, 2)}</span>
           <div className="heatmap__legend-bar" />
           <span className="heatmap__legend-value mono">{formatScore(scale.max, 2)}</span>
         </div>
-
-        <span className="heatmap__legend-note mono">contrast adapts to the visible subset</span>
       </div>
 
       <div className="heatmap__scroll">
         <div
           className="heatmap-grid"
           style={{
-            gridTemplateColumns: `132px repeat(${symbols.length}, minmax(84px, 1fr))`
+            gridTemplateColumns: `116px repeat(${symbols.length}, minmax(72px, 1fr))`
           }}
         >
           <div className="heatmap-grid__corner" />
@@ -133,9 +155,9 @@ export default function HeatmapGrid({ symbols, scores }: HeatmapGridProps) {
                       diagonal ? ' heatmap-grid__cell--diagonal' : ''
                     }`}
                     style={{ backgroundColor: scoreToColor(score, scale, diagonal) }}
-                    title={`${rowSymbol} ↔ ${symbols[colIndex]} = ${formatScore(score, 3)}`}
+                    title={`${rowSymbol} ↔ ${symbols[colIndex]} · ${describeScore(score, diagonal)} (${formatScore(score, 3)})`}
                   >
-                    {formatScore(score, 2)}
+                    {diagonal ? '—' : formatScore(score, 2)}
                   </div>
                 );
               })}
