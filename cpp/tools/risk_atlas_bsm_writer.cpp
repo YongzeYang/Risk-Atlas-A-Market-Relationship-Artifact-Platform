@@ -21,12 +21,6 @@ struct Options {
   std::filesystem::path output_path;
   u64 block_size{0};
   u64 cache_blocks{8};
-  double symmetry_tolerance{1e-8};
-};
-
-struct InputPayload {
-  std::vector<std::string> symbols;
-  std::vector<std::vector<double>> dense_scores;
 };
 
 [[nodiscard]] u64 parse_u64(const std::string& text, const char* name) {
@@ -73,12 +67,12 @@ struct InputPayload {
 
 void print_usage(const char* argv0) {
   std::cerr
-      << "Usage: " << argv0 << " --output <path> [--block-size <n>] [--cache-blocks <n>] [--symmetry-tolerance <x>]\n"
+  << "Usage: " << argv0 << " --output <path> [--block-size <n>] [--cache-blocks <n>]\n"
       << "\n"
-      << "Reads a dense symmetric matrix payload from stdin:\n"
+  << "Reads a lower-triangle streaming payload from stdin:\n"
       << "  line 1: N\n"
       << "  next N lines: symbol strings\n"
-      << "  next N lines: N whitespace-separated doubles per row\n";
+  << "  next N lines: row i has i+1 whitespace-separated doubles (j=0..i)\n";
 }
 
 [[nodiscard]] Options parse_args(int argc, char** argv) {
@@ -104,8 +98,6 @@ void print_usage(const char* argv0) {
       options.block_size = parse_u64(value, "block-size");
     } else if (arg == "--cache-blocks") {
       options.cache_blocks = parse_u64(value, "cache-blocks");
-    } else if (arg == "--symmetry-tolerance") {
-      options.symmetry_tolerance = parse_double(value, "symmetry-tolerance");
     } else {
       throw std::invalid_argument("Unknown CLI flag: " + arg);
     }
@@ -122,7 +114,37 @@ void print_usage(const char* argv0) {
   return options;
 }
 
-[[nodiscard]] InputPayload read_payload_from_stdin() {
+[[nodiscard]] std::vector<std::string> read_symbols_from_stdin(std::size_t n) {
+  std::vector<std::string> symbols;
+  symbols.reserve(n);
+
+  std::unordered_set<std::string> seen_symbols;
+
+  for (std::size_t i = 0; i < n; ++i) {
+    std::string symbol;
+    if (!std::getline(std::cin, symbol)) {
+      throw std::runtime_error("Failed to read symbol line " + std::to_string(i) + ".");
+    }
+
+    if (!symbol.empty() && symbol.back() == '\r') {
+      symbol.pop_back();
+    }
+
+    if (symbol.empty()) {
+      throw std::runtime_error("Encountered empty symbol at index " + std::to_string(i) + ".");
+    }
+
+    if (!seen_symbols.insert(symbol).second) {
+      throw std::runtime_error("Duplicate symbol in input payload: " + symbol);
+    }
+
+    symbols.push_back(std::move(symbol));
+  }
+
+  return symbols;
+}
+
+[[nodiscard]] std::vector<std::string> read_header_from_stdin() {
   std::size_t n = 0;
   if (!(std::cin >> n)) {
     throw std::runtime_error("Failed to read matrix dimension from stdin.");
@@ -135,79 +157,7 @@ void print_usage(const char* argv0) {
     throw std::runtime_error("Matrix dimension N must be > 0.");
   }
 
-  InputPayload payload;
-  payload.symbols.reserve(n);
-
-  for (std::size_t i = 0; i < n; ++i) {
-    std::string symbol;
-    if (!std::getline(std::cin, symbol)) {
-      throw std::runtime_error("Failed to read symbol line " + std::to_string(i) + ".");
-    }
-
-    if (symbol.empty()) {
-      throw std::runtime_error("Encountered empty symbol at index " + std::to_string(i) + ".");
-    }
-
-    payload.symbols.push_back(std::move(symbol));
-  }
-
-  payload.dense_scores.assign(n, std::vector<double>(n, 0.0));
-
-  for (std::size_t i = 0; i < n; ++i) {
-    for (std::size_t j = 0; j < n; ++j) {
-      double value = 0.0;
-      if (!(std::cin >> value)) {
-        throw std::runtime_error(
-            "Failed to read dense matrix value at [" + std::to_string(i) + ", " + std::to_string(j) + "].");
-      }
-
-      if (!std::isfinite(value)) {
-        throw std::runtime_error(
-            "Encountered non-finite dense matrix value at [" + std::to_string(i) + ", " + std::to_string(j) + "].");
-      }
-
-      payload.dense_scores[i][j] = value;
-    }
-  }
-
-  return payload;
-}
-
-void validate_payload(const InputPayload& payload, double symmetry_tolerance) {
-  if (payload.symbols.empty()) {
-    throw std::runtime_error("Input payload has no symbols.");
-  }
-
-  if (payload.dense_scores.size() != payload.symbols.size()) {
-    throw std::runtime_error("Dense score matrix row count does not match symbol count.");
-  }
-
-  std::unordered_set<std::string> seen_symbols;
-  for (const auto& symbol : payload.symbols) {
-    if (!seen_symbols.insert(symbol).second) {
-      throw std::runtime_error("Duplicate symbol in input payload: " + symbol);
-    }
-  }
-
-  const std::size_t n = payload.symbols.size();
-
-  for (std::size_t i = 0; i < n; ++i) {
-    if (payload.dense_scores[i].size() != n) {
-      throw std::runtime_error(
-          "Dense score matrix row " + std::to_string(i) + " has incorrect column count.");
-    }
-
-    for (std::size_t j = i + 1; j < n; ++j) {
-      const double a = payload.dense_scores[i][j];
-      const double b = payload.dense_scores[j][i];
-
-      if (std::abs(a - b) > symmetry_tolerance) {
-        throw std::runtime_error(
-            "Dense score matrix is not symmetric within tolerance at [" +
-            std::to_string(i) + ", " + std::to_string(j) + "].");
-      }
-    }
-  }
+  return read_symbols_from_stdin(n);
 }
 
 [[nodiscard]] u64 derive_block_size(std::size_t n, u64 configured_block_size) {
@@ -219,8 +169,8 @@ void validate_payload(const InputPayload& payload, double symmetry_tolerance) {
   return derived == 0 ? 1 : derived;
 }
 
-void write_bsm_artifact(const InputPayload& payload, const Options& options) {
-  const std::size_t n_size_t = payload.symbols.size();
+void write_bsm_artifact(const std::vector<std::string>& symbols, const Options& options) {
+  const std::size_t n_size_t = symbols.size();
   const u64 n = static_cast<u64>(n_size_t);
   const u64 block_size = derive_block_size(n_size_t, options.block_size);
 
@@ -240,13 +190,41 @@ void write_bsm_artifact(const InputPayload& payload, const Options& options) {
   lower_row.reserve(n_size_t);
 
   for (std::size_t i = 0; i < n_size_t; ++i) {
+    std::string row_text;
+    if (!std::getline(std::cin, row_text)) {
+      throw std::runtime_error("Failed to read lower-triangle row " + std::to_string(i) + ".");
+    }
+
+    if (!row_text.empty() && row_text.back() == '\r') {
+      row_text.pop_back();
+    }
+
+    std::istringstream row_stream(row_text);
     lower_row.assign(i + 1, 0.0);
 
     for (std::size_t j = 0; j <= i; ++j) {
-      lower_row[j] = payload.dense_scores[i][j];
+      std::string token;
+      if (!(row_stream >> token)) {
+        throw std::runtime_error(
+            "Row " + std::to_string(i) +
+            " has fewer values than expected; required " + std::to_string(i + 1) + " values.");
+      }
+
+      lower_row[j] = parse_double(token, "lower-triangle value");
+    }
+
+    std::string extra_token;
+    if (row_stream >> extra_token) {
+      throw std::runtime_error(
+          "Row " + std::to_string(i) + " has extra trailing values beyond " + std::to_string(i + 1) + ".");
     }
 
     writer.append(std::span<const double>(lower_row.data(), lower_row.size()));
+  }
+
+  std::string trailing_token;
+  if (std::cin >> trailing_token) {
+    throw std::runtime_error("Unexpected trailing tokens after lower-triangle rows.");
   }
 
   matrix.flush();
@@ -257,14 +235,13 @@ void write_bsm_artifact(const InputPayload& payload, const Options& options) {
 int main(int argc, char** argv) {
   try {
     const Options options = parse_args(argc, argv);
-    const InputPayload payload = read_payload_from_stdin();
+    const std::vector<std::string> symbols = read_header_from_stdin();
 
-    validate_payload(payload, options.symmetry_tolerance);
-    write_bsm_artifact(payload, options);
+    write_bsm_artifact(symbols, options);
 
     std::cout
-        << "Wrote " << payload.symbols.size()
-        << "x" << payload.symbols.size()
+        << "Wrote " << symbols.size()
+        << "x" << symbols.size()
         << " matrix artifact to " << options.output_path.string()
         << '\n';
 

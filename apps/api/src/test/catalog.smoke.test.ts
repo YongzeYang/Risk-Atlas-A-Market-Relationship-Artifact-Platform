@@ -20,7 +20,10 @@ test('catalog endpoints return lightweight summaries for datasets and universes'
     const datasets = JSON.parse(datasetsResponse.body) as DatasetListItem[];
     assert.ok(datasets.length > 0);
 
-    const dataset = datasets.find((item) => item.id === 'hk_eod_demo_v1') ?? datasets[0]!;
+    const dataset =
+      datasets.find((item) => item.id === 'hk_eod_yahoo_real_v1') ??
+      datasets.find((item) => item.id === 'hk_eod_demo_v1') ??
+      datasets[0]!;
     assert.ok(typeof dataset.priceRowCount === 'number');
     assert.ok(typeof dataset.symbolCount === 'number');
     assert.ok(Object.prototype.hasOwnProperty.call(dataset.firstValidAsOfByWindowDays, '60'));
@@ -40,9 +43,14 @@ test('catalog endpoints return lightweight summaries for datasets and universes'
     const sameMarketUniverses = universes.filter((item) => item.market === dataset.market);
     assert.ok(sameMarketUniverses.length > 0);
 
+    const supportedUniverses = sameMarketUniverses.filter((universe) =>
+      universe.supportedDatasetIds?.includes(dataset.id)
+    );
+
+    assert.ok(supportedUniverses.length > 0);
+
     for (const universe of sameMarketUniverses) {
       assert.ok(Array.isArray(universe.supportedDatasetIds));
-      assert.ok(universe.supportedDatasetIds.includes(dataset.id));
     }
   } finally {
     await app.close();

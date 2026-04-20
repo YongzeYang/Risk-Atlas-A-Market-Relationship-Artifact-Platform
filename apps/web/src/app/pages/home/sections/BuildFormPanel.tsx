@@ -16,6 +16,7 @@ import {
   describeCoverageCount,
   formatLookbackLabel
 } from '../../../../lib/snapshot-language';
+import { SCORE_METHOD_OPTIONS } from '../../../../lib/score-method';
 import type {
   BuildRunListItem,
   BuildRunWindowDays,
@@ -36,7 +37,6 @@ type BuildFormPanelProps = {
 };
 
 const WINDOW_OPTIONS: BuildRunWindowDays[] = [60, 120, 252];
-const SCORE_METHOD: BuildRunScoreMethod = 'pearson_corr';
 
 export default function BuildFormPanel({
   datasets,
@@ -51,6 +51,7 @@ export default function BuildFormPanel({
   const [universeId, setUniverseId] = useState('');
   const [asOfDate, setAsOfDate] = useState('');
   const [windowDays, setWindowDays] = useState<BuildRunWindowDays>(252);
+  const [scoreMethod, setScoreMethod] = useState<BuildRunScoreMethod>('pearson_corr');
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -179,7 +180,7 @@ export default function BuildFormPanel({
       universeId,
       asOfDate,
       windowDays,
-      scoreMethod: SCORE_METHOD,
+      scoreMethod,
       inviteCode
     };
 
@@ -344,6 +345,25 @@ export default function BuildFormPanel({
           </span>
         </label>
 
+        <label className="field">
+          <span className="field__label">Relationship method</span>
+          <select
+            className="field__control mono"
+            value={scoreMethod}
+            onChange={(event) => setScoreMethod(event.target.value as BuildRunScoreMethod)}
+            disabled={loading || submitting}
+          >
+            {SCORE_METHOD_OPTIONS.map((method) => (
+              <option key={method.value} value={method.value}>
+                {method.label}
+              </option>
+            ))}
+          </select>
+          <span className="field__hint">
+            {SCORE_METHOD_OPTIONS.find((method) => method.value === scoreMethod)?.hint}
+          </span>
+        </label>
+
         {!universesLoading && compatibleUniverses.length === 0 ? (
           <div className="state-note state-note--error">
             This data source does not currently support a buildable market basket here. Try a different source or basket.
@@ -402,7 +422,9 @@ export default function BuildFormPanel({
                 {minAsOfDate ? ` · earliest ${formatLookbackLabel(windowDays)} ${formatDateOnly(minAsOfDate)}` : ''}
               </div>
             ) : null}
-            <div className="workspace-note-list__item">Method is fixed to Pearson correlation in this release so snapshots stay comparable across screens.</div>
+            <div className="workspace-note-list__item">
+              Selected method: {SCORE_METHOD_OPTIONS.find((method) => method.value === scoreMethod)?.label}.
+            </div>
             <div className="workspace-note-list__item">The basket first resolves against the chosen source and date, then the engine removes flat or unusable return series before matrix generation.</div>
             <div className="workspace-note-list__item">A snapshot is descriptive. It helps you see concentration, relationships, spillover, and hidden groups, but it is not a direct forecast.</div>
           </div>

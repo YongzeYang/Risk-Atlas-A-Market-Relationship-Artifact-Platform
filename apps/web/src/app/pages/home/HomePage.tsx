@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import BoundaryNote from '../../../components/ui/BoundaryNote';
 import { useBuildDetailData, useBuildRunsData } from '../../../features/builds/hooks';
 import { useCatalogData } from '../../../features/catalog/hooks';
+import { filterMeaningfulTopPairsForDisplay } from '../../../lib/crypto-pair-display';
 import { formatDateOnly, formatInteger } from '../../../lib/format';
 import {
   describeExampleSnapshotBullets,
@@ -12,7 +13,63 @@ import {
   pickFeaturedBuild
 } from '../../../lib/build-run-language';
 import { formatLookbackLabel } from '../../../lib/snapshot-language';
+import type { BuildRunListItem, BuildRunScoreMethod } from '../../../types/api';
 import HomeHeroBand from './sections/HomeHeroBand';
+
+const HERO_MARKET_EXAMPLES = [
+  {
+    universeId: 'hk_all_common_equity',
+    marketLabel: 'Hong Kong equities',
+    title: 'HK All Tradable Common Equities',
+    description: 'Full-market snapshot for the tradable Hong Kong common-equity surface.'
+  },
+  {
+    universeId: 'crypto_market_map_all',
+    marketLabel: 'Crypto market',
+    title: 'Crypto market',
+    description: 'Full-market snapshot for the broad crypto market structure.'
+  }
+] as const;
+
+function scoreMethodPreference(scoreMethod: BuildRunScoreMethod): number {
+  switch (scoreMethod) {
+    case 'nmi_hist_10':
+      return 0;
+    case 'ewma_corr':
+      return 1;
+    case 'tail_dep_05':
+      return 2;
+    case 'pearson_corr':
+    default:
+      return 3;
+  }
+}
+
+function pickHeroBuild(buildRuns: BuildRunListItem[], universeId: string): BuildRunListItem | null {
+  const matchingBuilds = buildRuns.filter((buildRun) => buildRun.universeId === universeId);
+
+  if (matchingBuilds.length === 0) {
+    return null;
+  }
+
+  return [...matchingBuilds].sort((left, right) => {
+    const methodCompare = scoreMethodPreference(left.scoreMethod) - scoreMethodPreference(right.scoreMethod);
+    if (methodCompare !== 0) {
+      return methodCompare;
+    }
+
+    const asOfCompare = right.asOfDate.localeCompare(left.asOfDate);
+    if (asOfCompare !== 0) {
+      return asOfCompare;
+    }
+
+    return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+  })[0] ?? null;
+}
+
+function formatHeroScoreTag(scoreMethod: BuildRunScoreMethod): string {
+  return scoreMethod === 'nmi_hist_10' ? 'Mutual information' : '';
+}
 
 export default function HomePage() {
   const {
@@ -34,6 +91,29 @@ export default function HomePage() {
     [buildRuns]
   );
   const exampleBuild = useMemo(() => pickFeaturedBuild(readyBuilds), [readyBuilds]);
+  const heroExampleSnapshots = useMemo(
+    () =>
+      HERO_MARKET_EXAMPLES.flatMap((definition) => {
+        const buildRun = pickHeroBuild(readyBuilds, definition.universeId);
+        if (!buildRun) {
+          return [];
+        }
+
+        return [
+          {
+            to: `/builds/${buildRun.id}`,
+            marketLabel: definition.marketLabel,
+            title: definition.title,
+            description: definition.description,
+            asOfDate: formatDateOnly(buildRun.asOfDate),
+            lookbackLabel: formatLookbackLabel(buildRun.windowDays),
+            scoreTag: formatHeroScoreTag(buildRun.scoreMethod)
+          }
+        ];
+      }),
+    [readyBuilds]
+  );
+  const heroPrimaryExampleTo = heroExampleSnapshots[0]?.to ?? (exampleBuild ? `/builds/${exampleBuild.id}` : null);
   const comparisonPair = useMemo(() => pickComparisonBuildPair(readyBuilds), [readyBuilds]);
   const comparisonTo = comparisonPair
     ? `/compare?left=${comparisonPair[0].id}&right=${comparisonPair[1].id}`
@@ -61,11 +141,17 @@ export default function HomePage() {
     };
   }, [comparisonPair, universeLabelById]);
   const preferredUniverseLabels = [
-    universes.find((item) => item.id === 'hk_top_50_liquid')?.name,
-    universes.find((item) => item.id === 'hk_all_common_equity')?.name,
-    universes.find((item) => item.id === 'hk_financials')?.name,
-    universes.find((item) => item.id === 'hk_tech')?.name
-  ].filter((item): item is string => Boolean(item));
+    'hk_top_50_liquid',
+    'hk_all_common_equity',
+    'hk_financials',
+    'hk_tech',
+    'crypto_top_50_liquid',
+    'crypto_market_map_all',
+    'crypto_platform',
+    'crypto_defi'
+  ]
+    .map((universeId) => universes.find((item) => item.id === universeId)?.name)
+    .filter((item): item is string => Boolean(item));
   const topUniverseLabels =
     preferredUniverseLabels.length > 0
       ? preferredUniverseLabels
@@ -79,7 +165,10 @@ export default function HomePage() {
     }
 
     const universeLabel = universeLabelById[exampleBuild.universeId] ?? exampleBuild.universeId;
-    const topPair = exampleDetail?.topPairs[0];
+    const topPair = filterMeaningfulTopPairsForDisplay(
+      exampleBuild.datasetId,
+      exampleDetail?.topPairs ?? []
+    )[0];
     const topPairLabel = topPair ? `${topPair.left} and ${topPair.right}` : null;
 
     return {
@@ -109,7 +198,8 @@ export default function HomePage() {
     <div className="page page--home">
       <HomeHeroBand
         exampleLoading={buildRunsLoading}
-        exampleSnapshot={exampleSnapshot}
+        primaryExampleTo={heroPrimaryExampleTo}
+        exampleSnapshots={heroExampleSnapshots}
         comparisonSummary={comparisonSummary}
         readySnapshotCount={readyBuilds.length}
         universeCount={universes.length}
@@ -218,7 +308,7 @@ export default function HomePage() {
           </div>
 
           <div className="home-section-heading__aside">
-            Recommended first passes: Top 50 Liquid, full market, financials, and tech.
+            Recommended first passes: Top 50 Liquid, full market, and one theme basket that you expect to behave as a bloc.
           </div>
         </div>
 

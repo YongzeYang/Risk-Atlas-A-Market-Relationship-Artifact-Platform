@@ -15,14 +15,16 @@ import {
   formatScore,
   formatScoreRange
 } from '../../../../lib/format';
+import { formatScoreMethodLabel } from '../../../../lib/score-method';
 import { formatLookbackLabel } from '../../../../lib/snapshot-language';
-import type { BuildRunDetailResponse } from '../../../../types/api';
+import type { BuildRunDetailResponse, TopPairItem } from '../../../../types/api';
 
 type BuildMetaHeaderProps = {
   detail: BuildRunDetailResponse | null;
   loading: boolean;
   error: string | null;
   refreshing: boolean;
+  topPairs: TopPairItem[];
   onRefresh: () => void;
 };
 
@@ -43,10 +45,14 @@ function buildConclusion(detail: BuildRunDetailResponse): string | null {
   return 'This basket shows a wide spread of relationship scores — diversification looks present but uneven.';
 }
 
-function buildInsight(detail: BuildRunDetailResponse, symbolCount: number | null): ReactNode {
+function buildInsight(
+  detail: BuildRunDetailResponse,
+  topPairs: TopPairItem[],
+  symbolCount: number | null
+): ReactNode {
   if (detail.status === 'succeeded') {
     const conclusion = buildConclusion(detail);
-    const strongestPair = detail.topPairs[0];
+    const strongestPair = topPairs[0];
 
     if (strongestPair) {
       return (
@@ -173,6 +179,7 @@ function buildSubline(detail: BuildRunDetailResponse): string {
 
 export default function BuildMetaHeader({
   detail,
+  topPairs,
   loading,
   error,
   refreshing,
@@ -211,6 +218,7 @@ export default function BuildMetaHeader({
     detail.universeId,
     formatDateOnly(detail.asOfDate),
     formatLookbackLabel(detail.windowDays),
+    formatScoreMethodLabel(detail.scoreMethod),
     symbolCount !== null ? `${formatInteger(symbolCount)} names` : null
   ].filter((item): item is string => Boolean(item));
 
@@ -263,7 +271,7 @@ export default function BuildMetaHeader({
               ))}
             </p>
 
-            <p className="meta-header__insight">{buildInsight(detail, symbolCount)}</p>
+            <p className="meta-header__insight">{buildInsight(detail, topPairs, symbolCount)}</p>
             <p className="meta-header__subline">{buildSubline(detail)}</p>
 
             <BoundaryNote variant="accent">
@@ -310,6 +318,11 @@ export default function BuildMetaHeader({
             <div>
               <dt>Basket</dt>
               <dd className="mono">{detail.universeId}</dd>
+            </div>
+
+            <div>
+              <dt>Score method</dt>
+              <dd className="mono">{detail.scoreMethod}</dd>
             </div>
 
             <div>

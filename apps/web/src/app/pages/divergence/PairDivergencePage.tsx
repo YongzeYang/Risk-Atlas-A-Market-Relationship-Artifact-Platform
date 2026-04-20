@@ -17,6 +17,7 @@ import {
   useInviteCode
 } from '../../../features/builds/hooks';
 import { buildAnalysisWorkflowItems } from '../../../lib/analysis-workflow';
+import { filterMeaningfulTopPairsForDisplay } from '../../../lib/crypto-pair-display';
 import { formatDateOnly, formatInteger, formatScore } from '../../../lib/format';
 import { formatLookbackLabel, formatSnapshotOptionLabel } from '../../../lib/snapshot-language';
 import type {
@@ -524,7 +525,9 @@ function DivergencePreview({
 
   const symbolCount = detail?.symbolOrder.length ?? 0;
   const pairScanCount = symbolCount > 1 ? (symbolCount * (symbolCount - 1)) / 2 : 0;
-  const topPairs = detail?.topPairs.slice(0, 4) ?? [];
+  const topPairs = detail
+    ? filterMeaningfulTopPairsForDisplay(detail.datasetId, detail.topPairs).slice(0, 4)
+    : [];
 
   return (
     <>

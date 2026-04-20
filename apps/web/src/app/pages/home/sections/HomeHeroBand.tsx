@@ -22,15 +22,16 @@ type HomeHeroBandProps = {
     spilloverTo: string;
     groupsTo: string;
   };
-  exampleSnapshot: {
+  primaryExampleTo: string | null;
+  exampleSnapshots: Array<{
     to: string;
-    universeLabel: string;
+    marketLabel: string;
+    title: string;
+    description: string;
     asOfDate: string;
     lookbackLabel: string;
-    symbolCount: number | null;
-    topPairLabel: string | null;
-    insights: string[];
-  } | null;
+    scoreTag: string;
+  }>;
 };
 
 export default function HomeHeroBand({
@@ -39,7 +40,8 @@ export default function HomeHeroBand({
   readySnapshotCount,
   universeCount,
   paths,
-  exampleSnapshot
+  primaryExampleTo,
+  exampleSnapshots
 }: HomeHeroBandProps) {
   const analysisWorkflowItems = buildAnalysisWorkflowItems(null, {
     groupsTo: paths.groupsTo,
@@ -61,7 +63,7 @@ export default function HomeHeroBand({
     <section className="hero-band">
       <div className="workspace-hero workspace-hero--home hero-band__header">
         <div className="workspace-hero__copy hero-band__copy">
-          <div className="workspace-hero__eyebrow hero-band__eyebrow">Hong Kong market structure research</div>
+          <div className="workspace-hero__eyebrow hero-band__eyebrow">Hong Kong and crypto market structure research</div>
 
           <h1 className="workspace-hero__title hero-band__title">
             See what is really connected before the label catches up.
@@ -69,16 +71,16 @@ export default function HomeHeroBand({
 
           <p className="workspace-hero__description hero-band__description">
             One snapshot reveals hidden overlap, broken relationships, spillover, and hidden groups
-            across Hong Kong equities.
+            across Hong Kong equities and crypto markets.
           </p>
 
           <p className="workspace-hero__subline hero-band__subline">
-            Useful when a basket looks diversified on paper but still behaves like one crowded idea.
+            Useful when a basket or market looks diversified on paper but still behaves like one crowded idea.
           </p>
 
           <div className="workspace-hero__actions hero-band__actions">
-            <Link to={exampleSnapshot?.to ?? '/builds/new'} className="button button--primary">
-              {exampleSnapshot ? 'Open the example snapshot' : 'Create a snapshot'}
+            <Link to={primaryExampleTo ?? '/builds/new'} className="button button--primary">
+              {primaryExampleTo ? 'Open the example snapshot' : 'Create a snapshot'}
             </Link>
 
             <Link to={paths.compareTo} className="button button--ghost">
@@ -106,66 +108,56 @@ export default function HomeHeroBand({
         </div>
 
         <div className="workspace-hero__panel hero-band__spotlight">
-          <div className="workspace-hero__panel-label hero-band__spotlight-label">One snapshot, then the next question</div>
+          <div className="workspace-hero__panel-label hero-band__spotlight-label">Two full-market snapshots</div>
 
           <div className="hero-band__proof-stack">
-            <div className="hero-band__proof-card">
-              <div className="hero-band__proof-topline">
-                <div>
-                  <div className="hero-band__proof-kicker">Featured snapshot</div>
-                  <div className="hero-band__example-title">
-                    {exampleSnapshot
-                      ? exampleSnapshot.universeLabel
-                      : exampleLoading
-                        ? 'Loading guided snapshot'
-                        : 'Create the first guided snapshot'}
+            {exampleSnapshots.length > 0 ? (
+              exampleSnapshots.slice(0, 2).map((snapshot) => (
+                <div key={snapshot.to} className="hero-band__proof-card">
+                  <div className="hero-band__proof-topline">
+                    <div>
+                      <div className="hero-band__proof-kicker">{snapshot.marketLabel}</div>
+                      <div className="hero-band__example-title">{snapshot.title}</div>
+                    </div>
+
+                    {snapshot.scoreTag ? (
+                      <div className="hero-band__example-tag">{snapshot.scoreTag}</div>
+                    ) : null}
+                  </div>
+
+                  <div className="hero-band__example-meta">
+                    {snapshot.asOfDate} · {snapshot.lookbackLabel}
+                  </div>
+
+                  <p className="hero-band__spotlight-note hero-band__spotlight-note--compact">
+                    {snapshot.description}
+                  </p>
+
+                  <div className="hero-band__proof-actions">
+                    <Link to={snapshot.to} className="hero-band__proof-link">
+                      Open snapshot
+                    </Link>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="hero-band__proof-card">
+                <div className="hero-band__proof-topline">
+                  <div>
+                    <div className="hero-band__proof-kicker">Full-market examples</div>
+                    <div className="hero-band__example-title">
+                      {exampleLoading ? 'Loading guided snapshots' : 'Create the first full-market snapshots'}
+                    </div>
                   </div>
                 </div>
 
-                <div className="hero-band__example-tag">
-                  {exampleSnapshot ? 'Guided read' : exampleLoading ? 'Loading' : 'Setup needed'}
-                </div>
-              </div>
-
-              <div className="hero-band__example-meta">
-                {exampleSnapshot
-                  ? `${exampleSnapshot.asOfDate} · ${exampleSnapshot.lookbackLabel}`
-                  : 'The homepage works best when it can anchor on one finished market read.'}
-              </div>
-
-              {exampleSnapshot ? (
-                <>
-                  <div className="hero-band__proof-stats">
-                    <div className="hero-band__proof-stat">
-                      <div className="hero-band__proof-stat-value mono">
-                        {exampleSnapshot.symbolCount != null
-                          ? formatInteger(exampleSnapshot.symbolCount)
-                          : '—'}
-                      </div>
-                      <div className="hero-band__proof-stat-label">names</div>
-                    </div>
-
-                    <div className="hero-band__proof-stat">
-                      <div className="hero-band__proof-stat-value">
-                        {exampleSnapshot.topPairLabel ?? 'Detail ready after load'}
-                      </div>
-                      <div className="hero-band__proof-stat-label">closest relationship</div>
-                    </div>
-                  </div>
-
-                  <ul className="hero-band__example-list">
-                    {exampleSnapshot.insights.slice(0, 2).map((insight) => (
-                      <li key={insight}>{insight}</li>
-                    ))}
-                  </ul>
-                </>
-              ) : (
                 <p className="hero-band__spotlight-note">
-                  Start with one clean snapshot so the homepage can show a real product proof instead
-                  of a generic dashboard list.
+                  {exampleLoading
+                    ? 'Loading the latest Hong Kong and crypto market reads for the homepage spotlight.'
+                    : 'The homepage spotlight becomes clearer once one full Hong Kong snapshot and one full crypto snapshot are available.'}
                 </p>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

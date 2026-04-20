@@ -122,6 +122,7 @@ What that does:
 - starts PostgreSQL through docker compose
 - configures and builds the C++ BSM writer
 - runs Prisma generate, Prisma migrate deploy, and seed
+- seed prefers the local real-HK CSV at data/real-hk/hk_eod_yahoo_real_v1.csv when it exists and only falls back to regenerating the demo CSV when real-HK files are absent
 - starts the API and web dev servers together
 
 Default local addresses after startup:
@@ -186,9 +187,9 @@ After editing the root .env, run:
 pnpm env:sync
 ```
 
-## Optional: expand to the larger real HK dataset
+## Optional: refresh the larger real HK dataset from source
 
-The seeded demo data is enough to boot the product. If you want the larger real-HK import and the coverage audit report, run:
+If the repository already contains the local real-HK CSV under data/real-hk, seed will reuse it automatically. If you want to refresh that dataset from upstream sources and rewrite the coverage audit report, run:
 
 ```bash
 pnpm real-hk:refresh
@@ -202,6 +203,44 @@ If you only want to refresh the real-HK security-master taxonomy overlay without
 pnpm real-hk:taxonomy
 ```
 
+## Optional: import a real crypto POC dataset
+
+The repository now includes a static-universe crypto proof-of-concept importer that pulls public daily candles from Coinbase, writes a local CSV under data/crypto, imports the dataset, and runs one verification build:
+
+```bash
+pnpm crypto:coinbase:import
+```
+
+What it creates:
+
+- dataset: crypto_usd_coinbase_daily_v1
+- universe: crypto_usd_top_10
+- market: CRYPTO
+
+That Coinbase path is still the lightweight proof of concept.
+
+## Optional: import a crypto market-map dataset
+
+The repository also includes a larger crypto market-map importer. It uses CoinGecko market metadata for candidate ranking and taxonomy hints, then switches to Yahoo chart history for the actual daily time series so the import can scale to a much larger batch. It writes taxonomy files under data/crypto, imports the dataset, and runs one verification build on the imported market-map universe:
+
+```bash
+pnpm crypto:market-map:import
+```
+
+What it creates:
+
+- dataset: crypto_market_map_yahoo_v2
+- static universes: crypto_market_map_all, crypto_market_cap_50, crypto_market_cap_100, crypto_market_cap_200
+- dynamic universes: crypto_top_50_liquid, crypto_top_100_liquid, crypto_top_200_liquid, plus populated crypto sector baskets
+- market: CRYPTO
+
+Important scope notes:
+
+- the importer now uses Yahoo chart history with batched/concurrent fetching instead of the much slower CoinGecko public history endpoint
+- the importer intentionally excludes stablecoins, wrapped or bridged assets, leveraged tokens, and liquid-staking derivatives so the market map behaves more like a spot risk-asset universe
+- crypto dynamic universes are now market-aware for liquidity and sector-filter rules; the legacy all-common-equity rule remains HK-oriented
+- the default importer now runs in best-effort mode: it scans 5 CoinGecko candidate pages, tries to pull as many Yahoo history series as possible, and proceeds with whatever clears the build window as long as at least 50 assets survive; you can still override the upper bound and floor with `CRYPTO_MARKET_MAP_TARGET_COUNT`, `CRYPTO_MARKET_MAP_MIN_COUNT`, `CRYPTO_MARKET_MAP_CANDIDATE_PAGE_COUNT`, `CRYPTO_MARKET_MAP_REQUEST_DELAY_MS`, `CRYPTO_MARKET_MAP_HISTORY_BATCH_SIZE`, `CRYPTO_MARKET_MAP_HISTORY_CONCURRENCY`, `CRYPTO_MARKET_MAP_PROGRESS_EVERY`, and `CRYPTO_MARKET_MAP_ENRICH_DETAILS=1`
+
 ## HK universe support
 
 The current catalog includes:
@@ -210,6 +249,11 @@ The current catalog includes:
 - liquidity universes: hk_top_50_liquid and hk_top_200_liquid
 - market-wide universe: hk_all_common_equity, displayed as HK All Tradable Common Equities
 - sector universes for financials, property, tech, energy, consumer, industrial, telecom, and utilities
+
+Catalog compatibility is dataset-aware:
+
+- static universes are only advertised for datasets that fully cover all required symbols with the minimum build history
+- liquidity, all-common-equity, and sector universes remain dataset-resolved at request time
 
 Important scope note:
 

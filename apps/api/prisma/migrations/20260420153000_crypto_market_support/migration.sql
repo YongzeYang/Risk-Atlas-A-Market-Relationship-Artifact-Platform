@@ -1,0 +1,3 @@
+ALTER TYPE "Market" ADD VALUE IF NOT EXISTS 'CRYPTO';
+
+ALTER TYPE "SecurityType" ADD VALUE IF NOT EXISTS 'crypto_asset';

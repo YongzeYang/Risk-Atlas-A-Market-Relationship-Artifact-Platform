@@ -6,6 +6,8 @@
     "bootstrap:local": "bash ./scripts/bootstrap-local.sh",
     "dev:stack": "bash ./scripts/dev-stack.sh",
     "quickstart": "bash ./scripts/quickstart.sh",
+    "crypto:coinbase:import": "pnpm --filter @risk-atlas/api db:import-crypto-coinbase",
+    "crypto:market-map:import": "pnpm --filter @risk-atlas/api db:import-crypto-market-map",
     "real-hk:refresh": "bash ./scripts/real-hk-refresh.sh",
     "real-hk:taxonomy": "pnpm --filter @risk-atlas/api db:refresh-real-hk-taxonomy",
     "deps:bsm": "git submodule update --init --recursive cpp/third_party/bsm",

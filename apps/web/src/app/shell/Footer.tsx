@@ -12,7 +12,7 @@ export default function Footer() {
       <div className="footer__content">
         <div className="footer__brand">
           <div className="footer__eyebrow">{appConfig.title}</div>
-          <div className="footer__text">Personal research product for Hong Kong market structure.</div>
+          <div className="footer__text">Personal research product for Hong Kong and crypto market structure.</div>
           <div className="footer__caption">
             This is a personal project for research support. It does not constitute investment advice.
           </div>

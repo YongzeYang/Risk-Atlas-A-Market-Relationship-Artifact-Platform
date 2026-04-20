@@ -4,6 +4,7 @@ import {
   DEFAULT_STRUCTURE_HEATMAP_SIZE,
   MAX_STRUCTURE_HEATMAP_SIZE,
   MIN_STRUCTURE_HEATMAP_SIZE,
+  type BuildRunScoreMethod,
   type BuildRunStructureSummary,
   type CompareBuildStructuresResponse,
   type StructureClusterMatch,
@@ -17,12 +18,14 @@ import {
   requireArtifactSymbolIndex
 } from './build-run-artifact-context.js';
 import { queryBsmSubmatrix } from './bsm-reader.js';
+import { getScoreMethodSpec } from './score-method-spec.js';
 
 type StructureCandidate = {
   indices: number[];
 };
 
 type StructureBuildContext = {
+  scoreMethod: BuildRunScoreMethod;
   symbolOrder: string[];
   scores: number[][];
   sectorBySymbol: Map<string, string | null>;
@@ -35,8 +38,6 @@ type StructureClusterCandidate = {
   averageInternalScore: number | null;
   sectors: { sector: string | null; count: number }[];
 };
-
-const STRUCTURE_THRESHOLDS = [0.65, 0.55, 0.45, 0.35] as const;
 
 export async function getBuildRunStructure(
   buildRunId: string,
@@ -260,6 +261,7 @@ export async function resolveStructureSummary(
   );
 
   return computeBuildStructureSummary({
+    scoreMethod: context.scoreMethod,
     symbolOrder: context.preview.symbolOrder,
     scores: context.preview.scores,
     sectorBySymbol
@@ -269,7 +271,10 @@ export async function resolveStructureSummary(
 export function computeBuildStructureSummary(
   context: StructureBuildContext
 ): BuildRunStructureSummary {
-  const chosen = chooseStructureComponents(context.scores);
+  const chosen = chooseStructureComponents(
+    context.scores,
+    getScoreMethodSpec(context.scoreMethod).structureThresholds
+  );
 
   const clusterCandidates = chosen.components.map((component) =>
     buildStructureClusterCandidate(component, context)
@@ -310,14 +315,17 @@ export function computeBuildStructureSummary(
   };
 }
 
-function chooseStructureComponents(scores: number[][]): {
+function chooseStructureComponents(
+  scores: number[][],
+  thresholds: readonly number[]
+): {
   threshold: number;
   components: StructureCandidate[];
 } {
   const symbolCount = scores.length;
   let fallback: { threshold: number; components: StructureCandidate[] } | null = null;
 
-  for (const threshold of STRUCTURE_THRESHOLDS) {
+  for (const threshold of thresholds) {
     const components = buildConnectedComponents(scores, threshold);
     const nonSingletonCount = components.reduce(
       (sum, component) => sum + (component.indices.length > 1 ? component.indices.length : 0),
@@ -336,10 +344,10 @@ function chooseStructureComponents(scores: number[][]): {
 
   return (
     fallback ?? {
-      threshold: STRUCTURE_THRESHOLDS[STRUCTURE_THRESHOLDS.length - 1],
+      threshold: thresholds[thresholds.length - 1]!,
       components: buildConnectedComponents(
         scores,
-        STRUCTURE_THRESHOLDS[STRUCTURE_THRESHOLDS.length - 1]
+        thresholds[thresholds.length - 1]!
       )
     }
   );

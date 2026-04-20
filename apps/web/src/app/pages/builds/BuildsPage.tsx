@@ -12,9 +12,10 @@ import {
   pickFeaturedBuild
 } from '../../../lib/build-run-language';
 import { formatDateOnly, formatInteger } from '../../../lib/format';
+import { SCORE_METHOD_OPTIONS, formatScoreMethodLabel } from '../../../lib/score-method';
 import { formatLookbackLabel } from '../../../lib/snapshot-language';
 import BuildRunsPanel from '../home/sections/BuildRunsPanel';
-import type { BuildRunListItem, BuildRunStatus } from '../../../types/api';
+import type { BuildRunListItem, BuildRunScoreMethod, BuildRunStatus } from '../../../types/api';
 
 type SortMode = 'newest' | 'oldest' | 'asof_desc' | 'window_desc' | 'universe';
 
@@ -24,6 +25,7 @@ export default function BuildsPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | BuildRunStatus>('succeeded');
   const [universeFilter, setUniverseFilter] = useState<'all' | string>('all');
+  const [scoreMethodFilter, setScoreMethodFilter] = useState<'all' | BuildRunScoreMethod>('all');
   const [sortMode, setSortMode] = useState<SortMode>('asof_desc');
 
   const universeLabelById = useMemo(
@@ -60,15 +62,26 @@ export default function BuildsPage() {
           return false;
         }
 
+        if (scoreMethodFilter !== 'all' && item.scoreMethod !== scoreMethodFilter) {
+          return false;
+        }
+
         if (!query) {
           return true;
         }
 
-        return [item.id, item.datasetId, item.universeId, item.asOfDate]
+        return [
+          item.id,
+          item.datasetId,
+          item.universeId,
+          item.asOfDate,
+          item.scoreMethod,
+          formatScoreMethodLabel(item.scoreMethod)
+        ]
           .some((value) => value.toLowerCase().includes(query));
       })
       .sort((left, right) => compareBuildRuns(left, right, sortMode));
-  }, [buildRuns, search, statusFilter, universeFilter, sortMode]);
+  }, [buildRuns, scoreMethodFilter, search, sortMode, statusFilter, universeFilter]);
 
   const comparisonTo = comparisonPair
     ? `/compare?left=${comparisonPair[0].id}&right=${comparisonPair[1].id}`
@@ -154,7 +167,7 @@ export default function BuildsPage() {
                 <div className="featured-snapshot-card__eyebrow">Featured snapshot</div>
                 <div className="featured-snapshot-card__title">{featuredUniverseLabel}</div>
                 <div className="featured-snapshot-card__meta">
-                  {formatDateOnly(featuredBuild.asOfDate)} · {formatLookbackLabel(featuredBuild.windowDays)}
+                  {formatDateOnly(featuredBuild.asOfDate)} · {formatLookbackLabel(featuredBuild.windowDays)} · {formatScoreMethodLabel(featuredBuild.scoreMethod)}
                 </div>
                 <div className="featured-snapshot-card__copy">
                   {describeSnapshotHint(featuredBuild, featuredUniverseLabel)}
@@ -224,6 +237,22 @@ export default function BuildsPage() {
               </label>
 
               <label className="field">
+                <span className="field__label">Relationship method</span>
+                <select
+                  className="field__control mono"
+                  value={scoreMethodFilter}
+                  onChange={(event) => setScoreMethodFilter(event.target.value as 'all' | BuildRunScoreMethod)}
+                >
+                  <option value="all">All methods</option>
+                  {SCORE_METHOD_OPTIONS.map((method) => (
+                    <option key={method.value} value={method.value}>
+                      {method.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="field">
                 <span className="field__label">Sort</span>
                 <select
                   className="field__control mono"
@@ -241,6 +270,9 @@ export default function BuildsPage() {
 
             <div className="filter-summary-row">
               <span className="filter-summary-row__item">Showing {formatInteger(filteredBuilds.length)} of {formatInteger(buildRuns.length)} snapshots.</span>
+              {scoreMethodFilter !== 'all' ? (
+                <span className="filter-summary-row__item">Method: {formatScoreMethodLabel(scoreMethodFilter)}</span>
+              ) : null}
               <span className="filter-summary-row__item">Default filter is Ready so finished results stay in front of the operational noise.</span>
             </div>
           </Panel>

@@ -9,7 +9,9 @@ import {
   MIN_BUILD_UNIVERSE_SIZE,
   PREVIEW_FORMAT,
   TOP_PAIR_LIMIT,
+  isBuildRunScoreMethod,
   isBuildRunWindowDays,
+  type BuildRunScoreMethod,
   type BuildRunWindowDays,
   type ManifestV1,
   type PreviewV1,
@@ -24,13 +26,14 @@ import {
   writeManifestJsonStable
 } from './local-artifact-store.js';
 import {
-  buildCorrelationMatrix,
+  buildScoreMatrix,
 } from './correlation-analytics.js';
 import { prepareCorrelationInputs } from './correlation-preparation-service.js';
+import { compareTopPairItems } from './score-method-spec.js';
 import { computeBuildStructureSummary } from './structure-service.js';
 import { resolveUniverseSymbols } from './universe-resolver.js';
 
-type PreparedCorrelationBuild = {
+type PreparedScoreBuild = {
   symbolOrder: string[];
   scores: number[][];
   topPairs: TopPairItem[];
@@ -100,12 +103,13 @@ async function runBuildInternal(buildRunId: string): Promise<void> {
       );
     }
 
-    if (buildRun.scoreMethod !== 'pearson_corr') {
+    if (!isBuildRunScoreMethod(buildRun.scoreMethod)) {
       throw new Error(
         `Build run "${buildRunId}" has unsupported scoreMethod "${buildRun.scoreMethod}".`
       );
     }
 
+    const scoreMethod: BuildRunScoreMethod = buildRun.scoreMethod;
     const windowDays: BuildRunWindowDays = buildRun.windowDays;
     const resolvedUniverseSymbols = await resolveUniverseSymbols(
       buildRun.universe,
@@ -118,7 +122,8 @@ async function runBuildInternal(buildRunId: string): Promise<void> {
       datasetId: buildRun.datasetId,
       symbolOrder: resolvedUniverseSymbols,
       asOfDate: buildRun.asOfDate,
-      windowDays
+      windowDays,
+      scoreMethod
     });
 
     // Store the final symbol snapshot after filtering out unusable series.
@@ -142,6 +147,7 @@ async function runBuildInternal(buildRunId: string): Promise<void> {
       securityMasterEntries.map((entry) => [entry.symbol, entry.sector] as const)
     );
     const structureSummary = computeBuildStructureSummary({
+      scoreMethod,
       symbolOrder: prepared.symbolOrder,
       scores: prepared.scores,
       sectorBySymbol
@@ -156,7 +162,7 @@ async function runBuildInternal(buildRunId: string): Promise<void> {
       universeId: buildRun.universeId,
       asOfDate: buildRun.asOfDate,
       windowDays,
-      scoreMethod: 'pearson_corr',
+      scoreMethod,
       symbolOrder: prepared.symbolOrder,
       topPairs: prepared.topPairs,
       minScore: prepared.minScore,
@@ -185,7 +191,7 @@ async function runBuildInternal(buildRunId: string): Promise<void> {
         universeId: buildRun.universeId,
         asOfDate: buildRun.asOfDate,
         windowDays,
-        scoreMethod: 'pearson_corr',
+        scoreMethod,
         symbolCount: prepared.symbolOrder.length,
         symbolOrder: prepared.symbolOrder,
         files: {
@@ -302,7 +308,8 @@ async function buildCorrelationArtifactData(args: {
   symbolOrder: string[];
   asOfDate: string;
   windowDays: number;
-}): Promise<PreparedCorrelationBuild> {
+  scoreMethod: BuildRunScoreMethod;
+}): Promise<PreparedScoreBuild> {
   const preparedInputs = await prepareCorrelationInputs(args);
 
   if (preparedInputs.matrixReadySymbolOrder.length < MIN_BUILD_UNIVERSE_SIZE) {
@@ -311,13 +318,18 @@ async function buildCorrelationArtifactData(args: {
     );
   }
 
-  const scores = buildCorrelationMatrix({
+  const scores = buildScoreMatrix({
     symbolOrder: preparedInputs.matrixReadySymbolOrder,
     returnVectorsBySymbol: preparedInputs.returnVectorsBySymbol,
-    windowDays: args.windowDays
+    windowDays: args.windowDays,
+    scoreMethod: args.scoreMethod
   });
   const { minScore, maxScore } = computeMatrixScoreRange(scores);
-  const topPairs = computeTopPairs(preparedInputs.matrixReadySymbolOrder, scores);
+  const topPairs = computeTopPairs(
+    args.scoreMethod,
+    preparedInputs.matrixReadySymbolOrder,
+    scores
+  );
 
   return {
     symbolOrder: preparedInputs.matrixReadySymbolOrder,
@@ -351,7 +363,11 @@ function computeMatrixScoreRange(scores: number[][]): { minScore: number; maxSco
   return { minScore, maxScore };
 }
 
-function computeTopPairs(symbolOrder: string[], scores: number[][]): TopPairItem[] {
+function computeTopPairs(
+  scoreMethod: BuildRunScoreMethod,
+  symbolOrder: string[],
+  scores: number[][]
+): TopPairItem[] {
   const pairs: TopPairItem[] = [];
 
   for (let i = 0; i < symbolOrder.length; i += 1) {
@@ -362,7 +378,7 @@ function computeTopPairs(symbolOrder: string[], scores: number[][]): TopPairItem
         score: scores[i]![j]!
       });
 
-      pairs.sort(compareTopPairPriority);
+      pairs.sort((left, right) => compareTopPairItems(scoreMethod, left, right));
       if (pairs.length > TOP_PAIR_LIMIT) {
         pairs.pop();
       }
@@ -370,20 +386,6 @@ function computeTopPairs(symbolOrder: string[], scores: number[][]): TopPairItem
   }
 
   return pairs;
-}
-
-function compareTopPairPriority(a: TopPairItem, b: TopPairItem): number {
-  const absDiff = Math.abs(b.score) - Math.abs(a.score);
-  if (absDiff !== 0) {
-    return absDiff;
-  }
-
-  const leftCompare = a.left.localeCompare(b.left);
-  if (leftCompare !== 0) {
-    return leftCompare;
-  }
-
-  return a.right.localeCompare(b.right);
 }
 
 function toErrorMessage(error: unknown): string {

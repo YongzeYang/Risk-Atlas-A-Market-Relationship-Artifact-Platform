@@ -7,6 +7,7 @@ import SectionHeader from '../../../components/ui/SectionHeader';
 import StatusBadge from '../../../components/ui/StatusBadge';
 import { useBuildSeriesDetailData } from '../../../features/builds/hooks';
 import { formatDateOnly, formatDateTime, formatInteger } from '../../../lib/format';
+import { formatScoreMethodLabel } from '../../../lib/score-method';
 import { formatLookbackLabel } from '../../../lib/snapshot-language';
 import type { BuildSeriesRunItem } from '../../../types/api';
 
@@ -111,7 +112,7 @@ export default function BuildSeriesDetailPage() {
           <div className="series-detail__meta-row">
             <span>
               <span className="build-stream__meta-label">Score method</span>
-              <span className="mono">{detail.scoreMethod}</span>
+              <span className="mono">{formatScoreMethodLabel(detail.scoreMethod)}</span>
             </span>
             <span>
               <span className="build-stream__meta-label">Created</span>

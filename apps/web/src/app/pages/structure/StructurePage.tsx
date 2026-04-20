@@ -21,6 +21,7 @@ import {
   useInviteCode
 } from '../../../features/builds/hooks';
 import { buildAnalysisWorkflowItems } from '../../../lib/analysis-workflow';
+import { filterMeaningfulTopPairsForDisplay } from '../../../lib/crypto-pair-display';
 import { formatDateOnly, formatInteger, formatScore } from '../../../lib/format';
 import { formatLookbackLabel, formatSnapshotOptionLabel } from '../../../lib/snapshot-language';
 import type {
@@ -123,8 +124,9 @@ export default function StructurePage() {
     const desiredCount = Math.max(2, Math.min(Number(heatmapSize) || 6, 6));
     const seen = new Set<string>();
     const nextSymbols: string[] = [];
+    const previewPairs = filterMeaningfulTopPairsForDisplay(leftDetail.datasetId, leftDetail.topPairs);
 
-    for (const pair of leftDetail.topPairs) {
+    for (const pair of previewPairs) {
       if (!seen.has(pair.left)) {
         seen.add(pair.left);
         nextSymbols.push(pair.left);

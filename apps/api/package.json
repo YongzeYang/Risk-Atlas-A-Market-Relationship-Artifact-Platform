@@ -11,6 +11,8 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:generate-sample-eod": "tsx prisma/generate-sample-eod.ts",
     "db:import-eod": "tsx prisma/import-eod.ts",
+    "db:import-crypto-coinbase": "tsx prisma/import-crypto-coinbase.ts",
+    "db:import-crypto-market-map": "tsx prisma/import-crypto-market-map.ts",
     "db:refresh-real-hk-taxonomy": "tsx prisma/real-hk-benchmark.ts --taxonomy-only",
     "db:benchmark-real-hk": "tsx prisma/real-hk-benchmark.ts",
     "db:seed": "tsx prisma/seed.ts",

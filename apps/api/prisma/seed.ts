@@ -2,6 +2,8 @@
 import 'dotenv/config';
 
 import { scryptSync } from 'node:crypto';
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { DatasetSource, Market, Prisma, PrismaClient } from '@prisma/client';
 import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
@@ -19,6 +21,28 @@ import {
 } from './mvp-config.js';
 import { writeDeterministicHkEodDemoCsv, DEFAULT_DEMO_CSV_PATH } from './generate-sample-eod.js';
 import { importEodCsv } from './import-eod.js';
+
+const REAL_HK_DATASET_ID = 'hk_eod_yahoo_real_v1';
+const REAL_HK_DATASET_NAME = 'Hong Kong EOD Real Yahoo Chart v1';
+const DEFAULT_REAL_HK_CSV_PATH = fileURLToPath(
+  new URL('../../../data/real-hk/hk_eod_yahoo_real_v1.csv', import.meta.url)
+);
+
+type SeedDatasetTarget = {
+  datasetId: string;
+  datasetName: string;
+  csvPath: string;
+  needsGeneration: boolean;
+};
+
+type StaticUniverseCoverageIssue = {
+  universeId: string;
+  missing: string[];
+  insufficient: Array<{
+    symbol: string;
+    rowCount: number;
+  }>;
+};
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -98,28 +122,93 @@ async function upsertUniverse(universe: SeedUniverse) {
   });
 }
 
-async function upsertDataset() {
+async function upsertDataset(target: SeedDatasetTarget) {
   await prisma.dataset.upsert({
     where: {
-      id: DEMO_DATASET_ID
+      id: target.datasetId
     },
     update: {
-      name: DEMO_DATASET_NAME,
+      name: target.datasetName,
       source: DatasetSource.curated_csv,
       market: Market.HK
     },
     create: {
-      id: DEMO_DATASET_ID,
-      name: DEMO_DATASET_NAME,
+      id: target.datasetId,
+      name: target.datasetName,
       source: DatasetSource.curated_csv,
       market: Market.HK
     }
   });
 }
 
-async function validateDatasetCoverage(datasetId: string, staticUniverseIds: string[]) {
-  if (staticUniverseIds.length === 0) {
+function resolveSeedDatasetTarget(): SeedDatasetTarget {
+  if (existsSync(DEFAULT_REAL_HK_CSV_PATH)) {
+    return {
+      datasetId: REAL_HK_DATASET_ID,
+      datasetName: REAL_HK_DATASET_NAME,
+      csvPath: DEFAULT_REAL_HK_CSV_PATH,
+      needsGeneration: false
+    };
+  }
+
+  return {
+    datasetId: DEMO_DATASET_ID,
+    datasetName: DEMO_DATASET_NAME,
+    csvPath: DEFAULT_DEMO_CSV_PATH,
+    needsGeneration: true
+  };
+}
+
+async function cleanupLegacyDemoDataset(activeDatasetId: string) {
+  if (activeDatasetId === DEMO_DATASET_ID) {
     return;
+  }
+
+  await prisma.buildRun.deleteMany({
+    where: {
+      datasetId: DEMO_DATASET_ID
+    }
+  });
+
+  await prisma.buildSeries.deleteMany({
+    where: {
+      datasetId: DEMO_DATASET_ID
+    }
+  });
+
+  await prisma.eodPrice.deleteMany({
+    where: {
+      datasetId: DEMO_DATASET_ID
+    }
+  });
+
+  await prisma.dataset.deleteMany({
+    where: {
+      id: DEMO_DATASET_ID
+    }
+  });
+}
+
+function formatCoverageIssue(issue: StaticUniverseCoverageIssue): string {
+  return [
+    `Dataset coverage validation failed for universe "${issue.universeId}".`,
+    issue.missing.length > 0 ? `Missing symbols: ${issue.missing.join(', ')}` : null,
+    issue.insufficient.length > 0
+      ? `Insufficient price rows (< ${MIN_REQUIRED_PRICE_ROWS}): ${issue.insufficient
+          .map((entry) => `${entry.symbol}(${entry.rowCount})`)
+          .join(', ')}`
+      : null
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+async function assessStaticUniverseCoverage(
+  datasetId: string,
+  staticUniverseIds: string[]
+): Promise<StaticUniverseCoverageIssue[]> {
+  if (staticUniverseIds.length === 0) {
+    return [];
   }
 
   const universes = await prisma.universe.findMany({
@@ -133,6 +222,8 @@ async function validateDatasetCoverage(datasetId: string, staticUniverseIds: str
       id: 'asc'
     }
   });
+
+  const issues: StaticUniverseCoverageIssue[] = [];
 
   for (const universe of universes) {
     const symbols = asStringArray(universe.symbolsJson);
@@ -153,25 +244,30 @@ async function validateDatasetCoverage(datasetId: string, staticUniverseIds: str
     const countsBySymbol = new Map(counts.map((row) => [row.symbol, row._count._all]));
 
     const missing = symbols.filter((symbol) => !countsBySymbol.has(symbol));
-    const insufficient = symbols.filter(
-      (symbol) => (countsBySymbol.get(symbol) ?? 0) < MIN_REQUIRED_PRICE_ROWS
-    );
+    const insufficient = symbols
+      .map((symbol) => ({
+        symbol,
+        rowCount: countsBySymbol.get(symbol) ?? 0
+      }))
+      .filter((entry) => entry.rowCount < MIN_REQUIRED_PRICE_ROWS);
 
     if (missing.length > 0 || insufficient.length > 0) {
-      throw new Error(
-        [
-          `Dataset coverage validation failed for universe "${universe.id}".`,
-          missing.length > 0 ? `Missing symbols: ${missing.join(', ')}` : null,
-          insufficient.length > 0
-            ? `Insufficient price rows (< ${MIN_REQUIRED_PRICE_ROWS}): ${insufficient
-                .map((symbol) => `${symbol}(${countsBySymbol.get(symbol) ?? 0})`)
-                .join(', ')}`
-            : null
-        ]
-          .filter(Boolean)
-          .join(' ')
-      );
+      issues.push({
+        universeId: universe.id,
+        missing,
+        insufficient
+      });
     }
+  }
+
+  return issues;
+}
+
+async function validateDatasetCoverage(datasetId: string, staticUniverseIds: string[]) {
+  const issues = await assessStaticUniverseCoverage(datasetId, staticUniverseIds);
+
+  if (issues.length > 0) {
+    throw new Error(formatCoverageIssue(issues[0]!));
   }
 }
 
@@ -224,6 +320,8 @@ async function seedInviteCode() {
 }
 
 async function main() {
+  const seedDatasetTarget = resolveSeedDatasetTarget();
+
   await seedSecurityMaster();
   console.log(`Seeded ${SECURITY_MASTER.length} security master entries.`);
 
@@ -231,18 +329,26 @@ async function main() {
     await upsertUniverse(universe);
   }
 
-  await upsertDataset();
+  await upsertDataset(seedDatasetTarget);
 
-  const generationSummary = await writeDeterministicHkEodDemoCsv(DEFAULT_DEMO_CSV_PATH);
-  console.log(
-    `Generated ${generationSummary.outputPath} with ${generationSummary.rowCount} rows ` +
-      `(${generationSummary.symbolCount} symbols, ${generationSummary.minTradeDate}..${generationSummary.maxTradeDate}).`
-  );
+  if (seedDatasetTarget.needsGeneration) {
+    const generationSummary = await writeDeterministicHkEodDemoCsv(seedDatasetTarget.csvPath);
+    console.log(
+      `Generated ${generationSummary.outputPath} with ${generationSummary.rowCount} rows ` +
+        `(${generationSummary.symbolCount} symbols, ${generationSummary.minTradeDate}..${generationSummary.maxTradeDate}).`
+    );
+  } else {
+    console.log(
+      `Using local real-HK CSV seed source at ${seedDatasetTarget.csvPath}; ` +
+        `demo sample regeneration is skipped.`
+    );
+  }
 
   const importSummary = await importEodCsv({
-    datasetId: DEMO_DATASET_ID,
-    datasetName: DEMO_DATASET_NAME,
-    csvPath: DEFAULT_DEMO_CSV_PATH,
+    datasetId: seedDatasetTarget.datasetId,
+    datasetName: seedDatasetTarget.datasetName,
+    csvPath: seedDatasetTarget.csvPath,
+    market: Market.HK,
     replaceExisting: true,
     prismaClient: prisma
   });
@@ -252,12 +358,34 @@ async function main() {
       `${importSummary.symbolCount} symbols, ${importSummary.minTradeDate}..${importSummary.maxTradeDate}.`
   );
 
-  await validateDatasetCoverage(
-    DEMO_DATASET_ID,
-    SEED_UNIVERSES.filter((universe) => universe.definitionKind === 'static').map(
-      (universe) => universe.id
-    )
+  await cleanupLegacyDemoDataset(seedDatasetTarget.datasetId);
+
+  const staticUniverseIds = SEED_UNIVERSES.filter((universe) => universe.definitionKind === 'static').map(
+    (universe) => universe.id
   );
+
+  const coverageIssues = await assessStaticUniverseCoverage(
+    seedDatasetTarget.datasetId,
+    staticUniverseIds
+  );
+
+  const coveredStaticUniverseCount = staticUniverseIds.length - coverageIssues.length;
+
+  if (seedDatasetTarget.datasetId === DEMO_DATASET_ID) {
+    await validateDatasetCoverage(seedDatasetTarget.datasetId, staticUniverseIds);
+  } else {
+    console.log(
+      `Static universe coverage for ${seedDatasetTarget.datasetId}: ` +
+        `${coveredStaticUniverseCount}/${staticUniverseIds.length} fully covered.`
+    );
+
+    if (coverageIssues.length > 0) {
+      console.warn(
+        `Skipping strict coverage enforcement for unsupported static universes: ` +
+          `${coverageIssues.map((issue) => issue.universeId).join(', ')}.`
+      );
+    }
+  }
 
   await seedInviteCode();
   console.log(`Seeded ${SEED_INVITE_CODES.length} invite codes.`);
@@ -266,7 +394,7 @@ async function main() {
   const dynamicCount = SEED_UNIVERSES.length - staticCount;
   console.log(
     `Seed complete: ${SEED_UNIVERSES.length} universes (${staticCount} static, ${dynamicCount} dynamic), ` +
-      `1 dataset, coverage validated for static universes.`
+      `1 active dataset (${seedDatasetTarget.datasetId}), ${coveredStaticUniverseCount}/${staticCount} static universes fully covered.`
   );
 }
 

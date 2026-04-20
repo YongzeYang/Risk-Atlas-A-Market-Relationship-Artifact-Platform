@@ -8,9 +8,10 @@ import type { TopPairItem } from '../../../../types/api';
 type TopPairsPanelProps = {
   topPairs: TopPairItem[];
   symbolCount?: number;
+  hiddenPairCount?: number;
 };
 
-export default function TopPairsPanel({ topPairs, symbolCount }: TopPairsPanelProps) {
+export default function TopPairsPanel({ topPairs, symbolCount, hiddenPairCount = 0 }: TopPairsPanelProps) {
   return (
     <Panel variant="secondary">
       <SectionHeader
@@ -23,11 +24,16 @@ export default function TopPairsPanel({ topPairs, symbolCount }: TopPairsPanelPr
       />
 
       <div className="plain-summary">
+        {hiddenPairCount > 0 ? 'Default crypto symbol-collision pairs with perfect 1.000 scores are hidden here. ' : ''}
         These are the strongest relationships inside this snapshot. Use them as starting points for deeper follow-up, not as a finished thesis.
       </div>
 
       {topPairs.length === 0 ? (
-        <div className="state-note">No relationship summary is available for this snapshot.</div>
+        <div className="state-note">
+          {hiddenPairCount > 0
+            ? 'Only hidden symbol-collision duplicate pairs surfaced in the default crypto list.'
+            : 'No relationship summary is available for this snapshot.'}
+        </div>
       ) : (
         <ol className="rank-list">
           {topPairs.map((pair, index) => (

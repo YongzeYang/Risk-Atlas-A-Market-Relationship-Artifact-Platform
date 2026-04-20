@@ -8,6 +8,9 @@ generator client {
 
 enum ScoreMethod {
   pearson_corr
+  ewma_corr
+  tail_dep_05
+  nmi_hist_10
 }
 
 enum BuildStatus {
@@ -28,12 +31,14 @@ enum DatasetSource {
 
 enum Market {
   HK
+  CRYPTO
 }
 
 enum SecurityType {
   common_equity
   etf
   reit
+  crypto_asset
   warrant
   cbbc
   stapled_security
@@ -48,6 +53,17 @@ enum Sector {
   utilities
   energy
   consumer
+  platform
+  exchange
+  defi
+  oracle
+  infrastructure
+  meme
+  gaming
+  payment
+  privacy
+  rwa
+  ai_data
 }
 
 enum UniverseDefinitionKind {

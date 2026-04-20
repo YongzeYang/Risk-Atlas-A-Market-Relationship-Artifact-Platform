@@ -1,3 +1,5 @@
+import type { BuildRunScoreMethod } from '../contracts/build-runs.js';
+
 export type PriceRow = {
   symbol: string;
   tradeDate: string;
@@ -5,6 +7,28 @@ export type PriceRow = {
 };
 
 const NEAR_ZERO_VARIANCE_THRESHOLD = 1e-20;
+const EWMA_LAMBDA = 0.94;
+const TAIL_PROBABILITY = 0.05;
+const DEFAULT_MUTUAL_INFORMATION_BIN_COUNT = 10;
+const MUTUAL_INFORMATION_ENTROPY_EPSILON = 1e-12;
+
+type HistogramBinning = {
+  edges: readonly number[];
+  binCount: number;
+};
+
+type ScoreMethodPreparation = {
+  tailThreshold?: number;
+  mutualInformationBinning?: HistogramBinning;
+};
+
+type PairwiseScoreBuildArgs = {
+  symbolOrder: string[];
+  returnVectorsBySymbol: Map<string, Float64Array>;
+  windowDays: number;
+  scoreMethod: BuildRunScoreMethod;
+  minimumPairOverlapCount?: number;
+};
 
 export function buildRowsBySymbol(
   rows: PriceRow[],
@@ -140,10 +164,23 @@ export function buildCorrelationMatrix(args: {
   windowDays: number;
   minimumPairOverlapCount?: number;
 }): number[][] {
+  return buildScoreMatrix({
+    ...args,
+    scoreMethod: 'pearson_corr'
+  });
+}
+
+export function buildScoreMatrix(args: PairwiseScoreBuildArgs): number[][] {
   const minimumPairOverlapCount =
     args.minimumPairOverlapCount ?? getMinimumPairwiseOverlapCount(args.windowDays);
   const n = args.symbolOrder.length;
   const scores = Array.from({ length: n }, () => Array<number>(n).fill(0));
+  const preparations = prepareScoreMethodInputs(
+    args.scoreMethod,
+    args.symbolOrder,
+    args.returnVectorsBySymbol,
+    args.windowDays
+  );
 
   for (let i = 0; i < n; i += 1) {
     scores[i]![i] = 1;
@@ -165,12 +202,15 @@ export function buildCorrelationMatrix(args: {
         throw new Error(`Missing return vector for symbol "${rightSymbol}".`);
       }
 
-      const score = computeTrailingOverlapPearsonCorrelation(
+      const score = computePairScoreForMethod({
+        scoreMethod: args.scoreMethod,
         leftReturns,
         rightReturns,
-        args.windowDays,
-        minimumPairOverlapCount
-      );
+        windowDays: args.windowDays,
+        minimumPairOverlapCount,
+        leftPreparation: preparations.get(leftSymbol),
+        rightPreparation: preparations.get(rightSymbol)
+      });
       scores[i]![j] = score;
       scores[j]![i] = score;
     }
@@ -239,6 +279,105 @@ export function computeTrailingOverlapPearsonCorrelation(
 
   const raw = covariance / Math.sqrt(varianceLeft * varianceRight);
   return clamp(raw, -1, 1);
+}
+
+export function computeTrailingOverlapEwmaCorrelation(
+  left: Float64Array,
+  right: Float64Array,
+  windowDays: number,
+  minimumPairOverlapCount: number,
+  lambda = EWMA_LAMBDA
+): number {
+  const observations = extractTrailingOverlapObservations(left, right, windowDays);
+
+  if (observations.leftValues.length < minimumPairOverlapCount) {
+    return 0;
+  }
+
+  return computeEwmaCorrelationForSeries(observations.leftValues, observations.rightValues, lambda);
+}
+
+export function computeTrailingOverlapTailDependence(
+  left: Float64Array,
+  right: Float64Array,
+  windowDays: number,
+  minimumPairOverlapCount: number,
+  leftThreshold: number,
+  rightThreshold: number,
+  tailProbability = TAIL_PROBABILITY
+): number {
+  const observations = extractTrailingOverlapObservations(left, right, windowDays);
+
+  if (observations.leftValues.length < minimumPairOverlapCount) {
+    return 0;
+  }
+
+  return computeEmpiricalTailDependenceForSeries(
+    observations.leftValues,
+    observations.rightValues,
+    leftThreshold,
+    rightThreshold,
+    tailProbability
+  );
+}
+
+export function computeTrailingOverlapNormalizedMutualInformation(
+  left: Float64Array,
+  right: Float64Array,
+  windowDays: number,
+  minimumPairOverlapCount: number,
+  leftBinning: HistogramBinning,
+  rightBinning: HistogramBinning
+): number {
+  const observations = extractTrailingOverlapObservations(left, right, windowDays);
+
+  if (observations.leftValues.length < minimumPairOverlapCount) {
+    return 0;
+  }
+
+  return computeNormalizedMutualInformationForSeries(
+    observations.leftValues,
+    observations.rightValues,
+    leftBinning,
+    rightBinning
+  );
+}
+
+export function computeAlignedScoreForMethod(
+  scoreMethod: BuildRunScoreMethod,
+  left: number[],
+  right: number[]
+): number {
+  switch (scoreMethod) {
+    case 'pearson_corr':
+      return pearsonCorrelation(left, right);
+    case 'ewma_corr':
+      return computeEwmaCorrelationForSeries(left, right, EWMA_LAMBDA);
+    case 'tail_dep_05': {
+      const leftThreshold = computeQuantileFromSorted(
+        [...left].sort((a, b) => a - b),
+        TAIL_PROBABILITY
+      );
+      const rightThreshold = computeQuantileFromSorted(
+        [...right].sort((a, b) => a - b),
+        TAIL_PROBABILITY
+      );
+
+      return computeEmpiricalTailDependenceForSeries(
+        left,
+        right,
+        leftThreshold,
+        rightThreshold,
+        TAIL_PROBABILITY
+      );
+    }
+    case 'nmi_hist_10': {
+      const leftBinning = buildQuantileBinning(left, DEFAULT_MUTUAL_INFORMATION_BIN_COUNT);
+      const rightBinning = buildQuantileBinning(right, DEFAULT_MUTUAL_INFORMATION_BIN_COUNT);
+
+      return computeNormalizedMutualInformationForSeries(left, right, leftBinning, rightBinning);
+    }
+  }
 }
 
 export function pearsonCorrelation(left: number[], right: number[]): number {
@@ -336,6 +475,361 @@ export function computeSpreadZScore(leftPrices: number[], rightPrices: number[])
   }
 
   return (spreads[spreads.length - 1]! - spreadMean) / spreadStd;
+}
+
+function prepareScoreMethodInputs(
+  scoreMethod: BuildRunScoreMethod,
+  symbolOrder: string[],
+  returnVectorsBySymbol: Map<string, Float64Array>,
+  windowDays: number
+): Map<string, ScoreMethodPreparation> {
+  if (scoreMethod === 'pearson_corr' || scoreMethod === 'ewma_corr') {
+    return new Map<string, ScoreMethodPreparation>();
+  }
+
+  const preparations = new Map<string, ScoreMethodPreparation>();
+
+  for (const symbol of symbolOrder) {
+    const returns = returnVectorsBySymbol.get(symbol);
+    if (!returns) {
+      throw new Error(`Missing return vector for symbol "${symbol}".`);
+    }
+
+    const trailingReturns = extractTrailingValidValues(returns, windowDays);
+    if (trailingReturns.length === 0) {
+      throw new Error(`No trailing returns are available for symbol "${symbol}".`);
+    }
+
+    const preparation: ScoreMethodPreparation = {};
+
+    if (scoreMethod === 'tail_dep_05') {
+      preparation.tailThreshold = computeQuantileFromSorted(
+        [...trailingReturns].sort((a, b) => a - b),
+        TAIL_PROBABILITY
+      );
+    }
+
+    if (scoreMethod === 'nmi_hist_10') {
+      preparation.mutualInformationBinning = buildQuantileBinning(
+        trailingReturns,
+        DEFAULT_MUTUAL_INFORMATION_BIN_COUNT
+      );
+    }
+
+    preparations.set(symbol, preparation);
+  }
+
+  return preparations;
+}
+
+function computePairScoreForMethod(args: {
+  scoreMethod: BuildRunScoreMethod;
+  leftReturns: Float64Array;
+  rightReturns: Float64Array;
+  windowDays: number;
+  minimumPairOverlapCount: number;
+  leftPreparation: ScoreMethodPreparation | undefined;
+  rightPreparation: ScoreMethodPreparation | undefined;
+}): number {
+  switch (args.scoreMethod) {
+    case 'pearson_corr':
+      return computeTrailingOverlapPearsonCorrelation(
+        args.leftReturns,
+        args.rightReturns,
+        args.windowDays,
+        args.minimumPairOverlapCount
+      );
+    case 'ewma_corr':
+      return computeTrailingOverlapEwmaCorrelation(
+        args.leftReturns,
+        args.rightReturns,
+        args.windowDays,
+        args.minimumPairOverlapCount,
+        EWMA_LAMBDA
+      );
+    case 'tail_dep_05': {
+      const leftThreshold = args.leftPreparation?.tailThreshold;
+      const rightThreshold = args.rightPreparation?.tailThreshold;
+
+      if (leftThreshold === undefined || rightThreshold === undefined) {
+        throw new Error('Tail-dependence score preparation is missing per-symbol thresholds.');
+      }
+
+      return computeTrailingOverlapTailDependence(
+        args.leftReturns,
+        args.rightReturns,
+        args.windowDays,
+        args.minimumPairOverlapCount,
+        leftThreshold,
+        rightThreshold,
+        TAIL_PROBABILITY
+      );
+    }
+    case 'nmi_hist_10': {
+      const leftBinning = args.leftPreparation?.mutualInformationBinning;
+      const rightBinning = args.rightPreparation?.mutualInformationBinning;
+
+      if (!leftBinning || !rightBinning) {
+        throw new Error('Mutual-information score preparation is missing per-symbol binning.');
+      }
+
+      return computeTrailingOverlapNormalizedMutualInformation(
+        args.leftReturns,
+        args.rightReturns,
+        args.windowDays,
+        args.minimumPairOverlapCount,
+        leftBinning,
+        rightBinning
+      );
+    }
+  }
+}
+
+function extractTrailingValidValues(values: Float64Array, limit: number): number[] {
+  const extracted: number[] = [];
+
+  for (let index = values.length - 1; index >= 0 && extracted.length < limit; index -= 1) {
+    const value = values[index]!;
+    if (!Number.isNaN(value)) {
+      extracted.push(value);
+    }
+  }
+
+  return extracted.reverse();
+}
+
+function extractTrailingOverlapObservations(
+  left: Float64Array,
+  right: Float64Array,
+  limit: number
+): { leftValues: number[]; rightValues: number[] } {
+  if (left.length !== right.length) {
+    throw new Error('Return vector length mismatch while computing pairwise score.');
+  }
+
+  const leftValues: number[] = [];
+  const rightValues: number[] = [];
+
+  for (let index = left.length - 1; index >= 0 && leftValues.length < limit; index -= 1) {
+    const leftValue = left[index]!;
+    const rightValue = right[index]!;
+
+    if (Number.isNaN(leftValue) || Number.isNaN(rightValue)) {
+      continue;
+    }
+
+    leftValues.push(leftValue);
+    rightValues.push(rightValue);
+  }
+
+  leftValues.reverse();
+  rightValues.reverse();
+
+  return {
+    leftValues,
+    rightValues
+  };
+}
+
+function computeEwmaCorrelationForSeries(
+  left: number[],
+  right: number[],
+  lambda: number
+): number {
+  if (left.length !== right.length) {
+    throw new Error('Return series length mismatch while computing EWMA correlation.');
+  }
+
+  let varianceLeft = 0;
+  let varianceRight = 0;
+  let covariance = 0;
+  const alpha = 1 - lambda;
+
+  for (let index = 0; index < left.length; index += 1) {
+    const leftValue = left[index]!;
+    const rightValue = right[index]!;
+
+    varianceLeft = lambda * varianceLeft + alpha * leftValue * leftValue;
+    varianceRight = lambda * varianceRight + alpha * rightValue * rightValue;
+    covariance = lambda * covariance + alpha * leftValue * rightValue;
+  }
+
+  if (
+    varianceLeft <= NEAR_ZERO_VARIANCE_THRESHOLD ||
+    varianceRight <= NEAR_ZERO_VARIANCE_THRESHOLD
+  ) {
+    return 0;
+  }
+
+  const raw = covariance / Math.sqrt(varianceLeft * varianceRight);
+  return clamp(raw, -1, 1);
+}
+
+function computeEmpiricalTailDependenceForSeries(
+  left: number[],
+  right: number[],
+  leftThreshold: number,
+  rightThreshold: number,
+  tailProbability: number
+): number {
+  if (left.length !== right.length) {
+    throw new Error('Return series length mismatch while computing tail dependence.');
+  }
+
+  if (left.length === 0) {
+    return 0;
+  }
+
+  let jointTailCount = 0;
+
+  for (let index = 0; index < left.length; index += 1) {
+    if (left[index]! <= leftThreshold && right[index]! <= rightThreshold) {
+      jointTailCount += 1;
+    }
+  }
+
+  const raw = jointTailCount / (left.length * tailProbability);
+  return clamp(raw, 0, 1);
+}
+
+function computeNormalizedMutualInformationForSeries(
+  left: number[],
+  right: number[],
+  leftBinning: HistogramBinning,
+  rightBinning: HistogramBinning
+): number {
+  if (left.length !== right.length) {
+    throw new Error('Return series length mismatch while computing normalized mutual information.');
+  }
+
+  if (left.length === 0) {
+    return 0;
+  }
+
+  const leftCounts = Array<number>(leftBinning.binCount).fill(0);
+  const rightCounts = Array<number>(rightBinning.binCount).fill(0);
+  const jointCounts = Array<number>(leftBinning.binCount * rightBinning.binCount).fill(0);
+
+  for (let index = 0; index < left.length; index += 1) {
+    const leftBin = locateHistogramBin(left[index]!, leftBinning);
+    const rightBin = locateHistogramBin(right[index]!, rightBinning);
+
+    leftCounts[leftBin] += 1;
+    rightCounts[rightBin] += 1;
+    jointCounts[leftBin * rightBinning.binCount + rightBin] += 1;
+  }
+
+  const total = left.length;
+  const leftProbabilities = leftCounts.map((count) => count / total);
+  const rightProbabilities = rightCounts.map((count) => count / total);
+
+  const leftEntropy = leftProbabilities.reduce(
+    (sum, probability) =>
+      probability > 0 ? sum - probability * Math.log(probability) : sum,
+    0
+  );
+  const rightEntropy = rightProbabilities.reduce(
+    (sum, probability) =>
+      probability > 0 ? sum - probability * Math.log(probability) : sum,
+    0
+  );
+
+  if (
+    leftEntropy <= MUTUAL_INFORMATION_ENTROPY_EPSILON ||
+    rightEntropy <= MUTUAL_INFORMATION_ENTROPY_EPSILON
+  ) {
+    return 0;
+  }
+
+  let mutualInformation = 0;
+
+  for (let leftBin = 0; leftBin < leftBinning.binCount; leftBin += 1) {
+    for (let rightBin = 0; rightBin < rightBinning.binCount; rightBin += 1) {
+      const jointProbability =
+        jointCounts[leftBin * rightBinning.binCount + rightBin]! / total;
+
+      if (jointProbability <= 0) {
+        continue;
+      }
+
+      mutualInformation +=
+        jointProbability *
+        Math.log(
+          jointProbability / (leftProbabilities[leftBin]! * rightProbabilities[rightBin]!)
+        );
+    }
+  }
+
+  const normalized = mutualInformation / Math.sqrt(leftEntropy * rightEntropy);
+  return clamp(normalized, 0, 1);
+}
+
+function buildQuantileBinning(values: number[], binCount: number): HistogramBinning {
+  if (values.length === 0) {
+    throw new Error('At least one value is required to build histogram bins.');
+  }
+
+  const sorted = [...values].sort((a, b) => a - b);
+  const edges = [Number.NEGATIVE_INFINITY];
+
+  for (let bucket = 1; bucket < binCount; bucket += 1) {
+    edges.push(computeQuantileFromSorted(sorted, bucket / binCount));
+  }
+
+  edges.push(Number.POSITIVE_INFINITY);
+
+  return {
+    edges,
+    binCount
+  };
+}
+
+function computeQuantileFromSorted(sorted: number[], quantile: number): number {
+  if (sorted.length === 0) {
+    throw new Error('Cannot compute a quantile from an empty series.');
+  }
+
+  if (quantile <= 0) {
+    return sorted[0]!;
+  }
+
+  if (quantile >= 1) {
+    return sorted[sorted.length - 1]!;
+  }
+
+  const scaledIndex = (sorted.length - 1) * quantile;
+  const lowerIndex = Math.floor(scaledIndex);
+  const upperIndex = Math.ceil(scaledIndex);
+
+  if (lowerIndex === upperIndex) {
+    return sorted[lowerIndex]!;
+  }
+
+  const weight = scaledIndex - lowerIndex;
+  return sorted[lowerIndex]! * (1 - weight) + sorted[upperIndex]! * weight;
+}
+
+function locateHistogramBin(value: number, binning: HistogramBinning): number {
+  let low = 0;
+  let high = binning.binCount - 1;
+
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    const lowerBound = binning.edges[mid]!;
+    const upperBound = binning.edges[mid + 1]!;
+
+    if (value >= lowerBound && value < upperBound) {
+      return mid;
+    }
+
+    if (value < lowerBound) {
+      high = mid - 1;
+    } else {
+      low = mid + 1;
+    }
+  }
+
+  return binning.binCount - 1;
 }
 
 function mean(values: number[]): number {

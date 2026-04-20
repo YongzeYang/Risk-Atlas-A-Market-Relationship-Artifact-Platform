@@ -72,7 +72,7 @@ export default function NewBuildPage() {
 
   const staticUniverses = universes.filter((u) => u.definitionKind === 'static');
   const dynamicUniverses = universes.filter((u) => u.definitionKind !== 'static');
-  const sectorBaskets = universes.filter((u) => u.id.includes('financials') || u.id.includes('tech') || u.id.includes('property') || u.id.includes('energy'));
+  const sectorBaskets = universes.filter((u) => u.definitionKind === 'sector_filter');
 
   return (
     <div className="page page--new-build">

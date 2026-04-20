@@ -7,6 +7,7 @@ import SectionHeader from '../../../../components/ui/SectionHeader';
 import StatusBadge from '../../../../components/ui/StatusBadge';
 import { describeSnapshotHint, summarizeBuildFailure } from '../../../../lib/build-run-language';
 import { formatDateOnly, formatDateTime, formatDurationMs, truncateMiddle } from '../../../../lib/format';
+import { formatScoreMethodLabel } from '../../../../lib/score-method';
 import { formatLookbackLabel } from '../../../../lib/snapshot-language';
 import type { BuildRunListItem } from '../../../../types/api';
 
@@ -97,6 +98,8 @@ export default function BuildRunsPanel({
                     <span>Snapshot date {formatDateOnly(buildRun.asOfDate)}</span>
                     <span className="build-stream__divider">·</span>
                     <span>{formatLookbackLabel(buildRun.windowDays)}</span>
+                    <span className="build-stream__divider">·</span>
+                    <span className="build-stream__method">{formatScoreMethodLabel(buildRun.scoreMethod)}</span>
                   </div>
 
                   <div className="build-stream__summary">

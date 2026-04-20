@@ -1,9 +1,11 @@
 // apps/api/src/services/catalog-service.ts
 import type { Prisma } from '@prisma/client';
 
+import { BUILD_RUN_WINDOW_DAYS } from '../contracts/build-runs.js';
 import { prisma } from '../lib/prisma.js';
 
 const CATALOG_CACHE_TTL_MS = Number.parseInt(process.env.CATALOG_CACHE_TTL_MS ?? '30000', 10);
+const MIN_STATIC_UNIVERSE_ROWS = Math.max(...BUILD_RUN_WINDOW_DAYS) + 1;
 
 export const CATALOG_CACHE_CONTROL = `public, max-age=${Math.max(
   0,
@@ -109,6 +111,51 @@ function toInt(value: bigint | number | null | undefined): number {
   return value ?? 0;
 }
 
+async function getSupportedDatasetIdsForStaticUniverse(args: {
+  market: string;
+  symbolsJson: Prisma.JsonValue;
+  datasetIdsByMarket: Map<string, string[]>;
+}): Promise<string[]> {
+  const candidateDatasetIds = args.datasetIdsByMarket.get(args.market) ?? [];
+  if (candidateDatasetIds.length === 0) {
+    return [];
+  }
+
+  const symbols = asStringArray(args.symbolsJson);
+  if (symbols.length === 0) {
+    return [];
+  }
+
+  const counts = await prisma.eodPrice.groupBy({
+    by: ['datasetId', 'symbol'],
+    where: {
+      datasetId: {
+        in: candidateDatasetIds
+      },
+      symbol: {
+        in: symbols
+      }
+    },
+    _count: {
+      _all: true
+    }
+  });
+
+  const countsByDataset = new Map<string, Map<string, number>>();
+
+  for (const row of counts) {
+    const existing = countsByDataset.get(row.datasetId) ?? new Map<string, number>();
+    existing.set(row.symbol, row._count._all);
+    countsByDataset.set(row.datasetId, existing);
+  }
+
+  return candidateDatasetIds.filter((datasetId) => {
+    const countsBySymbol = countsByDataset.get(datasetId);
+
+    return symbols.every((symbol) => (countsBySymbol?.get(symbol) ?? 0) >= MIN_STATIC_UNIVERSE_ROWS);
+  });
+}
+
 export async function listDatasets(): Promise<DatasetListItem[]> {
   return withCatalogCache(datasetListCache, async () => {
     const datasets = await prisma.dataset.findMany({
@@ -176,17 +223,32 @@ export async function listUniverses(): Promise<UniverseListItem[]> {
       datasetIdsByMarket.set(dataset.market, existing);
     }
 
-    return universes.map((universe) => ({
-      id: universe.id,
-      name: universe.name,
-      market: universe.market,
-      symbolCount: universe.symbolCount,
-      symbols: asStringArray(universe.symbolsJson),
-      definitionKind: universe.definitionKind,
-      definitionParams: universe.definitionParams,
-      supportedDatasetIds: datasetIdsByMarket.get(universe.market) ?? [],
-      createdAt: universe.createdAt.toISOString()
-    }));
+    const items: UniverseListItem[] = [];
+
+    for (const universe of universes) {
+      const supportedDatasetIds =
+        universe.definitionKind === 'static'
+          ? await getSupportedDatasetIdsForStaticUniverse({
+              market: universe.market,
+              symbolsJson: universe.symbolsJson,
+              datasetIdsByMarket
+            })
+          : (datasetIdsByMarket.get(universe.market) ?? []);
+
+      items.push({
+        id: universe.id,
+        name: universe.name,
+        market: universe.market,
+        symbolCount: universe.symbolCount,
+        symbols: asStringArray(universe.symbolsJson),
+        definitionKind: universe.definitionKind,
+        definitionParams: universe.definitionParams,
+        supportedDatasetIds,
+        createdAt: universe.createdAt.toISOString()
+      });
+    }
+
+    return items;
   });
 }
 

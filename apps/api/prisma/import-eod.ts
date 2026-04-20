@@ -6,6 +6,8 @@ import { resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 
+import { Market } from '@prisma/client';
+
 import { prisma } from '../src/lib/prisma.js';
 
 import { DEFAULT_DEMO_CSV_PATH } from './generate-sample-eod.js';
@@ -15,12 +17,24 @@ import {
   HK_SYMBOL_PATTERN,
   ISO_DATE_PATTERN
 } from './mvp-config.js';
+type ImportMarket = Market | 'CRYPTO';
 
 const CSV_HEADER_V1 = 'tradeDate,symbol,adjClose';
 const CSV_HEADER_V2 = 'tradeDate,symbol,adjClose,volume';
 const BATCH_SIZE = 5000;
 const DEFAULT_IMPORT_TRANSACTION_TIMEOUT_MS = 300_000;
 const WINDOW_DAYS = [60, 120, 252] as const;
+const GENERIC_SYMBOL_PATTERN = /^[A-Z0-9][A-Z0-9._/-]{1,31}$/;
+
+const SYMBOL_PATTERN_BY_MARKET: Record<ImportMarket, RegExp> = {
+  HK: HK_SYMBOL_PATTERN,
+  CRYPTO: GENERIC_SYMBOL_PATTERN
+};
+
+const SYMBOL_FORMAT_HINT_BY_MARKET: Record<ImportMarket, string> = {
+  HK: 'zero-padded format like 0700.HK',
+  CRYPTO: 'uppercase product format like BTC-USD'
+};
 
 type WindowDays = (typeof WINDOW_DAYS)[number];
 type FirstValidAsOfByWindowDays = Record<`${WindowDays}`, string | null>;
@@ -37,6 +51,7 @@ export type ImportEodCsvOptions = {
   datasetId: string;
   datasetName: string;
   csvPath: string;
+  market?: ImportMarket;
   replaceExisting?: boolean;
   prismaClient?: typeof prisma;
   transactionTimeoutMs?: number;
@@ -73,16 +88,21 @@ function parseCsvLine(line: string, lineNumber: number, columnCount: number): st
   return parts.map((p) => p.trim());
 }
 
-function validateImportRow(row: Omit<ImportRow, 'datasetId'>, lineNumber: number) {
+function validateImportRow(
+  row: Omit<ImportRow, 'datasetId'>,
+  lineNumber: number,
+  market: ImportMarket
+) {
   if (!ISO_DATE_PATTERN.test(row.tradeDate)) {
     throw new Error(
       `Invalid tradeDate "${row.tradeDate}" at line ${lineNumber}. Expected YYYY-MM-DD.`
     );
   }
 
-  if (!HK_SYMBOL_PATTERN.test(row.symbol)) {
+  if (!SYMBOL_PATTERN_BY_MARKET[market].test(row.symbol)) {
     throw new Error(
-      `Invalid symbol "${row.symbol}" at line ${lineNumber}. Expected zero-padded format like 0700.HK.`
+      `Invalid symbol "${row.symbol}" at line ${lineNumber} for market ${market}. ` +
+        `Expected ${SYMBOL_FORMAT_HINT_BY_MARKET[market]}.`
     );
   }
 
@@ -91,7 +111,7 @@ function validateImportRow(row: Omit<ImportRow, 'datasetId'>, lineNumber: number
   }
 }
 
-async function readImportRows(csvPath: string, datasetId: string) {
+async function readImportRows(csvPath: string, datasetId: string, market: ImportMarket) {
   if (!existsSync(csvPath)) {
     throw new Error(`CSV not found: ${csvPath}`);
   }
@@ -144,7 +164,7 @@ async function readImportRows(csvPath: string, datasetId: string) {
     const symbol = parts[1]!.toUpperCase();
     const adjClose = Number(parts[2]!);
 
-    validateImportRow({ tradeDate, symbol, adjClose }, lineNumber);
+    validateImportRow({ tradeDate, symbol, adjClose }, lineNumber, market);
 
     const row: ImportRow = {
       datasetId,
@@ -250,13 +270,15 @@ async function loadPersistedDatasetSummary(tx: any, datasetId: string): Promise<
 
 export async function importEodCsv(options: ImportEodCsvOptions): Promise<ImportEodCsvSummary> {
   const client = options.prismaClient ?? prisma;
+  const market = options.market ?? Market.HK;
   const replaceExisting = options.replaceExisting ?? true;
   const transactionTimeoutMs =
     options.transactionTimeoutMs ?? DEFAULT_IMPORT_TRANSACTION_TIMEOUT_MS;
 
   const { rows, symbolCount, minTradeDate, maxTradeDate, firstValidAsOfByWindowDays } = await readImportRows(
     options.csvPath,
-    options.datasetId
+    options.datasetId,
+    market
   );
 
   const importedSummary = {
@@ -276,7 +298,7 @@ export async function importEodCsv(options: ImportEodCsvOptions): Promise<Import
         update: {
           name: options.datasetName,
           source: 'curated_csv',
-          market: 'HK',
+          market,
           catalogSymbolCount: importedSummary.symbolCount,
           catalogPriceRowCount: BigInt(importedSummary.rowCount),
           catalogMinTradeDate: importedSummary.minTradeDate,
@@ -289,7 +311,7 @@ export async function importEodCsv(options: ImportEodCsvOptions): Promise<Import
           id: options.datasetId,
           name: options.datasetName,
           source: 'curated_csv',
-          market: 'HK',
+          market,
           catalogSymbolCount: importedSummary.symbolCount,
           catalogPriceRowCount: BigInt(importedSummary.rowCount),
           catalogMinTradeDate: importedSummary.minTradeDate,
@@ -360,6 +382,7 @@ async function main() {
     datasetId: DEMO_DATASET_ID,
     datasetName: DEMO_DATASET_NAME,
     csvPath,
+    market: Market.HK,
     replaceExisting: true,
     prismaClient: prisma
   });

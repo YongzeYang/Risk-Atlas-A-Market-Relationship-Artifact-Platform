@@ -2,6 +2,7 @@ import { prisma } from '../lib/prisma.js';
 import { ServiceError } from '../lib/service-error.js';
 import {
   ARTIFACT_FILE_NAMES,
+  type BuildRunScoreMethod,
   type BuildRunWindowDays,
   type PreviewV1
 } from '../contracts/build-runs.js';
@@ -15,6 +16,7 @@ export type LoadedBuildRunArtifactContext = {
   datasetId: string;
   asOfDate: string;
   windowDays: BuildRunWindowDays;
+  scoreMethod: BuildRunScoreMethod;
   preview: PreviewV1;
   symbolIndexBySymbol: Map<string, number>;
   matrixPath: string;
@@ -33,6 +35,7 @@ export async function loadSucceededBuildRunArtifactContext(
       datasetId: true,
       asOfDate: true,
       windowDays: true,
+      scoreMethod: true,
       status: true,
       artifact: {
         select: {
@@ -77,6 +80,7 @@ export async function loadSucceededBuildRunArtifactContext(
     datasetId: buildRun.datasetId,
     asOfDate: buildRun.asOfDate,
     windowDays: buildRun.windowDays as BuildRunWindowDays,
+    scoreMethod: buildRun.scoreMethod as BuildRunScoreMethod,
     preview,
     symbolIndexBySymbol,
     matrixPath: resolveLocalStorageFilePath(

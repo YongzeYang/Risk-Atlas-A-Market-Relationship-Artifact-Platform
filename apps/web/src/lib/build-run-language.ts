@@ -4,7 +4,11 @@ const FEATURED_UNIVERSE_IDS = [
   'hk_top_50_liquid',
   'hk_all_common_equity',
   'hk_financials',
-  'hk_tech'
+  'hk_tech',
+  'crypto_top_50_liquid',
+  'crypto_market_map_all',
+  'crypto_platform',
+  'crypto_defi'
 ];
 
 function universePreference(universeId: string): number {
@@ -108,6 +112,22 @@ export function describeSnapshotHint(
 
   if (label.includes('tech')) {
     return 'Useful when you want to check whether growth names are moving like one crowded trade.';
+  }
+
+  if (label.includes('defi')) {
+    return 'Useful when you want to see whether on-chain financial protocols are behaving like one crowded risk pocket.';
+  }
+
+  if (label.includes('platform') || label.includes('layer 1') || label.includes('layer1')) {
+    return 'Useful when you want to see whether core network assets are moving as one shared infrastructure bloc.';
+  }
+
+  if (label.includes('exchange')) {
+    return 'Useful when you want to isolate venue and trading-stack tokens from the broader crypto tape.';
+  }
+
+  if (label.includes('meme')) {
+    return 'Useful when you want to test whether reflexive retail momentum is clustering into one high-beta pocket.';
   }
 
   if (label.includes('property') || label.includes('real estate')) {

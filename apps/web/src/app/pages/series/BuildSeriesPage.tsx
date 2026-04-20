@@ -21,6 +21,7 @@ import {
   describeCoverageCount,
   formatLookbackLabel
 } from '../../../lib/snapshot-language';
+import { SCORE_METHOD_OPTIONS } from '../../../lib/score-method';
 import type {
   BuildRunScoreMethod,
   BuildRunWindowDays,
@@ -31,7 +32,6 @@ import type {
 
 const WINDOW_OPTIONS: BuildRunWindowDays[] = [60, 120, 252];
 const FREQUENCY_OPTIONS: BuildSeriesFrequency[] = ['daily', 'weekly', 'monthly'];
-const SCORE_METHOD: BuildRunScoreMethod = 'pearson_corr';
 
 export default function BuildSeriesPage() {
   const {
@@ -47,6 +47,7 @@ export default function BuildSeriesPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [windowDays, setWindowDays] = useState<BuildRunWindowDays>(252);
+  const [scoreMethod, setScoreMethod] = useState<BuildRunScoreMethod>('pearson_corr');
   const [frequency, setFrequency] = useState<BuildSeriesFrequency>('weekly');
   const [seriesName, setSeriesName] = useState('');
   const { inviteCode, setInviteCode } = useInviteCode();
@@ -193,7 +194,7 @@ export default function BuildSeriesPage() {
         datasetId,
         universeId,
         windowDays,
-        scoreMethod: SCORE_METHOD,
+        scoreMethod,
         startDate,
         endDate,
         frequency,
@@ -210,7 +211,18 @@ export default function BuildSeriesPage() {
         setSubmitting(false);
       }
     },
-    [seriesName, datasetId, universeId, windowDays, startDate, endDate, frequency, inviteCode, refresh]
+    [
+      seriesName,
+      datasetId,
+      universeId,
+      windowDays,
+      scoreMethod,
+      startDate,
+      endDate,
+      frequency,
+      inviteCode,
+      refresh
+    ]
   );
   const dateRangeError = useMemo(() => {
     if (!startDate || !endDate) {
@@ -489,6 +501,23 @@ export default function BuildSeriesPage() {
               </label>
 
               <label className="field">
+                <span className="field__label">Relationship method</span>
+                <select
+                  className="field__control mono"
+                  value={scoreMethod}
+                  onChange={(e) => setScoreMethod(e.target.value as BuildRunScoreMethod)}
+                  disabled={submitting}
+                >
+                  {SCORE_METHOD_OPTIONS.map((method) => (
+                    <option key={method.value} value={method.value}>{method.label}</option>
+                  ))}
+                </select>
+                <span className="field__hint">
+                  {SCORE_METHOD_OPTIONS.find((method) => method.value === scoreMethod)?.hint}
+                </span>
+              </label>
+
+              <label className="field">
                 <span className="field__label">Cadence</span>
                 <select
                   className="field__control mono"
@@ -523,6 +552,9 @@ export default function BuildSeriesPage() {
               <div className="workspace-note-list">
                 <div className="workspace-note-list__item">Weekly and monthly cadence snap to the last real trading date in each bucket.</div>
                 <div className="workspace-note-list__item">Every scheduled snapshot is validated before the series is accepted.</div>
+                <div className="workspace-note-list__item">
+                  Selected method: {SCORE_METHOD_OPTIONS.find((method) => method.value === scoreMethod)?.label}.
+                </div>
                 <div className="workspace-note-list__item">A snapshot series is descriptive. It helps you watch drift and hidden groups over time, not bypass judgment.</div>
               </div>
             </ResearchDetails>

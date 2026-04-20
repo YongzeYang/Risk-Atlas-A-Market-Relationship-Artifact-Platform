@@ -16,15 +16,16 @@ import {
 import {
   buildAlignedPriceSeries,
   buildRowsBySymbol,
+  computeAlignedScoreForMethod,
   computeCumulativeReturn,
   computeLogReturns,
   computeSpreadZScore,
-  pearsonCorrelation,
   type PriceRow,
   selectAlignedWindowDates
 } from './correlation-analytics.js';
 import { loadSucceededBuildRunArtifactContext } from './build-run-artifact-context.js';
 import { queryBsmPairScore } from './bsm-reader.js';
+import { getScoreMethodSpec } from './score-method-spec.js';
 
 export async function getBuildRunPairDivergence(
   buildRunId: string,
@@ -34,6 +35,14 @@ export async function getBuildRunPairDivergence(
     buildRunId,
     `Build run "${buildRunId}" is not ready for divergence analysis.`
   );
+  const scoreMethodSpec = getScoreMethodSpec(context.scoreMethod);
+
+  if (!scoreMethodSpec.supportsPairDivergence) {
+    throw new ServiceError(
+      409,
+      `Pair-divergence is only available for correlation-style score methods. Build run "${buildRunId}" uses "${context.scoreMethod}".`
+    );
+  }
 
   const recentWindowDays = query.recentWindowDays ?? DEFAULT_PAIR_DIVERGENCE_RECENT_WINDOW_DAYS;
   const limit = query.limit ?? DEFAULT_PAIR_DIVERGENCE_LIMIT;
@@ -167,7 +176,11 @@ export async function getBuildRunPairDivergence(
       let recentCorr: number;
 
       try {
-        recentCorr = pearsonCorrelation(leftRecentReturns, rightRecentReturns);
+        recentCorr = computeAlignedScoreForMethod(
+          context.scoreMethod,
+          leftRecentReturns,
+          rightRecentReturns
+        );
       } catch {
         continue;
       }

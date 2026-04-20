@@ -17,6 +17,7 @@ import {
   requireArtifactSymbolIndex
 } from './build-run-artifact-context.js';
 import { queryBsmRowTopk } from './bsm-reader.js';
+import { classifyExposureStrength } from './score-method-spec.js';
 
 type SecuritySnapshot = {
   sector: string | null;
@@ -96,7 +97,7 @@ export async function getBuildRunExposure(
       sector,
       securityType: snapshot?.securityType ?? null,
       sameSector: anchorSector !== null && sector !== null && anchorSector === sector,
-      strengthBand: classifyExposureStrength(entry.score)
+      strengthBand: classifyExposureStrength(context.scoreMethod, entry.score)
     };
   });
 
@@ -186,20 +187,4 @@ function normalizeExposureWeights(scores: number[]): number[] {
   }
 
   return absoluteWeights.map((value) => value / absoluteTotal);
-}
-
-function classifyExposureStrength(score: number): ExposureStrengthBand {
-  if (score >= 0.8) {
-    return 'very_high';
-  }
-
-  if (score >= 0.6) {
-    return 'high';
-  }
-
-  if (score >= 0.4) {
-    return 'moderate';
-  }
-
-  return 'low';
 }

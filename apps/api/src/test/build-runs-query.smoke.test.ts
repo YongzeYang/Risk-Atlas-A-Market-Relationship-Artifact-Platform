@@ -31,26 +31,62 @@ import type {
 } from '../contracts/build-runs.js';
 import { buildApp } from '../app.js';
 import { prisma } from '../lib/prisma.js';
+import { getBuildRequestValidationForResolvedUniverse } from '../services/build-request-validation-service.js';
 
 const repoRootDir = resolve(fileURLToPath(new URL('../../../../', import.meta.url)));
 const writerBinaryPath = resolve(repoRootDir, 'cpp', 'build', 'bin', 'risk_atlas_bsm_writer');
 const queryBinaryPath = resolve(repoRootDir, 'cpp', 'build', 'bin', 'risk_atlas_bsm_query');
 const INVITE_CODE = 'risk-atlas-demo-2026';
+const PRIMARY_SMOKE_DATASET_ID = 'hk_eod_yahoo_real_v1';
+const FALLBACK_SMOKE_DATASET_ID = 'hk_eod_demo_v1';
 const ANALYSIS_HEADERS = {
   'x-invite-code': INVITE_CODE
 } as const;
+const MIN_SMOKE_SYMBOL_COUNT = 12;
+const PREFERRED_SMOKE_UNIVERSE_IDS = [
+  'hk_top_20',
+  'hk_financials_10',
+  'hk_top_50_liquid',
+  'hk_top_200_liquid',
+  'hk_real_yahoo_300',
+  'hk_real_yahoo_500',
+  'hk_real_yahoo_1000',
+  'hk_all_common_equity',
+  'hk_financials',
+  'hk_tech',
+  'hk_property',
+  'hk_consumer',
+  'hk_industrials',
+  'hk_energy',
+  'hk_telecom',
+  'hk_utilities'
+] as const;
 
-const BUILD_REQUEST = {
-  datasetId: 'hk_eod_demo_v1',
-  universeId: 'hk_top_20',
-  asOfDate: '2026-04-15',
+const BUILD_REQUEST_TEMPLATE = {
   windowDays: 252,
   scoreMethod: 'pearson_corr',
   inviteCode: INVITE_CODE
 } as const;
 
+type SmokeDatasetId =
+  | typeof PRIMARY_SMOKE_DATASET_ID
+  | typeof FALLBACK_SMOKE_DATASET_ID;
+
+type SmokeBuildPrerequisites = {
+  datasetId: SmokeDatasetId;
+  universeId: string;
+  asOfDate: string;
+  invalidAsOfDate: string;
+};
+
 test('build-runs query API smoke', async (t) => {
-  await ensureSmokePrerequisites();
+  const smoke = await ensureSmokePrerequisites();
+  const buildRequest = {
+    ...BUILD_REQUEST_TEMPLATE,
+    datasetId: smoke.datasetId,
+    universeId: smoke.universeId,
+    asOfDate: smoke.asOfDate
+  } as const;
 
   const app = await buildApp();
 
@@ -63,18 +99,18 @@ test('build-runs query API smoke', async (t) => {
       const createResponse = await app.inject({
         method: 'POST',
         url: '/build-runs',
-        payload: BUILD_REQUEST
+        payload: buildRequest
       });
 
       assert.equal(createResponse.statusCode, 202, createResponse.body);
 
       const created = parseJson<BuildRunListItem>(createResponse.body);
 
-      assert.equal(created.datasetId, BUILD_REQUEST.datasetId);
-      assert.equal(created.universeId, BUILD_REQUEST.universeId);
-      assert.equal(created.asOfDate, BUILD_REQUEST.asOfDate);
-      assert.equal(created.windowDays, BUILD_REQUEST.windowDays);
-      assert.equal(created.scoreMethod, BUILD_REQUEST.scoreMethod);
+      assert.equal(created.datasetId, buildRequest.datasetId);
+      assert.equal(created.universeId, buildRequest.universeId);
+      assert.equal(created.asOfDate, buildRequest.asOfDate);
+      assert.equal(created.windowDays, buildRequest.windowDays);
+      assert.equal(created.scoreMethod, buildRequest.scoreMethod);
       assert.equal(created.status, 'pending');
 
       buildRunId = created.id;
@@ -117,10 +153,10 @@ test('build-runs query API smoke', async (t) => {
         method: 'POST',
         url: '/build-runs/validate',
         payload: {
-          datasetId: BUILD_REQUEST.datasetId,
-          universeId: BUILD_REQUEST.universeId,
-          asOfDate: BUILD_REQUEST.asOfDate,
-          windowDays: BUILD_REQUEST.windowDays
+          datasetId: buildRequest.datasetId,
+          universeId: buildRequest.universeId,
+          asOfDate: buildRequest.asOfDate,
+          windowDays: buildRequest.windowDays
         }
       });
 
@@ -129,17 +165,20 @@ test('build-runs query API smoke', async (t) => {
       const valid = parseJson<BuildRequestValidationResponse>(validResponse.body);
       assert.equal(valid.valid, true);
       assert.equal(valid.reasonCode, 'ok');
-      assert.equal(valid.resolvedSymbolCount, 20);
+      assert.ok(
+        typeof valid.resolvedSymbolCount === 'number' &&
+          valid.resolvedSymbolCount >= MIN_SMOKE_SYMBOL_COUNT
+      );
       assert.equal(valid.requiredRows, 253);
 
       const invalidResponse = await app.inject({
         method: 'POST',
         url: '/build-runs/validate',
         payload: {
-          datasetId: BUILD_REQUEST.datasetId,
-          universeId: BUILD_REQUEST.universeId,
-          asOfDate: '2025-04-15',
-          windowDays: BUILD_REQUEST.windowDays
+          datasetId: buildRequest.datasetId,
+          universeId: buildRequest.universeId,
+          asOfDate: smoke.invalidAsOfDate,
+          windowDays: buildRequest.windowDays
         }
       });
 
@@ -147,8 +186,10 @@ test('build-runs query API smoke', async (t) => {
 
       const invalid = parseJson<BuildRequestValidationResponse>(invalidResponse.body);
       assert.equal(invalid.valid, false);
-      assert.equal(invalid.reasonCode, 'insufficient_history');
-      assert.match(invalid.message ?? '', /does not have enough history/i);
+      assert.ok(
+        invalid.reasonCode === 'insufficient_history' || invalid.reasonCode === 'universe_size'
+      );
+      assert.match(invalid.message ?? '', /history|resolved/i);
       assert.equal(invalid.requiredRows, 253);
     });
 
@@ -158,10 +199,10 @@ test('build-runs query API smoke', async (t) => {
         url: '/build-series',
         payload: {
           name: 'smoke-weekly-series',
-          datasetId: BUILD_REQUEST.datasetId,
-          universeId: BUILD_REQUEST.universeId,
-          windowDays: BUILD_REQUEST.windowDays,
-          scoreMethod: BUILD_REQUEST.scoreMethod,
+          datasetId: buildRequest.datasetId,
+          universeId: buildRequest.universeId,
+          windowDays: buildRequest.windowDays,
+          scoreMethod: buildRequest.scoreMethod,
           startDate: '2026-04-08',
           endDate: '2026-04-15',
           frequency: 'weekly',
@@ -192,11 +233,11 @@ test('build-runs query API smoke', async (t) => {
     await t.test('pair-score endpoint is correct, self score = 1, and pair symmetry holds', async () => {
       assert.ok(detail);
 
-      const left = '0700.HK';
-      const right = '0941.HK';
+      const [left, right] = detail.symbolOrder;
 
-      assert.ok(detail.symbolOrder.includes(left));
-      assert.ok(detail.symbolOrder.includes(right));
+      assert.ok(left);
+      assert.ok(right);
+      assert.notEqual(left, right);
 
       const pairResponse = await app.inject({
         method: 'GET',
@@ -250,7 +291,9 @@ test('build-runs query API smoke', async (t) => {
     });
 
     await t.test('neighbors endpoint is correct', async () => {
-      const symbol = '0700.HK';
+      assert.ok(detail);
+
+      const symbol = detail.symbolOrder[0]!;
 
       const neighborsResponse = await app.inject({
         method: 'GET',
@@ -335,8 +378,8 @@ test('build-runs query API smoke', async (t) => {
       const divergence = parseJson<PairDivergenceResponse>(divergenceResponse.body);
 
       assert.equal(divergence.buildRunId, buildRunId);
-      assert.equal(divergence.asOfDate, BUILD_REQUEST.asOfDate);
-      assert.equal(divergence.longWindowDays, BUILD_REQUEST.windowDays);
+      assert.equal(divergence.asOfDate, buildRequest.asOfDate);
+      assert.equal(divergence.longWindowDays, buildRequest.windowDays);
       assert.equal(divergence.recentWindowDays, 20);
       assert.ok(divergence.candidateCount >= divergence.candidates.length);
       assert.ok(divergence.candidates.length > 0);
@@ -399,9 +442,13 @@ test('build-runs query API smoke', async (t) => {
     });
 
     await t.test('exposure returns sector aggregation and concentration metrics', async () => {
+      assert.ok(detail);
+
+      const symbol = detail.symbolOrder[0]!;
+
       const exposureResponse = await app.inject({
         method: 'GET',
-        url: `/build-runs/${buildRunId}/exposure?symbol=0700.HK&k=10`
+        url: `/build-runs/${buildRunId}/exposure?symbol=${symbol}&k=10`
       });
 
       assert.equal(exposureResponse.statusCode, 200, exposureResponse.body);
@@ -409,7 +456,7 @@ test('build-runs query API smoke', async (t) => {
       const exposure = parseJson<ExposureResponse>(exposureResponse.body);
 
       assert.equal(exposure.buildRunId, buildRunId);
-      assert.equal(exposure.symbol, '0700.HK');
+      assert.equal(exposure.symbol, symbol);
       assert.ok(exposure.neighborCount > 0);
       assert.ok(exposure.neighbors.length > 0);
       assert.ok(exposure.sectors.length > 0);
@@ -421,13 +468,17 @@ test('build-runs query API smoke', async (t) => {
     });
 
     await t.test('queued exposure run persists its result', async () => {
+      assert.ok(detail);
+
+      const symbol = detail.symbolOrder[0]!;
+
       const createResponse = await app.inject({
         method: 'POST',
         url: '/analysis-runs/exposure',
         headers: ANALYSIS_HEADERS,
         payload: {
           buildRunId,
-          symbol: '0700.HK',
+          symbol,
           k: 10
         }
       });
@@ -441,7 +492,7 @@ test('build-runs query API smoke', async (t) => {
       const completed = await waitForSucceededAnalysisRun(app, created.id);
       assert.equal(completed.kind, 'exposure');
       assert.ok(completed.result);
-      assert.equal(completed.result.symbol, '0700.HK');
+      assert.equal(completed.result.symbol, symbol);
       assert.ok(completed.result.neighborCount > 0);
     });
 
@@ -499,7 +550,7 @@ test('build-runs query API smoke', async (t) => {
       const createResponse = await app.inject({
         method: 'POST',
         url: '/build-runs',
-        payload: BUILD_REQUEST
+        payload: buildRequest
       });
 
       assert.equal(createResponse.statusCode, 202, createResponse.body);
@@ -531,7 +582,7 @@ test('build-runs query API smoke', async (t) => {
         const createResponse = await app.inject({
           method: 'POST',
           url: '/build-runs',
-          payload: BUILD_REQUEST
+          payload: buildRequest
         });
 
         assert.equal(createResponse.statusCode, 202, createResponse.body);
@@ -561,7 +612,7 @@ test('build-runs query API smoke', async (t) => {
   }
 });
 
-async function ensureSmokePrerequisites(): Promise<void> {
+async function ensureSmokePrerequisites(): Promise<SmokeBuildPrerequisites> {
   await access(writerBinaryPath, constants.X_OK).catch(() => {
     throw new Error(
       `BSM writer binary not found or not executable at ${writerBinaryPath}. ` +
@@ -576,22 +627,104 @@ async function ensureSmokePrerequisites(): Promise<void> {
     );
   });
 
-  const [dataset, universe] = await Promise.all([
-    prisma.dataset.findUnique({
-      where: { id: BUILD_REQUEST.datasetId },
-      select: { id: true }
+  const [datasets, universes] = await Promise.all([
+    prisma.dataset.findMany({
+      where: {
+        id: {
+          in: [PRIMARY_SMOKE_DATASET_ID, FALLBACK_SMOKE_DATASET_ID]
+        }
+      },
+      select: {
+        id: true,
+        market: true,
+        catalogMaxTradeDate: true,
+        catalogFirstValidAsOf252: true
+      }
     }),
-    prisma.universe.findUnique({
-      where: { id: BUILD_REQUEST.universeId },
-      select: { id: true }
+    prisma.universe.findMany({
+      select: {
+        id: true,
+        market: true,
+        definitionKind: true,
+        symbolsJson: true,
+        definitionParams: true,
+        symbolCount: true
+      }
     })
   ]);
 
-  if (!dataset || !universe) {
+  const dataset =
+    datasets.find((entry) => entry.id === PRIMARY_SMOKE_DATASET_ID) ??
+    datasets.find((entry) => entry.id === FALLBACK_SMOKE_DATASET_ID) ??
+    null;
+
+  if (!dataset) {
     throw new Error(
       `Smoke test seed data is missing. Run "pnpm db:seed" in apps/api first.`
     );
   }
+
+  if (!dataset.catalogMaxTradeDate || !dataset.catalogFirstValidAsOf252) {
+    throw new Error(
+      `Dataset "${dataset.id}" is missing catalog coverage metadata. Rerun "pnpm db:seed" first.`
+    );
+  }
+
+  const orderedUniverses = [...universes]
+    .filter((universe) => universe.market === dataset.market)
+    .sort((left, right) => {
+      const rankDifference = getSmokeUniverseRank(left.id) - getSmokeUniverseRank(right.id);
+      if (rankDifference !== 0) {
+        return rankDifference;
+      }
+
+      const leftSymbolCount = left.symbolCount ?? Number.MAX_SAFE_INTEGER;
+      const rightSymbolCount = right.symbolCount ?? Number.MAX_SAFE_INTEGER;
+      if (leftSymbolCount !== rightSymbolCount) {
+        return leftSymbolCount - rightSymbolCount;
+      }
+
+      return left.id.localeCompare(right.id);
+    });
+
+  for (const universe of orderedUniverses) {
+    const validation = await getBuildRequestValidationForResolvedUniverse({
+      dataset: {
+        id: dataset.id,
+        market: dataset.market
+      },
+      universe,
+      asOfDate: dataset.catalogMaxTradeDate,
+      windowDays: BUILD_REQUEST_TEMPLATE.windowDays
+    });
+
+    if (validation.valid && (validation.resolvedSymbolCount ?? 0) >= MIN_SMOKE_SYMBOL_COUNT) {
+      return {
+        datasetId: dataset.id as SmokeDatasetId,
+        universeId: universe.id,
+        asOfDate: dataset.catalogMaxTradeDate,
+        invalidAsOfDate: shiftIsoDate(dataset.catalogFirstValidAsOf252, -1)
+      };
+    }
+  }
+
+  throw new Error(
+    `No buildable smoke-test universe with at least ${MIN_SMOKE_SYMBOL_COUNT} symbols was found for dataset "${dataset.id}".`
+  );
+}
+
+function getSmokeUniverseRank(universeId: string): number {
+  const rank = PREFERRED_SMOKE_UNIVERSE_IDS.indexOf(
+    universeId as (typeof PREFERRED_SMOKE_UNIVERSE_IDS)[number]
+  );
+
+  return rank === -1 ? PREFERRED_SMOKE_UNIVERSE_IDS.length : rank;
+}
+
+function shiftIsoDate(value: string, days: number): string {
+  const date = new Date(`${value}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 
 async function waitForSucceededBuild(

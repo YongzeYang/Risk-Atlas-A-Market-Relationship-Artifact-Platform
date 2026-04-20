@@ -1,4 +1,9 @@
-export const BUILD_RUN_SCORE_METHODS = ['pearson_corr'] as const;
+export const BUILD_RUN_SCORE_METHODS = [
+  'pearson_corr',
+  'ewma_corr',
+  'tail_dep_05',
+  'nmi_hist_10'
+] as const;
 export type BuildRunScoreMethod = (typeof BUILD_RUN_SCORE_METHODS)[number];
 
 export const BUILD_RUN_WINDOW_DAYS = [60, 120, 252] as const;

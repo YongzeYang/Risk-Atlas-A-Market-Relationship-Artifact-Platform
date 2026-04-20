@@ -14,24 +14,56 @@ type UniverseResolutionOptions = {
   minimumRows?: number;
 };
 
+function getPrimarySecurityTypesForMarket(market: string): string[] {
+  switch (market) {
+    case 'HK':
+      return ['common_equity'];
+    case 'CRYPTO':
+      return ['crypto_asset'];
+    default:
+      throw new Error(`Unsupported dataset market for universe resolution: "${market}".`);
+  }
+}
+
 export async function resolveUniverseSymbols(
   universe: UniverseRow,
   datasetId: string,
   asOfDate: string,
   options: UniverseResolutionOptions = {}
 ): Promise<string[]> {
+  const dataset = await prisma.dataset.findUnique({
+    where: { id: datasetId },
+    select: { market: true }
+  });
+
+  if (!dataset) {
+    throw new Error(`Dataset "${datasetId}" was not found for universe resolution.`);
+  }
+
   switch (universe.definitionKind) {
     case 'static':
       return parseUniverseSymbolsJson(universe.symbolsJson);
 
     case 'all_common_equity':
-      return resolveAllCommonEquity(datasetId, asOfDate, options.minimumRows);
+      return resolveAllPrimaryMarketAssets(
+        dataset.market,
+        datasetId,
+        asOfDate,
+        options.minimumRows
+      );
 
     case 'sector_filter':
-      return resolveSectorFilter(universe.definitionParams, datasetId, asOfDate, options.minimumRows);
+      return resolveSectorFilter(
+        dataset.market,
+        universe.definitionParams,
+        datasetId,
+        asOfDate,
+        options.minimumRows
+      );
 
     case 'liquidity_top_n':
       return resolveLiquidityTopN(
+        dataset.market,
         universe.definitionParams,
         datasetId,
         asOfDate,
@@ -43,12 +75,14 @@ export async function resolveUniverseSymbols(
   }
 }
 
-async function resolveAllCommonEquity(
+async function resolveAllPrimaryMarketAssets(
+  market: string,
   datasetId: string,
   asOfDate: string,
   minimumRows?: number
 ): Promise<string[]> {
-  return resolveCoveredCommonEquitySymbols({
+  return resolveCoveredMarketAssetSymbols({
+    market,
     datasetId,
     asOfDate,
     minimumRows
@@ -56,6 +90,7 @@ async function resolveAllCommonEquity(
 }
 
 async function resolveSectorFilter(
+  market: string,
   definitionParams: Prisma.JsonValue,
   datasetId: string,
   asOfDate: string,
@@ -66,7 +101,8 @@ async function resolveSectorFilter(
     throw new Error('sector_filter universe requires definitionParams.sectors array.');
   }
 
-  return resolveCoveredCommonEquitySymbols({
+  return resolveCoveredMarketAssetSymbols({
+    market,
     datasetId,
     asOfDate,
     minimumRows,
@@ -74,7 +110,8 @@ async function resolveSectorFilter(
   });
 }
 
-async function resolveCoveredCommonEquitySymbols(args: {
+async function resolveCoveredMarketAssetSymbols(args: {
+  market: string;
   datasetId: string;
   asOfDate: string;
   minimumRows?: number;
@@ -101,24 +138,32 @@ async function resolveCoveredCommonEquitySymbols(args: {
     return [];
   }
 
+  const primarySecurityTypes = getPrimarySecurityTypesForMarket(args.market);
+
   const entries = await prisma.securityMaster.findMany({
-    where: { securityType: 'common_equity' },
+    where: {
+      securityType: {
+        in: primarySecurityTypes as never[]
+      }
+    },
     select: { symbol: true },
     orderBy: { symbol: 'asc' }
   });
 
-  const commonEquitySymbolSet = new Set(entries.map((entry) => entry.symbol));
-  const eligibleCommonEquitySymbols = eligibleSymbols.filter((symbol) => commonEquitySymbolSet.has(symbol));
+  const marketAssetSymbolSet = new Set(entries.map((entry) => entry.symbol));
+  const eligibleMarketAssetSymbols = eligibleSymbols.filter((symbol) => marketAssetSymbolSet.has(symbol));
 
-  if (eligibleCommonEquitySymbols.length === 0) {
+  if (eligibleMarketAssetSymbols.length === 0) {
     return [];
   }
 
   const filteredEntries = await prisma.securityMaster.findMany({
     where: {
-      securityType: 'common_equity',
+      securityType: {
+        in: primarySecurityTypes as never[]
+      },
       symbol: {
-        in: eligibleCommonEquitySymbols
+        in: eligibleMarketAssetSymbols
       },
       ...(args.sectors && args.sectors.length > 0
         ? {
@@ -136,6 +181,7 @@ async function resolveCoveredCommonEquitySymbols(args: {
 }
 
 async function resolveLiquidityTopN(
+  market: string,
   definitionParams: Prisma.JsonValue,
   datasetId: string,
   asOfDate: string,
@@ -165,7 +211,8 @@ async function resolveLiquidityTopN(
 
   const minDate = recentDatesRows[recentDatesRows.length - 1]!.tradeDate;
   const eligibleSymbols = new Set(
-    await resolveCoveredCommonEquitySymbols({
+    await resolveCoveredMarketAssetSymbols({
+      market,
       datasetId,
       asOfDate,
       minimumRows

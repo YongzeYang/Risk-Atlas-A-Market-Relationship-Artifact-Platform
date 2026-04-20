@@ -10,6 +10,8 @@ import WorkflowStrip from '../../../components/ui/WorkflowStrip';
 import { useBuildDetailData } from '../../../features/builds/hooks';
 import { formatDateTime, formatInteger, formatScore, formatScoreRange } from '../../../lib/format';
 import { buildSnapshotWorkflowItems } from '../../../lib/analysis-workflow';
+import { filterMeaningfulTopPairsForDisplay } from '../../../lib/crypto-pair-display';
+import { formatScoreMethodLabel } from '../../../lib/score-method';
 import { formatLookbackLabel } from '../../../lib/snapshot-language';
 import BuildMetaHeader from './sections/BuildMetaHeader';
 import HeatmapPanel from './sections/HeatmapPanel';
@@ -72,7 +74,11 @@ export default function BuildDetailPage() {
     detail?.status === 'succeeded' &&
     detail.symbolOrder.length > 0 &&
     detail.artifact !== null;
-  const strongestPair = detail?.topPairs[0] ?? null;
+  const visibleTopPairs = detail
+    ? filterMeaningfulTopPairsForDisplay(detail.datasetId, detail.topPairs)
+    : [];
+  const hiddenTopPairCount = detail ? detail.topPairs.length - visibleTopPairs.length : 0;
+  const strongestPair = visibleTopPairs[0] ?? null;
   const workflowItems = buildSnapshotWorkflowItems('snapshot', {
     snapshotTo: `/builds/${id}`,
     groupsTo: `/structure?build=${id}`,
@@ -80,11 +86,13 @@ export default function BuildDetailPage() {
     relationshipsTo: `/divergence?build=${id}`,
     spilloverTo: `/exposure?build=${id}`
   });
+  const [baseReadItem, ...nextQuestionWorkflowItems] = workflowItems;
 
   return (
     <div className="page page--detail">
       <BuildMetaHeader
         detail={detail}
+        topPairs={visibleTopPairs}
         loading={loading}
         error={error}
         refreshing={refreshing}
@@ -98,10 +106,31 @@ export default function BuildDetailPage() {
             whether the pattern will persist, or what to trade next.
           </BoundaryNote>
 
+          {baseReadItem ? (
+            <section className="analysis-base-read">
+              <div className="workflow-picker__header">
+                <h2 className="workflow-picker__title">Start here</h2>
+                <p className="workflow-picker__subtitle">
+                  Keep the base read separate from the narrower follow-up questions. Use this snapshot as the
+                  anchor before you branch.
+                </p>
+              </div>
+
+              <article className="workflow-card workflow-card--current analysis-base-read__card">
+                <div className="workflow-card__label">{baseReadItem.label}</div>
+                <div className="workflow-card__title">{baseReadItem.title}</div>
+                <div className="workflow-card__description">{baseReadItem.description}</div>
+                <div className="workflow-card__action workflow-card__action--current">
+                  {baseReadItem.actionLabel}
+                </div>
+              </article>
+            </section>
+          ) : null}
+
           <WorkflowStrip
-            title="Move from the base read into the next question"
-            subtitle="Stay with one snapshot until the question truly changes. Then move one step narrower."
-            items={workflowItems}
+            title="Then move one step narrower"
+            subtitle="Once the base read is clear, move into Step 1 to Step 4 based on the next question rather than treating them as parallel paths."
+            items={nextQuestionWorkflowItems}
             className="analysis-flow-strip"
             compact
           />
@@ -127,7 +156,13 @@ export default function BuildDetailPage() {
               <StatCard
                 label="Strongest relationship"
                 value={strongestPair ? `${strongestPair.left} ↔ ${strongestPair.right}` : '—'}
-                helper={strongestPair ? `Score ${formatScore(strongestPair.score, 3)}` : 'No relationship summary available.'}
+                helper={
+                  strongestPair
+                    ? `Score ${formatScore(strongestPair.score, 3)}`
+                    : hiddenTopPairCount > 0
+                      ? 'Hidden duplicate crypto pairs were removed from the default summary.'
+                      : 'No relationship summary available.'
+                }
               />
               <StatCard
                 label="Names in basket"
@@ -149,10 +184,14 @@ export default function BuildDetailPage() {
               <HeatmapPanel
                 buildRunId={id}
                 symbolOrder={detail.symbolOrder}
-                topPairs={detail.topPairs}
+                topPairs={visibleTopPairs}
               />
 
-              <TopPairsPanel topPairs={detail.topPairs} symbolCount={detail.symbolOrder.length} />
+              <TopPairsPanel
+                topPairs={visibleTopPairs}
+                symbolCount={detail.symbolOrder.length}
+                hiddenPairCount={hiddenTopPairCount}
+              />
 
               <NeighborsPanel
                 buildRunId={id}
@@ -218,6 +257,7 @@ export default function BuildDetailPage() {
                 <div className="workspace-note-list">
                   <div className="workspace-note-list__item">Snapshot date: {detail.asOfDate}</div>
                   <div className="workspace-note-list__item">Lookback: {formatLookbackLabel(detail.windowDays)}</div>
+                  <div className="workspace-note-list__item">Score method: {formatScoreMethodLabel(detail.scoreMethod)}</div>
                   <div className="workspace-note-list__item">Created: {formatDateTime(detail.createdAt)}</div>
                   <div className="workspace-note-list__item">Data source: {detail.datasetId}</div>
                   <div className="workspace-note-list__item">Basket code: {detail.universeId}</div>
@@ -242,6 +282,8 @@ export default function BuildDetailPage() {
 
           <div className="build-state__meta">
             <span className="mono">{detail.universeId}</span>
+            <span>·</span>
+            <span className="mono">{formatScoreMethodLabel(detail.scoreMethod)}</span>
             <span>·</span>
             <span className="mono">{formatDateTime(detail.createdAt)}</span>
           </div>
