@@ -15,6 +15,8 @@ RUN apt-get update \
 
 WORKDIR /opt/risk-atlas
 
+ENV DATABASE_URL=postgresql://risk_atlas_build:risk_atlas_build@127.0.0.1:5432/risk_atlas_build?schema=public
+
 COPY . .
 
 RUN test -f cpp/third_party/bsm/CMakeLists.txt || (echo "Missing cpp/third_party/bsm. Run git submodule update --init --recursive before building." >&2 && exit 1)

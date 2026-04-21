@@ -331,6 +331,8 @@ sudo systemctl status docker --no-pager
 sudo journalctl -u docker -n 50 --no-pager
 ```
 
+If the journal shows `failed to load listeners: no sockets found via socket activation`, the host is in a broken Docker service/socket state. The updated bootstrap now resets the failed state and starts `docker.socket` before restarting `docker.service`.
+
 On hosts that already had Ubuntu's Docker package preinstalled, the intended path is now:
 
 - keep the existing Docker engine if it is healthy

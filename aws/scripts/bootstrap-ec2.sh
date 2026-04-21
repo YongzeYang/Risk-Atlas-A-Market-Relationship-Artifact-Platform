@@ -14,9 +14,14 @@ docker_compose_available() {
   docker compose version >/dev/null 2>&1 || command -v docker-compose >/dev/null 2>&1
 }
 
+docker_socket_unit_exists() {
+  systemctl list-unit-files docker.socket --no-legend 2>/dev/null | grep -q '^docker.socket'
+}
+
 start_and_verify_service() {
   local service_name="$1"
 
+  systemctl reset-failed "${service_name}" || true
   systemctl enable "${service_name}"
   if ! systemctl restart "${service_name}"; then
     systemctl status "${service_name}" --no-pager || true
@@ -31,6 +36,21 @@ start_and_verify_service() {
     echo "${service_name} is not active after startup." >&2
     exit 1
   fi
+}
+
+start_and_verify_docker_service() {
+  if docker_socket_unit_exists; then
+    systemctl reset-failed docker.socket || true
+    systemctl enable docker.socket
+    if ! systemctl restart docker.socket; then
+      systemctl status docker.socket --no-pager || true
+      journalctl -u docker.socket -n 50 --no-pager || true
+      echo "Failed to start docker.socket. See the diagnostics above." >&2
+      exit 1
+    fi
+  fi
+
+  start_and_verify_service docker
 }
 
 ensure_docker_apt_repo() {
@@ -206,7 +226,7 @@ main() {
   corepack enable
   corepack prepare "pnpm@${PNPM_VERSION}" --activate
 
-  start_and_verify_service docker
+  start_and_verify_docker_service
   start_and_verify_service nginx
 
   usermod -aG docker "${DEPLOY_USER}"
