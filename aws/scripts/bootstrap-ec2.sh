@@ -29,7 +29,6 @@ ensure_docker_apt_repo() {
 install_base_packages() {
   apt-get update
   apt-get install -y --no-install-recommends \
-    awscli \
     build-essential \
     ca-certificates \
     certbot \
@@ -43,6 +42,48 @@ install_base_packages() {
     python3-certbot-nginx \
     rsync \
     unzip
+}
+
+resolve_awscli_arch() {
+  case "$(dpkg --print-architecture)" in
+    amd64)
+      echo "x86_64"
+      ;;
+    arm64)
+      echo "aarch64"
+      ;;
+    *)
+      echo "Unsupported architecture for AWS CLI installer: $(dpkg --print-architecture)" >&2
+      exit 1
+      ;;
+  esac
+}
+
+install_awscli() {
+  local installer_arch
+  local install_args=()
+  local temp_dir
+
+  if command -v aws >/dev/null 2>&1; then
+    return
+  fi
+
+  if apt-get install -y --no-install-recommends awscli; then
+    return
+  fi
+
+  installer_arch="$(resolve_awscli_arch)"
+  temp_dir="$(mktemp -d)"
+
+  curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-${installer_arch}.zip" -o "${temp_dir}/awscliv2.zip"
+  unzip -q "${temp_dir}/awscliv2.zip" -d "${temp_dir}"
+
+  if [[ -d "/usr/local/aws-cli" ]]; then
+    install_args+=(--update)
+  fi
+
+  "${temp_dir}/aws/install" "${install_args[@]}"
+  rm -rf "${temp_dir}"
 }
 
 install_docker() {
@@ -76,6 +117,11 @@ verify_runtime_dependencies() {
     exit 1
   fi
 
+  if ! command -v aws >/dev/null 2>&1; then
+    echo "AWS CLI is not available after bootstrap." >&2
+    exit 1
+  fi
+
   if ! command -v pnpm >/dev/null 2>&1; then
     echo "pnpm is not available after bootstrap." >&2
     exit 1
@@ -106,6 +152,7 @@ prepare_host_directories() {
 
 main() {
   install_base_packages
+  install_awscli
   install_docker
   install_node
 

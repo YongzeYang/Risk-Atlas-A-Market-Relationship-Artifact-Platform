@@ -309,7 +309,7 @@ What the bootstrap script installs:
 - Docker Compose plugin
 - Nginx
 - Certbot and the Nginx Certbot plugin
-- AWS CLI
+- AWS CLI v2, using the Ubuntu package when available and the official AWS installer as a fallback
 - Node.js 20
 - pnpm via Corepack
 - CMake, build-essential, git, rsync, jq, gettext-base
@@ -320,6 +320,7 @@ Verify the host immediately after bootstrap:
 docker --version
 docker compose version || docker-compose version
 certbot --version
+aws --version
 pnpm --version
 ```
 
