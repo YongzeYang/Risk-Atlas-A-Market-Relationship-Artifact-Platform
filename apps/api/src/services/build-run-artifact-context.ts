@@ -1,15 +1,15 @@
 import { prisma } from '../lib/prisma.js';
 import { ServiceError } from '../lib/service-error.js';
 import {
-  ARTIFACT_FILE_NAMES,
+  type ArtifactStorageKind,
   type BuildRunScoreMethod,
   type BuildRunWindowDays,
   type PreviewV1
 } from '../contracts/build-runs.js';
 import {
+  ensureLocalMatrixArtifactPath,
   readPreviewArtifact,
-  resolveLocalStorageFilePath
-} from './local-artifact-store.js';
+} from './artifact-store.js';
 
 export type LoadedBuildRunArtifactContext = {
   buildRunId: string;
@@ -40,7 +40,9 @@ export async function loadSucceededBuildRunArtifactContext(
       artifact: {
         select: {
           storageKind: true,
-          storagePrefix: true
+          storageBucket: true,
+          storagePrefix: true,
+          matrixByteSize: true
         }
       }
     }
@@ -54,10 +56,11 @@ export async function loadSucceededBuildRunArtifactContext(
     throw new ServiceError(409, notReadyMessage);
   }
 
-  const preview = await readPreviewArtifact(
-    buildRun.artifact.storageKind,
-    buildRun.artifact.storagePrefix
-  );
+  const preview = await readPreviewArtifact({
+    storageKind: buildRun.artifact.storageKind as ArtifactStorageKind,
+    storageBucket: buildRun.artifact.storageBucket,
+    storagePrefix: buildRun.artifact.storagePrefix
+  });
 
   if (preview.buildRunId !== buildRunId) {
     throw new Error(
@@ -65,15 +68,16 @@ export async function loadSucceededBuildRunArtifactContext(
     );
   }
 
-  if (buildRun.artifact.storageKind !== 'local_fs') {
-    throw new Error(
-      `BSM artifact queries are not implemented for storageKind "${buildRun.artifact.storageKind}".`
-    );
-  }
-
   const symbolIndexBySymbol = new Map(
     preview.symbolOrder.map((symbol, index) => [symbol, index] as const)
   );
+
+  const matrixPath = await ensureLocalMatrixArtifactPath({
+    storageKind: buildRun.artifact.storageKind as ArtifactStorageKind,
+    storageBucket: buildRun.artifact.storageBucket,
+    storagePrefix: buildRun.artifact.storagePrefix,
+    matrixByteSize: buildRun.artifact.matrixByteSize
+  });
 
   return {
     buildRunId,
@@ -83,10 +87,7 @@ export async function loadSucceededBuildRunArtifactContext(
     scoreMethod: buildRun.scoreMethod as BuildRunScoreMethod,
     preview,
     symbolIndexBySymbol,
-    matrixPath: resolveLocalStorageFilePath(
-      buildRun.artifact.storagePrefix,
-      ARTIFACT_FILE_NAMES.matrix
-    )
+    matrixPath
   };
 }
 

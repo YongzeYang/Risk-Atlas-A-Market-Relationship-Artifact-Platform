@@ -1,0 +1,10 @@
+[Unit]
+Description=Risk Atlas artifact sync to S3
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/risk-atlas/app
+EnvironmentFile=/opt/risk-atlas/app/aws/.env.production
+ExecStart=/opt/risk-atlas/app/aws/scripts/sync-artifacts-to-s3.sh /opt/risk-atlas/app/aws/.env.production

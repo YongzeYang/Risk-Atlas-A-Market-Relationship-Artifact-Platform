@@ -160,6 +160,13 @@ Important keys:
 - POSTGRES_HOST: database host used by the API
 - POSTGRES_PORT: host port mapped by docker compose
 - API_PORT: Fastify port
+- ARTIFACT_STORAGE_BACKEND: local_fs or s3; local_fs is the default local behavior, s3 uploads build artifacts to S3 and uses a local matrix cache for queries
+- ARTIFACT_ROOT_DIR: local working directory for artifacts and analysis-run records
+- ARTIFACT_CACHE_DIR: local cache directory for matrix.bsm files when ARTIFACT_STORAGE_BACKEND=s3
+- AWS_REGION: AWS region used for S3 artifact operations when ARTIFACT_STORAGE_BACKEND=s3
+- S3_ARTIFACT_BUCKET: S3 bucket name used for build artifacts when ARTIFACT_STORAGE_BACKEND=s3
+- S3_ARTIFACT_PREFIX: optional S3 prefix root such as prod or staging
+- S3_SIGNED_URL_TTL_SECONDS: lifetime of S3 presigned matrix download URLs
 - WEB_PORT: Vite dev port
 - VITE_API_BASE_URL: optional absolute web-to-api base URL; leave blank for default local proxy behavior
 - CORS_ALLOWED_ORIGINS: optional comma-separated origins allowed when the browser calls the API directly
@@ -175,6 +182,7 @@ POSTGRES_USER=atlas
 POSTGRES_PASSWORD=replace-this-password
 POSTGRES_PORT=5544
 API_PORT=3100
+ARTIFACT_STORAGE_BACKEND=local_fs
 WEB_PORT=5174
 VITE_API_BASE_URL=
 CORS_ALLOWED_ORIGINS=http://localhost:5174
@@ -186,6 +194,23 @@ After editing the root .env, run:
 ```bash
 pnpm env:sync
 ```
+
+## AWS production deployment
+
+The recommended first production deployment for this repository is:
+
+- one Ubuntu EC2 host
+- host-level Nginx for ports 80 and 443
+- Docker Compose for the API and PostgreSQL
+- one public domain with same-origin routing
+- Amazon S3 as the recommended low-cost build artifact source of truth
+- a small local EC2 cache for matrix.bsm query files when S3 storage is enabled
+
+The API now supports both local_fs and s3 artifact storage backends. In s3 mode, preview.json and manifest.json are read from S3, build downloads use presigned URLs, and matrix.bsm is cached locally on demand for the existing C++ query path.
+
+For the full step-by-step AWS guide, deployment scripts, Compose file, Nginx templates, environment template, and S3 sync timer, see:
+
+- [aws/README.md](aws/README.md)
 
 ## Optional: refresh the larger real HK dataset from source
 

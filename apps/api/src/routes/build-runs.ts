@@ -35,6 +35,9 @@ import {
 } from '../contracts/build-runs.js';
 import { ServiceError } from '../lib/service-error.js';
 import {
+  createS3ArtifactDownloadUrl,
+} from '../services/artifact-store.js';
+import {
   createBuildRun,
   getBuildRunDetail,
   getBuildRunDownloadArtifact,
@@ -323,10 +326,16 @@ export const buildRunRoutes: FastifyPluginAsync = async (app) => {
       try {
         const artifact = await getBuildRunDownloadArtifact(request.params.id);
 
-        if (artifact.storageKind !== 'local_fs') {
-          return reply.code(501).send({
-            message: `Download for storageKind "${artifact.storageKind}" is not implemented in local mode.`
+        if (artifact.storageKind === 's3') {
+          const signedUrl = await createS3ArtifactDownloadUrl({
+            storageBucket: artifact.storageBucket,
+            storagePrefix: artifact.storagePrefix,
+            objectFilename: ARTIFACT_FILE_NAMES.matrix,
+            downloadFilename: artifact.filename,
+            mediaType: artifact.mediaType
           });
+
+          return reply.redirect(signedUrl);
         }
 
         const filePath = resolveLocalStorageFilePath(

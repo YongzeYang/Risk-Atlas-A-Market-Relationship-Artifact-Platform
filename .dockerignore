@@ -1,0 +1,10 @@
+.git
+node_modules
+**/node_modules
+artifacts
+apps/api/dist
+apps/web/dist
+cpp/build
+aws/.env.production
+.env
+memories

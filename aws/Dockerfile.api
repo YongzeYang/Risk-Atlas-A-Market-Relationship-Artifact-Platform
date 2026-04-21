@@ -1,0 +1,61 @@
+FROM node:20-bookworm AS build
+
+ENV PNPM_HOME=/pnpm
+ENV PATH=${PNPM_HOME}:${PATH}
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    build-essential \
+    ca-certificates \
+    cmake \
+    git \
+    python3 \
+  && rm -rf /var/lib/apt/lists/* \
+  && corepack enable
+
+WORKDIR /opt/risk-atlas
+
+COPY . .
+
+RUN test -f cpp/third_party/bsm/CMakeLists.txt || (echo "Missing cpp/third_party/bsm. Run git submodule update --init --recursive before building." >&2 && exit 1)
+RUN pnpm install --frozen-lockfile
+RUN pnpm cpp:configure
+RUN pnpm cpp:build
+RUN pnpm --dir apps/api prisma:generate
+RUN pnpm --dir apps/api build
+
+FROM node:20-bookworm-slim AS runtime
+
+ENV PNPM_HOME=/pnpm
+ENV PATH=${PNPM_HOME}:${PATH}
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    libstdc++6 \
+  && rm -rf /var/lib/apt/lists/* \
+  && corepack enable
+
+WORKDIR /opt/risk-atlas
+
+COPY --from=build /opt/risk-atlas/package.json ./package.json
+COPY --from=build /opt/risk-atlas/pnpm-lock.yaml ./pnpm-lock.yaml
+COPY --from=build /opt/risk-atlas/pnpm-workspace.yaml ./pnpm-workspace.yaml
+COPY --from=build /opt/risk-atlas/node_modules ./node_modules
+COPY --from=build /opt/risk-atlas/apps/api ./apps/api
+COPY --from=build /opt/risk-atlas/data ./data
+RUN mkdir -p /opt/risk-atlas/bin
+COPY --from=build /opt/risk-atlas/cpp/build/bin/risk_atlas_bsm_writer /opt/risk-atlas/bin/risk_atlas_bsm_writer
+COPY --from=build /opt/risk-atlas/cpp/build/bin/risk_atlas_bsm_query /opt/risk-atlas/bin/risk_atlas_bsm_query
+
+ENV NODE_ENV=production
+ENV HOST=0.0.0.0
+ENV PORT=3000
+ENV BSM_WRITER_BIN=/opt/risk-atlas/bin/risk_atlas_bsm_writer
+ENV BSM_QUERY_BIN=/opt/risk-atlas/bin/risk_atlas_bsm_query
+
+WORKDIR /opt/risk-atlas/apps/api
+
+EXPOSE 3000
+
+CMD ["node", "dist/server.js"]

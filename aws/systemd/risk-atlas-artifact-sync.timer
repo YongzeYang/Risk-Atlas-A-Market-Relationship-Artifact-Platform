@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Risk Atlas artifact sync to S3 every 30 minutes
+
+[Timer]
+OnBootSec=5m
+OnUnitActiveSec=30m
+Persistent=true
+Unit=risk-atlas-artifact-sync.service
+
+[Install]
+WantedBy=timers.target

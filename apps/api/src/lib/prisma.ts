@@ -38,3 +38,16 @@ export const prisma =
 if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.prisma = prisma;
 }
+
+let disconnected = false;
+
+export async function disconnectPrisma(): Promise<void> {
+  if (disconnected) {
+    return;
+  }
+
+  disconnected = true;
+
+  await prisma.$disconnect();
+  await pool.end();
+}

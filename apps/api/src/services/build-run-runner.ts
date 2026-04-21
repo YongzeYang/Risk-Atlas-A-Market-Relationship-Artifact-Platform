@@ -19,6 +19,10 @@ import {
 } from '../contracts/build-runs.js';
 import { writeBsmMatrixArtifact } from './bsm-writer.js';
 import {
+  resolveConfiguredArtifactStorageKind,
+  uploadLocalArtifactBundleToS3
+} from './artifact-store.js';
+import {
   cleanupLocalArtifactBundle,
   prepareLocalArtifactBundle,
   statFileByteSize,
@@ -153,6 +157,7 @@ async function runBuildInternal(buildRunId: string): Promise<void> {
       sectorBySymbol
     });
 
+    const configuredArtifactStorageKind = resolveConfiguredArtifactStorageKind();
     const artifactPaths = await prepareLocalArtifactBundle(buildRunId);
 
     const preview: PreviewV1 = {
@@ -220,6 +225,21 @@ async function runBuildInternal(buildRunId: string): Promise<void> {
       })
     );
 
+    let persistedStorageKind: ArtifactStorageKind = ArtifactStorageKind.local_fs;
+    let persistedStorageBucket: string | null = null;
+    let persistedStoragePrefix = artifactPaths.storagePrefix;
+
+    if (configuredArtifactStorageKind === 's3') {
+      const uploadedArtifact = await uploadLocalArtifactBundleToS3({
+        buildRunId: buildRun.id,
+        localPaths: artifactPaths
+      });
+
+      persistedStorageKind = ArtifactStorageKind.s3;
+      persistedStorageBucket = uploadedArtifact.storageBucket;
+      persistedStoragePrefix = uploadedArtifact.storagePrefix;
+    }
+
     await prisma.$transaction(async (tx) => {
       await tx.artifact.upsert({
         where: {
@@ -227,9 +247,9 @@ async function runBuildInternal(buildRunId: string): Promise<void> {
         },
         update: {
           bundleVersion: ARTIFACT_BUNDLE_VERSION,
-          storageKind: ArtifactStorageKind.local_fs,
-          storageBucket: null,
-          storagePrefix: artifactPaths.storagePrefix,
+          storageKind: persistedStorageKind,
+          storageBucket: persistedStorageBucket,
+          storagePrefix: persistedStoragePrefix,
           matrixByteSize: BigInt(matrixByteSize),
           previewByteSize: BigInt(previewByteSize),
           manifestByteSize: BigInt(manifestByteSize),
@@ -240,9 +260,9 @@ async function runBuildInternal(buildRunId: string): Promise<void> {
         create: {
           buildRunId: buildRun.id,
           bundleVersion: ARTIFACT_BUNDLE_VERSION,
-          storageKind: ArtifactStorageKind.local_fs,
-          storageBucket: null,
-          storagePrefix: artifactPaths.storagePrefix,
+          storageKind: persistedStorageKind,
+          storageBucket: persistedStorageBucket,
+          storagePrefix: persistedStoragePrefix,
           matrixByteSize: BigInt(matrixByteSize),
           previewByteSize: BigInt(previewByteSize),
           manifestByteSize: BigInt(manifestByteSize),
@@ -263,6 +283,10 @@ async function runBuildInternal(buildRunId: string): Promise<void> {
         }
       });
     });
+
+    if (persistedStorageKind === ArtifactStorageKind.s3) {
+      await cleanupLocalArtifactBundle(buildRunId);
+    }
 
     // Update series progress AFTER the transaction commits so counts see committed data
     if (buildRun.seriesId) {

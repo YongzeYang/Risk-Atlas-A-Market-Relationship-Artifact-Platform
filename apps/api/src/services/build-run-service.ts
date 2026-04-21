@@ -17,7 +17,7 @@ import {
   type TopPairItem
 } from '../contracts/build-runs.js';
 import { validateBuildRequestCoverage } from './build-request-validation-service.js';
-import { readPreviewArtifact } from './local-artifact-store.js';
+import { readPreviewArtifact } from './artifact-store.js';
 import { validateInviteCode } from './invite-code-service.js';
 
 type BuildRunRow = {
@@ -50,6 +50,7 @@ type ArtifactRow = {
 
 export type BuildRunDownloadDescriptor = {
   storageKind: ArtifactStorageKind;
+  storageBucket: string | null;
   storagePrefix: string;
   filename: string;
   mediaType: typeof MATRIX_ARTIFACT_MEDIA_TYPE;
@@ -179,10 +180,11 @@ export async function getBuildRunDetail(
   }
 
   if (buildRun.status === 'succeeded' && buildRun.artifact) {
-    const preview = await readPreviewArtifact(
-      buildRun.artifact.storageKind,
-      buildRun.artifact.storagePrefix
-    );
+    const preview = await readPreviewArtifact({
+      storageKind: buildRun.artifact.storageKind as ArtifactStorageKind,
+      storageBucket: buildRun.artifact.storageBucket,
+      storagePrefix: buildRun.artifact.storagePrefix
+    });
 
     if (artifact && artifact.symbolCount !== preview.symbolOrder.length) {
       throw new Error(
@@ -245,6 +247,7 @@ export async function getBuildRunDownloadArtifact(
 
   return {
     storageKind: buildRun.artifact.storageKind as ArtifactStorageKind,
+    storageBucket: buildRun.artifact.storageBucket,
     storagePrefix: buildRun.artifact.storagePrefix,
     filename: downloadInfo.filename,
     mediaType: downloadInfo.mediaType
