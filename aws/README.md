@@ -306,7 +306,7 @@ sudo DEPLOY_USER=ubuntu bash aws/scripts/bootstrap-ec2.sh
 What the bootstrap script installs:
 
 - Docker Engine
-- Docker Compose plugin
+- Docker Compose support; if Docker is already present on the host, the script tries to add Compose first instead of replacing the existing engine immediately
 - Nginx
 - Certbot and the Nginx Certbot plugin
 - AWS CLI v2, using the Ubuntu package when available and the official AWS installer as a fallback
@@ -324,7 +324,36 @@ aws --version
 pnpm --version
 ```
 
+If bootstrap stops on Docker service startup, inspect the service directly before rerunning anything else:
+
+```bash
+sudo systemctl status docker --no-pager
+sudo journalctl -u docker -n 50 --no-pager
+```
+
+On hosts that already had Ubuntu's Docker package preinstalled, the intended path is now:
+
+- keep the existing Docker engine if it is healthy
+- install Docker Compose support separately
+- fail the bootstrap immediately if the Docker daemon is not active
+
 After bootstrap, log out once and SSH back in so your user picks up Docker group membership.
+
+Note:
+
+If the repository already exists on the server and you are updating deployment scripts, do not stop at git fetch.
+
+git fetch only updates remote refs. It does not update the checked-out files in /opt/risk-atlas/app.
+
+Use:
+
+```bash
+cd /opt/risk-atlas/app
+git pull --ff-only origin main
+git submodule update --init --recursive
+```
+
+If git pull refuses because of local tracked-file changes, inspect them with git status first. The production secrets file aws/.env.production is already ignored and should not block a fast-forward pull.
 
 ## 7. Configure the production environment file
 

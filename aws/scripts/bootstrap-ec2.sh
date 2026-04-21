@@ -14,6 +14,25 @@ docker_compose_available() {
   docker compose version >/dev/null 2>&1 || command -v docker-compose >/dev/null 2>&1
 }
 
+start_and_verify_service() {
+  local service_name="$1"
+
+  systemctl enable "${service_name}"
+  if ! systemctl restart "${service_name}"; then
+    systemctl status "${service_name}" --no-pager || true
+    journalctl -u "${service_name}" -n 50 --no-pager || true
+    echo "Failed to start ${service_name}. See the diagnostics above." >&2
+    exit 1
+  fi
+
+  if ! systemctl is-active --quiet "${service_name}"; then
+    systemctl status "${service_name}" --no-pager || true
+    journalctl -u "${service_name}" -n 50 --no-pager || true
+    echo "${service_name} is not active after startup." >&2
+    exit 1
+  fi
+}
+
 ensure_docker_apt_repo() {
   install -m 0755 -d /etc/apt/keyrings
   if [[ ! -f /etc/apt/keyrings/docker.gpg ]]; then
@@ -91,6 +110,22 @@ install_docker() {
     return
   fi
 
+  if command -v docker >/dev/null 2>&1; then
+    apt-get update
+
+    if apt-get install -y --no-install-recommends docker-compose-plugin; then
+      return
+    fi
+
+    if apt-get install -y --no-install-recommends docker-compose-v2; then
+      return
+    fi
+
+    if apt-get install -y --no-install-recommends docker-compose; then
+      return
+    fi
+  fi
+
   ensure_docker_apt_repo
   apt-get update
   apt-get install -y --no-install-recommends \
@@ -104,6 +139,18 @@ install_docker() {
 verify_runtime_dependencies() {
   if ! command -v docker >/dev/null 2>&1; then
     echo "Docker is not available after bootstrap." >&2
+    exit 1
+  fi
+
+  if ! systemctl is-active --quiet docker; then
+    echo "Docker service is installed but not running." >&2
+    echo "Run: sudo systemctl status docker --no-pager" >&2
+    echo "Run: sudo journalctl -u docker -n 50 --no-pager" >&2
+    exit 1
+  fi
+
+  if ! docker info >/dev/null 2>&1; then
+    echo "Docker CLI is present but cannot talk to the Docker daemon." >&2
     exit 1
   fi
 
@@ -159,8 +206,8 @@ main() {
   corepack enable
   corepack prepare "pnpm@${PNPM_VERSION}" --activate
 
-  systemctl enable --now docker
-  systemctl enable --now nginx
+  start_and_verify_service docker
+  start_and_verify_service nginx
 
   usermod -aG docker "${DEPLOY_USER}"
   prepare_host_directories
