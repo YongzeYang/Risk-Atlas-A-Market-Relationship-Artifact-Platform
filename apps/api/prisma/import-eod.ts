@@ -47,6 +47,11 @@ type ImportRow = {
   volume?: bigint;
 };
 
+type ImportProcessedSummary = Pick<
+  ImportEodCsvSummary,
+  'rowCount' | 'symbolCount' | 'minTradeDate' | 'maxTradeDate' | 'firstValidAsOfByWindowDays'
+>;
+
 export type ImportEodCsvOptions = {
   datasetId: string;
   datasetName: string;
@@ -111,7 +116,24 @@ function validateImportRow(
   }
 }
 
-async function readImportRows(csvPath: string, datasetId: string, market: ImportMarket) {
+function buildDatasetCatalogData(summary: ImportProcessedSummary) {
+  return {
+    catalogSymbolCount: summary.symbolCount,
+    catalogPriceRowCount: BigInt(summary.rowCount),
+    catalogMinTradeDate: summary.minTradeDate,
+    catalogMaxTradeDate: summary.maxTradeDate,
+    catalogFirstValidAsOf60: summary.firstValidAsOfByWindowDays['60'],
+    catalogFirstValidAsOf120: summary.firstValidAsOfByWindowDays['120'],
+    catalogFirstValidAsOf252: summary.firstValidAsOfByWindowDays['252']
+  };
+}
+
+async function streamImportRows(
+  csvPath: string,
+  datasetId: string,
+  market: ImportMarket,
+  onBatch: (batch: ImportRow[]) => Promise<void>
+): Promise<ImportProcessedSummary> {
   if (!existsSync(csvPath)) {
     throw new Error(`CSV not found: ${csvPath}`);
   }
@@ -127,12 +149,23 @@ async function readImportRows(csvPath: string, datasetId: string, market: Import
   let columnCount = 3;
   let hasVolume = false;
 
-  const rows: ImportRow[] = [];
+  let rowCount = 0;
+  let batch: ImportRow[] = [];
   const symbols = new Set<string>();
   const tradeDates = new Set<string>();
 
   let minTradeDate: string | null = null;
   let maxTradeDate: string | null = null;
+
+  async function flushBatch() {
+    if (batch.length === 0) {
+      return;
+    }
+
+    const currentBatch = batch;
+    batch = [];
+    await onBatch(currentBatch);
+  }
 
   for await (const rawLine of rl) {
     lineNumber += 1;
@@ -181,7 +214,8 @@ async function readImportRows(csvPath: string, datasetId: string, market: Import
       row.volume = BigInt(Math.round(volumeNum));
     }
 
-    rows.push(row);
+    batch.push(row);
+    rowCount += 1;
 
     symbols.add(symbol);
     tradeDates.add(tradeDate);
@@ -192,18 +226,24 @@ async function readImportRows(csvPath: string, datasetId: string, market: Import
     if (maxTradeDate === null || tradeDate > maxTradeDate) {
       maxTradeDate = tradeDate;
     }
+
+    if (batch.length >= BATCH_SIZE) {
+      await flushBatch();
+    }
   }
+
+  await flushBatch();
 
   if (!seenHeader) {
     throw new Error('CSV is empty or missing a header row.');
   }
 
-  if (rows.length === 0 || minTradeDate === null || maxTradeDate === null) {
+  if (rowCount === 0 || minTradeDate === null || maxTradeDate === null) {
     throw new Error('CSV contains no data rows.');
   }
 
   return {
-    rows,
+    rowCount,
     symbolCount: symbols.size,
     minTradeDate,
     maxTradeDate,
@@ -275,22 +315,8 @@ export async function importEodCsv(options: ImportEodCsvOptions): Promise<Import
   const transactionTimeoutMs =
     options.transactionTimeoutMs ?? DEFAULT_IMPORT_TRANSACTION_TIMEOUT_MS;
 
-  const { rows, symbolCount, minTradeDate, maxTradeDate, firstValidAsOfByWindowDays } = await readImportRows(
-    options.csvPath,
-    options.datasetId,
-    market
-  );
-
-  const importedSummary = {
-    rowCount: rows.length,
-    symbolCount,
-    minTradeDate,
-    maxTradeDate,
-    firstValidAsOfByWindowDays
-  };
-
-  await client.$transaction(
-    async (tx: any) => {
+  const finalSummary = await client.$transaction(
+    async (tx: any): Promise<ImportProcessedSummary> => {
       await tx.dataset.upsert({
         where: {
           id: options.datasetId
@@ -298,27 +324,13 @@ export async function importEodCsv(options: ImportEodCsvOptions): Promise<Import
         update: {
           name: options.datasetName,
           source: 'curated_csv',
-          market,
-          catalogSymbolCount: importedSummary.symbolCount,
-          catalogPriceRowCount: BigInt(importedSummary.rowCount),
-          catalogMinTradeDate: importedSummary.minTradeDate,
-          catalogMaxTradeDate: importedSummary.maxTradeDate,
-          catalogFirstValidAsOf60: importedSummary.firstValidAsOfByWindowDays['60'],
-          catalogFirstValidAsOf120: importedSummary.firstValidAsOfByWindowDays['120'],
-          catalogFirstValidAsOf252: importedSummary.firstValidAsOfByWindowDays['252']
+          market
         },
         create: {
           id: options.datasetId,
           name: options.datasetName,
           source: 'curated_csv',
-          market,
-          catalogSymbolCount: importedSummary.symbolCount,
-          catalogPriceRowCount: BigInt(importedSummary.rowCount),
-          catalogMinTradeDate: importedSummary.minTradeDate,
-          catalogMaxTradeDate: importedSummary.maxTradeDate,
-          catalogFirstValidAsOf60: importedSummary.firstValidAsOfByWindowDays['60'],
-          catalogFirstValidAsOf120: importedSummary.firstValidAsOfByWindowDays['120'],
-          catalogFirstValidAsOf252: importedSummary.firstValidAsOfByWindowDays['252']
+          market
         }
       });
 
@@ -330,31 +342,29 @@ export async function importEodCsv(options: ImportEodCsvOptions): Promise<Import
         });
       }
 
-      for (let offset = 0; offset < rows.length; offset += BATCH_SIZE) {
-        const batch = rows.slice(offset, offset + BATCH_SIZE);
-        await tx.eodPrice.createMany({
-          data: batch
-        });
-      }
+      const importedSummary = await streamImportRows(
+        options.csvPath,
+        options.datasetId,
+        market,
+        async (batch) => {
+          await tx.eodPrice.createMany({
+            data: batch
+          });
+        }
+      );
 
-      if (!replaceExisting) {
-        const persistedSummary = await loadPersistedDatasetSummary(tx, options.datasetId);
+      const persistedSummary = replaceExisting
+        ? importedSummary
+        : await loadPersistedDatasetSummary(tx, options.datasetId);
 
-        await tx.dataset.update({
-          where: {
-            id: options.datasetId
-          },
-          data: {
-            catalogSymbolCount: persistedSummary.symbolCount,
-            catalogPriceRowCount: BigInt(persistedSummary.rowCount),
-            catalogMinTradeDate: persistedSummary.minTradeDate || null,
-            catalogMaxTradeDate: persistedSummary.maxTradeDate || null,
-            catalogFirstValidAsOf60: persistedSummary.firstValidAsOfByWindowDays['60'],
-            catalogFirstValidAsOf120: persistedSummary.firstValidAsOfByWindowDays['120'],
-            catalogFirstValidAsOf252: persistedSummary.firstValidAsOfByWindowDays['252']
-          }
-        });
-      }
+      await tx.dataset.update({
+        where: {
+          id: options.datasetId
+        },
+        data: buildDatasetCatalogData(persistedSummary)
+      });
+
+      return persistedSummary;
     },
     {
       timeout: transactionTimeoutMs,
@@ -366,11 +376,11 @@ export async function importEodCsv(options: ImportEodCsvOptions): Promise<Import
     datasetId: options.datasetId,
     datasetName: options.datasetName,
     csvPath: options.csvPath,
-    rowCount: rows.length,
-    symbolCount,
-    minTradeDate,
-    maxTradeDate,
-    firstValidAsOfByWindowDays
+    rowCount: finalSummary.rowCount,
+    symbolCount: finalSummary.symbolCount,
+    minTradeDate: finalSummary.minTradeDate,
+    maxTradeDate: finalSummary.maxTradeDate,
+    firstValidAsOfByWindowDays: finalSummary.firstValidAsOfByWindowDays
   };
 }
 

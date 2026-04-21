@@ -27,6 +27,7 @@ const REAL_HK_DATASET_NAME = 'Hong Kong EOD Real Yahoo Chart v1';
 const DEFAULT_REAL_HK_CSV_PATH = fileURLToPath(
   new URL('../../../data/real-hk/hk_eod_yahoo_real_v1.csv', import.meta.url)
 );
+const REAL_HK_IMPORT_TRANSACTION_TIMEOUT_MS = 900_000;
 
 type SeedDatasetTarget = {
   datasetId: string;
@@ -350,7 +351,10 @@ async function main() {
     csvPath: seedDatasetTarget.csvPath,
     market: Market.HK,
     replaceExisting: true,
-    prismaClient: prisma
+    prismaClient: prisma,
+    transactionTimeoutMs: seedDatasetTarget.needsGeneration
+      ? undefined
+      : REAL_HK_IMPORT_TRANSACTION_TIMEOUT_MS
   });
 
   console.log(
