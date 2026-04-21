@@ -13,6 +13,7 @@ pnpm-debug.log*
 # ------------------------------
 **/.env
 **/.env.*
+aws/.env.production
 !**/.env.example
 !**/.env.*.example
 *.pem

@@ -6,6 +6,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 AWS_DIR="${ROOT_DIR}/aws"
 ENV_FILE="${1:-${AWS_DIR}/.env.production}"
 COMPOSE_FILE="${AWS_DIR}/docker-compose.ec2.yml"
+DOCKER_COMPOSE_CMD=()
 
 require_command() {
   local command_name="$1"
@@ -23,10 +24,30 @@ require_env() {
   fi
 }
 
+resolve_docker_compose_command() {
+  if docker compose version >/dev/null 2>&1; then
+    DOCKER_COMPOSE_CMD=(docker compose)
+    return
+  fi
+
+  if command -v docker-compose >/dev/null 2>&1; then
+    DOCKER_COMPOSE_CMD=(docker-compose)
+    return
+  fi
+
+  echo "Missing Docker Compose. Install the Docker Compose plugin or docker-compose standalone first." >&2
+  echo "On a clean EC2 host, run: sudo DEPLOY_USER=${SUDO_USER:-ubuntu} bash aws/scripts/bootstrap-ec2.sh" >&2
+  exit 1
+}
+
+docker_compose() {
+  "${DOCKER_COMPOSE_CMD[@]}" "$@"
+}
+
 wait_for_postgres() {
   local attempt
   for attempt in {1..30}; do
-    if docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" exec -T postgres \
+    if docker_compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" exec -T postgres \
       pg_isready -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" >/dev/null 2>&1; then
       return
     fi
@@ -64,6 +85,7 @@ main() {
   require_command rsync
   require_command sudo
   require_command envsubst
+  resolve_docker_compose_command
 
   if [[ ! -f "${ENV_FILE}" ]]; then
     echo "Missing environment file: ${ENV_FILE}" >&2
@@ -104,20 +126,20 @@ main() {
 
   rsync -a --delete apps/web/dist/ "${WEB_ROOT_DIR}/"
 
-  docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" build api
-  docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" up -d postgres
+  docker_compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" build api
+  docker_compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" up -d postgres
 
   wait_for_postgres
 
-  docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" run --rm --no-deps api \
+  docker_compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" run --rm --no-deps api \
     npx prisma migrate deploy
 
   if [[ "${RUN_SEED_ON_DEPLOY:-0}" == "1" ]]; then
-    docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" run --rm --no-deps api \
+    docker_compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" run --rm --no-deps api \
       node --import tsx prisma/seed.ts
   fi
 
-  docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" up -d api
+  docker_compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" up -d api
 
   render_nginx_config
 

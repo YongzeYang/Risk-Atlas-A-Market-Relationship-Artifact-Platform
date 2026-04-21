@@ -314,6 +314,15 @@ What the bootstrap script installs:
 - pnpm via Corepack
 - CMake, build-essential, git, rsync, jq, gettext-base
 
+Verify the host immediately after bootstrap:
+
+```bash
+docker --version
+docker compose version || docker-compose version
+certbot --version
+pnpm --version
+```
+
 After bootstrap, log out once and SSH back in so your user picks up Docker group membership.
 
 ## 7. Configure the production environment file
@@ -362,6 +371,8 @@ cd /opt/risk-atlas/app
 bash aws/scripts/deploy-ec2.sh
 ```
 
+If your server only has the standalone docker-compose binary, the deploy script now falls back to it automatically.
+
 What the deploy script does:
 
 1. loads aws/.env.production
@@ -402,6 +413,23 @@ At this point, verify:
 curl http://YOUR_DOMAIN/health
 curl http://YOUR_DOMAIN/docs
 ```
+
+If you use Cloudflare proxying and you see HTTP 521 here, that means Cloudflare cannot reach your origin yet. Verify the origin directly before debugging Cloudflare itself:
+
+```bash
+curl -H "Host: YOUR_DOMAIN" http://127.0.0.1/health
+curl -H "Host: YOUR_DOMAIN" http://YOUR_EC2_PUBLIC_IP/health
+sudo systemctl status nginx --no-pager
+```
+
+If the direct origin checks fail, fix the EC2 host first. Typical causes are:
+
+- the bootstrap script was never run, so Nginx, Certbot, or Docker Compose is missing
+- the deploy script stopped before it reached the Nginx render step
+- the security group is not allowing port 80 or 443
+- Cloudflare is proxied too early, masking an origin-side failure
+
+For the cleanest first validation, temporarily switch the DNS record to DNS only in Cloudflare until the origin returns 200 on port 80.
 
 ### Step 2: issue the certificate
 
@@ -538,6 +566,8 @@ These are the settings you must treat differently from local development:
 ```bash
 docker compose -f aws/docker-compose.ec2.yml --env-file aws/.env.production ps
 ```
+
+If your host exposes only docker-compose, replace docker compose with docker-compose in the manual commands below.
 
 ### API logs
 

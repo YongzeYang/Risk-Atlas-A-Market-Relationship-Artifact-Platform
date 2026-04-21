@@ -10,6 +10,22 @@ fi
 DEPLOY_USER="${DEPLOY_USER:-${SUDO_USER:-ubuntu}}"
 PNPM_VERSION="${PNPM_VERSION:-10.17.1}"
 
+docker_compose_available() {
+  docker compose version >/dev/null 2>&1 || command -v docker-compose >/dev/null 2>&1
+}
+
+ensure_docker_apt_repo() {
+  install -m 0755 -d /etc/apt/keyrings
+  if [[ ! -f /etc/apt/keyrings/docker.gpg ]]; then
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    chmod a+r /etc/apt/keyrings/docker.gpg
+  fi
+
+  . /etc/os-release
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu ${VERSION_CODENAME} stable" \
+    > /etc/apt/sources.list.d/docker.list
+}
+
 install_base_packages() {
   apt-get update
   apt-get install -y --no-install-recommends \
@@ -30,20 +46,11 @@ install_base_packages() {
 }
 
 install_docker() {
-  if command -v docker >/dev/null 2>&1; then
+  if command -v docker >/dev/null 2>&1 && docker_compose_available; then
     return
   fi
 
-  install -m 0755 -d /etc/apt/keyrings
-  if [[ ! -f /etc/apt/keyrings/docker.gpg ]]; then
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-    chmod a+r /etc/apt/keyrings/docker.gpg
-  fi
-
-  . /etc/os-release
-  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu ${VERSION_CODENAME} stable" \
-    > /etc/apt/sources.list.d/docker.list
-
+  ensure_docker_apt_repo
   apt-get update
   apt-get install -y --no-install-recommends \
     containerd.io \
@@ -51,6 +58,28 @@ install_docker() {
     docker-ce \
     docker-ce-cli \
     docker-compose-plugin
+}
+
+verify_runtime_dependencies() {
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "Docker is not available after bootstrap." >&2
+    exit 1
+  fi
+
+  if ! docker_compose_available; then
+    echo "Docker Compose is not available after bootstrap." >&2
+    exit 1
+  fi
+
+  if ! command -v certbot >/dev/null 2>&1; then
+    echo "Certbot is not available after bootstrap." >&2
+    exit 1
+  fi
+
+  if ! command -v pnpm >/dev/null 2>&1; then
+    echo "pnpm is not available after bootstrap." >&2
+    exit 1
+  fi
 }
 
 install_node() {
@@ -88,6 +117,7 @@ main() {
 
   usermod -aG docker "${DEPLOY_USER}"
   prepare_host_directories
+  verify_runtime_dependencies
 
   echo "Bootstrap finished. Log out and back in once so ${DEPLOY_USER} picks up docker group membership." 
 }
