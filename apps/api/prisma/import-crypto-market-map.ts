@@ -719,10 +719,12 @@ async function fetchYahooHistoryRows(symbol: string): Promise<CsvRow[]> {
 
   for (let index = 0; index < timestamps.length; index += 1) {
     const timestampSeconds = timestamps[index];
-    const price = adjCloses?.[index] ?? closes?.[index] ?? null;
-    if (!Number.isFinite(price) || !timestampSeconds || price <= 0) {
+    const rawPrice = adjCloses?.[index] ?? closes?.[index] ?? null;
+    if (rawPrice === null || !Number.isFinite(rawPrice) || !timestampSeconds || rawPrice <= 0) {
       continue;
     }
+
+    const price = rawPrice;
 
     const rawVolume = volumes?.[index] ?? null;
     rows.push({
@@ -936,9 +938,15 @@ function assignSector(
   return null;
 }
 
-function normalizeLabels(...groups: string[][] | string[]): string[] {
+function normalizeLabels(...groups: Array<string[] | string | null | undefined>): string[] {
   return groups
-    .flatMap((group) => (Array.isArray(group) ? group : [group]))
+    .flatMap((group) => {
+      if (Array.isArray(group)) {
+        return group;
+      }
+
+      return group ? [group] : [];
+    })
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean);
 }
@@ -1048,7 +1056,7 @@ async function upsertStaticUniverses(selectedAssets: SelectedAsset[]) {
   const orderedSymbols = selectedAssets.map((asset) => asset.symbol);
 
   for (const definition of STATIC_UNIVERSE_DEFINITIONS) {
-    const symbols = definition.take ? orderedSymbols.slice(0, definition.take) : orderedSymbols;
+    const symbols = 'take' in definition ? orderedSymbols.slice(0, definition.take) : orderedSymbols;
 
     await prisma.universe.upsert({
       where: { id: definition.id },

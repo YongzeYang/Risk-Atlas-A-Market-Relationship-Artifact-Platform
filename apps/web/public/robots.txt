@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+
+Disallow: /datasets
+Disallow: /universes
+Disallow: /security-master
+Disallow: /build-runs
+Disallow: /build-series
+Disallow: /analysis-runs
+Disallow: /compare-builds
+Disallow: /compare-build-structures
+Disallow: /docs
+Disallow: /health

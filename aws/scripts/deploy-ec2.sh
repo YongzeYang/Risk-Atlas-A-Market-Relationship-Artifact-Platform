@@ -98,6 +98,7 @@ main() {
   pnpm install --frozen-lockfile
 
   VITE_API_BASE_URL="${VITE_API_BASE_URL:-}" \
+  VITE_SITE_URL="${VITE_SITE_URL:-https://${DOMAIN_NAME}}" \
   VITE_REPOSITORY_URL="${VITE_REPOSITORY_URL:-}" \
     pnpm --dir apps/web build
 

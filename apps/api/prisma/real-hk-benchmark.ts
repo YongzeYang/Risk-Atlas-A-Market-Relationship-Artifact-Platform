@@ -852,8 +852,13 @@ function inferBroadSectorFromName(labels: Array<string | null | undefined>): Sec
   return null;
 }
 
-function normalizeTaxonomyValue(value: string): string {
-  return value.toLowerCase().replace(/[—–-]/g, ' ').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+function normalizeTaxonomyValue(value: string | null | undefined): string {
+  return (value ?? '')
+    .toLowerCase()
+    .replace(/[—–-]/g, ' ')
+    .replace(/[^a-z0-9 ]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function matchesKeyword(value: string, fragments: string[]): boolean {
