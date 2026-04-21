@@ -23,6 +23,7 @@ const CSV_HEADER_V1 = 'tradeDate,symbol,adjClose';
 const CSV_HEADER_V2 = 'tradeDate,symbol,adjClose,volume';
 const BATCH_SIZE = 5000;
 const DEFAULT_IMPORT_TRANSACTION_TIMEOUT_MS = 300_000;
+const PROGRESS_LOG_EVERY_ROWS = 100_000;
 const WINDOW_DAYS = [60, 120, 252] as const;
 const GENERIC_SYMBOL_PATTERN = /^[A-Z0-9][A-Z0-9._/-]{1,31}$/;
 
@@ -151,6 +152,8 @@ async function streamImportRows(
 
   let rowCount = 0;
   let batch: ImportRow[] = [];
+  let flushedRowCount = 0;
+  let nextProgressLogAt = PROGRESS_LOG_EVERY_ROWS;
   const symbols = new Set<string>();
   const tradeDates = new Set<string>();
 
@@ -165,6 +168,17 @@ async function streamImportRows(
     const currentBatch = batch;
     batch = [];
     await onBatch(currentBatch);
+    flushedRowCount += currentBatch.length;
+
+    if (flushedRowCount >= nextProgressLogAt) {
+      console.log(
+        `CSV import progress for ${datasetId}: ${flushedRowCount.toLocaleString('en-US')} rows inserted so far.`
+      );
+
+      while (nextProgressLogAt <= flushedRowCount) {
+        nextProgressLogAt += PROGRESS_LOG_EVERY_ROWS;
+      }
+    }
   }
 
   for await (const rawLine of rl) {
@@ -314,6 +328,11 @@ export async function importEodCsv(options: ImportEodCsvOptions): Promise<Import
   const replaceExisting = options.replaceExisting ?? true;
   const transactionTimeoutMs =
     options.transactionTimeoutMs ?? DEFAULT_IMPORT_TRANSACTION_TIMEOUT_MS;
+
+  console.log(
+    `Starting CSV import for dataset ${options.datasetId} from ${options.csvPath} ` +
+      `(batch size ${BATCH_SIZE.toLocaleString('en-US')}).`
+  );
 
   const finalSummary = await client.$transaction(
     async (tx: any): Promise<ImportProcessedSummary> => {

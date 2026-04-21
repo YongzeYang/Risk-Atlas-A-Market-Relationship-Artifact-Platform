@@ -433,6 +433,21 @@ Then run the deploy script once.
 
 After the first successful seed, set it back to 0 unless you intentionally want to rerun it.
 
+If your seed uses the bundled real-HK CSV, the first import is intentionally heavy: the file is about 1.4 million rows and may take several minutes on EC2 before the next post-import log lines appear.
+
+The importer now prints progress every 100,000 inserted rows.
+
+If you want to check progress from another SSH session while the deploy script is still running:
+
+```bash
+cd /opt/risk-atlas/app
+set -a
+source aws/.env.production
+set +a
+docker compose -f aws/docker-compose.ec2.yml --env-file aws/.env.production exec -T postgres \
+  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c 'SELECT COUNT(*) FROM "eod_prices";'
+```
+
 ## 9. HTTPS with Let's Encrypt
 
 ### Step 1: deploy the HTTP-only Nginx config

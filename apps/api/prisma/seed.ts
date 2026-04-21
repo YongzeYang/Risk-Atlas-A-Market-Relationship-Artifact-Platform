@@ -27,7 +27,7 @@ const REAL_HK_DATASET_NAME = 'Hong Kong EOD Real Yahoo Chart v1';
 const DEFAULT_REAL_HK_CSV_PATH = fileURLToPath(
   new URL('../../../data/real-hk/hk_eod_yahoo_real_v1.csv', import.meta.url)
 );
-const REAL_HK_IMPORT_TRANSACTION_TIMEOUT_MS = 900_000;
+const REAL_HK_IMPORT_TRANSACTION_TIMEOUT_MS = 1_800_000;
 
 type SeedDatasetTarget = {
   datasetId: string;
@@ -343,6 +343,7 @@ async function main() {
       `Using local real-HK CSV seed source at ${seedDatasetTarget.csvPath}; ` +
         `demo sample regeneration is skipped.`
     );
+    console.log('Starting real-HK dataset import. This can take several minutes on EC2.');
   }
 
   const importSummary = await importEodCsv({
