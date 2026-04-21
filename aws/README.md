@@ -415,7 +415,9 @@ What the deploy script does:
 6. builds the production API Docker image
 7. starts PostgreSQL with Docker Compose
 8. runs Prisma migrate deploy inside the API image
-9. optionally runs the seed step if RUN_SEED_ON_DEPLOY=1
+9. optionally runs one of the first-deploy data helpers:
+  - RUN_INITIAL_MARKET_BOOTSTRAP_ON_DEPLOY=1 imports or verifies the Hong Kong and crypto datasets, then runs 8 snapshot builds total: 4 score methods for HK and the same 4 score methods for crypto
+  - otherwise, RUN_SEED_ON_DEPLOY=1 runs the Hong Kong seed path only
 10. starts or updates the API container with either local_fs or s3 artifact mode depending on ARTIFACT_STORAGE_BACKEND
 11. renders the Nginx site config from the templates in aws/nginx
 12. reloads Nginx
@@ -423,7 +425,7 @@ What the deploy script does:
 
 ### Seed behavior
 
-If this is the first deploy and you want the seed script to run automatically, set:
+If this is the first deploy and you want only the Hong Kong seed path to run automatically, set:
 
 ```dotenv
 RUN_SEED_ON_DEPLOY=1
@@ -432,6 +434,36 @@ RUN_SEED_ON_DEPLOY=1
 Then run the deploy script once.
 
 After the first successful seed, set it back to 0 unless you intentionally want to rerun it.
+
+### Initial market bootstrap behavior
+
+If you want the server to initialize both markets and produce all 8 one-date snapshots automatically on first deploy, set:
+
+```dotenv
+RUN_INITIAL_MARKET_BOOTSTRAP_ON_DEPLOY=1
+RUN_SEED_ON_DEPLOY=0
+```
+
+That helper does this in order:
+
+1. ensures the Hong Kong dataset exists by running prisma/seed.ts only when the HK dataset is still missing or empty
+2. ensures the crypto dataset exists by running prisma/import-crypto-market-map.ts only when crypto_market_map_yahoo_v2 is still missing or empty
+3. runs 8 snapshot builds sequentially with windowDays=252:
+   - Hong Kong market: pearson_corr, ewma_corr, tail_dep_05, nmi_hist_10
+   - Crypto market: pearson_corr, ewma_corr, tail_dep_05, nmi_hist_10
+
+The snapshot helper uses these dataset and universe pairs:
+
+- HK: dataset hk_eod_yahoo_real_v1 when available, otherwise hk_eod_demo_v1; universe hk_all_common_equity
+- Crypto: dataset crypto_market_map_yahoo_v2; universe crypto_market_map_all
+
+If you prefer to run that helper manually instead of through the deploy script:
+
+```bash
+cd /opt/risk-atlas/app
+docker compose -f aws/docker-compose.ec2.yml --env-file aws/.env.production run --rm --no-deps api \
+  node --import tsx prisma/bootstrap-initial-market-state.ts
+```
 
 If your seed uses the bundled real-HK CSV, the first import is intentionally heavy: the file is about 1.4 million rows and may take several minutes on EC2 before the next post-import log lines appear.
 

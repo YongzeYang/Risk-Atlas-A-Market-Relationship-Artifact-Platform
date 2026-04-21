@@ -53,6 +53,8 @@ const LIQUIDITY_ADV_DAYS = 30;
 const BUILD_WINDOW_DAYS = 252;
 const MIN_REQUIRED_HISTORY_ROWS = BUILD_WINDOW_DAYS + 1;
 const BUILD_SCORE_METHOD = 'pearson_corr' as const;
+const SKIP_VERIFICATION_BUILD =
+  (process.env.CRYPTO_MARKET_MAP_SKIP_VERIFICATION_BUILD ?? '0').trim() === '1';
 const MIN_SECTOR_UNIVERSE_SIZE = 5;
 const PROGRESS_LOG_EVERY = parsePositiveInteger(
   process.env.CRYPTO_MARKET_MAP_PROGRESS_EVERY,
@@ -465,31 +467,49 @@ async function main() {
       `(${importSummary.minTradeDate}..${importSummary.maxTradeDate}).`
   );
 
-  const buildRun = await prisma.buildRun.create({
-    data: {
-      datasetId: DATASET_ID,
-      universeId: BUILD_UNIVERSE_ID,
-      asOfDate: importSummary.maxTradeDate,
-      windowDays: BUILD_WINDOW_DAYS,
-      scoreMethod: BUILD_SCORE_METHOD
+  let completedBuild: {
+    id: string;
+    status: string;
+    errorMessage: string | null;
+    artifact: {
+      symbolCount: number;
+      minScore: number | null;
+      maxScore: number | null;
+      matrixByteSize: bigint | null;
+      previewByteSize: bigint | null;
+      manifestByteSize: bigint | null;
+    } | null;
+  } | null = null;
+
+  if (SKIP_VERIFICATION_BUILD) {
+    console.log('Skipping crypto verification build because CRYPTO_MARKET_MAP_SKIP_VERIFICATION_BUILD=1.');
+  } else {
+    const buildRun = await prisma.buildRun.create({
+      data: {
+        datasetId: DATASET_ID,
+        universeId: BUILD_UNIVERSE_ID,
+        asOfDate: importSummary.maxTradeDate,
+        windowDays: BUILD_WINDOW_DAYS,
+        scoreMethod: BUILD_SCORE_METHOD
+      }
+    });
+
+    console.log(`Running verification build ${buildRun.id} on universe ${BUILD_UNIVERSE_ID}.`);
+    await runBuild(buildRun.id);
+
+    completedBuild = await prisma.buildRun.findUnique({
+      where: { id: buildRun.id },
+      include: { artifact: true }
+    });
+
+    if (!completedBuild || completedBuild.status !== 'succeeded' || !completedBuild.artifact) {
+      throw new Error(
+        `Crypto market-map build ${buildRun.id} did not succeed: ${completedBuild?.errorMessage ?? 'unknown error'}`
+      );
     }
-  });
 
-  console.log(`Running verification build ${buildRun.id} on universe ${BUILD_UNIVERSE_ID}.`);
-  await runBuild(buildRun.id);
-
-  const completedBuild = await prisma.buildRun.findUnique({
-    where: { id: buildRun.id },
-    include: { artifact: true }
-  });
-
-  if (!completedBuild || completedBuild.status !== 'succeeded' || !completedBuild.artifact) {
-    throw new Error(
-      `Crypto market-map build ${buildRun.id} did not succeed: ${completedBuild?.errorMessage ?? 'unknown error'}`
-    );
+    console.log(`Verification build ${buildRun.id} succeeded after ${formatElapsed(Date.now() - startedAt)}.`);
   }
-
-  console.log(`Verification build ${buildRun.id} succeeded after ${formatElapsed(Date.now() - startedAt)}.`);
 
   console.log(
     JSON.stringify(
@@ -500,17 +520,19 @@ async function main() {
         rowCount: importSummary.rowCount,
         minTradeDate: importSummary.minTradeDate,
         maxTradeDate: importSummary.maxTradeDate,
-        buildRunId: buildRun.id,
+        buildRunId: completedBuild?.id ?? null,
         buildUniverseId: BUILD_UNIVERSE_ID,
-        buildStatus: completedBuild.status,
-        artifact: {
-          symbolCount: completedBuild.artifact.symbolCount,
-          minScore: completedBuild.artifact.minScore,
-          maxScore: completedBuild.artifact.maxScore,
-          matrixByteSize: completedBuild.artifact.matrixByteSize?.toString() ?? null,
-          previewByteSize: completedBuild.artifact.previewByteSize?.toString() ?? null,
-          manifestByteSize: completedBuild.artifact.manifestByteSize?.toString() ?? null
-        },
+        buildStatus: completedBuild?.status ?? null,
+        artifact: completedBuild?.artifact
+          ? {
+              symbolCount: completedBuild.artifact.symbolCount,
+              minScore: completedBuild.artifact.minScore,
+              maxScore: completedBuild.artifact.maxScore,
+              matrixByteSize: completedBuild.artifact.matrixByteSize?.toString() ?? null,
+              previewByteSize: completedBuild.artifact.previewByteSize?.toString() ?? null,
+              manifestByteSize: completedBuild.artifact.manifestByteSize?.toString() ?? null
+            }
+          : null,
         sectors: summarizeSectors(selectedAssets),
         skipped: Object.fromEntries([...skipCounts.entries()].sort((left, right) => left[0].localeCompare(right[0]))),
         output: {

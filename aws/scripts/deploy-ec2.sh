@@ -134,7 +134,10 @@ main() {
   docker_compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" run --rm --no-deps api \
     npx prisma migrate deploy
 
-  if [[ "${RUN_SEED_ON_DEPLOY:-0}" == "1" ]]; then
+  if [[ "${RUN_INITIAL_MARKET_BOOTSTRAP_ON_DEPLOY:-0}" == "1" ]]; then
+    docker_compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" run --rm --no-deps api \
+      node --import tsx prisma/bootstrap-initial-market-state.ts
+  elif [[ "${RUN_SEED_ON_DEPLOY:-0}" == "1" ]]; then
     docker_compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" run --rm --no-deps api \
       node --import tsx prisma/seed.ts
   fi
