@@ -1,6 +1,7 @@
 // apps/api/prisma/import-eod.ts
 import 'dotenv/config';
 
+import { randomUUID } from 'node:crypto';
 import { createReadStream, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createInterface } from 'node:readline';
@@ -357,12 +358,13 @@ async function upsertImportBatch(tx: any, batch: ImportRow[]): Promise<void> {
 
   const values = Prisma.join(
     dedupedBatch.map((row) =>
-      Prisma.sql`(${row.datasetId}, ${row.tradeDate}, ${row.symbol}, ${row.adjClose}, ${row.volume ?? null})`
+      Prisma.sql`(${randomUUID()}, ${row.datasetId}, ${row.tradeDate}, ${row.symbol}, ${row.adjClose}, ${row.volume ?? null})`
     )
   );
 
   await tx.$executeRaw(Prisma.sql`
     INSERT INTO "eod_prices" (
+      "id",
       "datasetId",
       "tradeDate",
       "symbol",
