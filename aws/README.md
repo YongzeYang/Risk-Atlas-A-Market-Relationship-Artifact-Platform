@@ -1,5 +1,7 @@
 # Risk Atlas on AWS
 
+Chinese versions: [Simplified Chinese](README.zh-CN.md) | [Traditional Chinese (Hong Kong)](README.zh-HK.md)
+
 This directory contains the production deployment assets for a single-host AWS setup:
 
 - one Ubuntu EC2 instance
@@ -10,6 +12,15 @@ This directory contains the production deployment assets for a single-host AWS s
 - a local EC2 cache for matrix.bsm files that must still be queried by the C++ binaries
 
 The API now supports both local_fs and s3 artifact storage backends. The recommended budget-first production shape is s3 for persisted build artifacts plus a small local matrix cache.
+
+## Deployment lifecycle at a glance
+
+1. Host bootstrap on a clean Ubuntu EC2 host: run `sudo DEPLOY_USER=ubuntu bash aws/scripts/bootstrap-ec2.sh` once to install Docker, Nginx, Certbot, AWS CLI, Node.js 20, pnpm, and the native build prerequisites.
+2. First deployment and initial market bootstrap: copy `aws/.env.production.example` to `aws/.env.production`, set `RUN_INITIAL_MARKET_BOOTSTRAP_ON_DEPLOY=1` if you want the server to reuse repository baselines, refresh both markets, and build the latest 8 default market-wide snapshots during first deploy, then run `bash aws/scripts/deploy-ec2.sh`.
+3. Daily data refresh: keep `INSTALL_DAILY_MARKET_REFRESH_TIMER=1` enabled for the built-in 24-hour systemd timer, or run `bash aws/scripts/run-daily-market-refresh.sh` manually when you want an immediate refresh.
+4. Ongoing maintenance: fast-forward the checked-out `main` branch, rerun `bash aws/scripts/deploy-ec2.sh`, monitor Docker, Nginx, and the daily timer, back up PostgreSQL, and prune old artifacts or cache files when disk pressure grows.
+
+The sections below expand each phase in detail.
 
 ## 1. What to buy and why
 
@@ -410,7 +421,7 @@ Why:
 - Nginx will proxy those paths to the API container
 - this avoids a second API subdomain and avoids unnecessary CORS complexity
 
-## 8. First deployment
+## 8. First deployment and initial market bootstrap
 
 Run the provided deployment script:
 
@@ -500,6 +511,15 @@ The timer runs the same market-state refresh flow every 24 hours:
 2. overlap-refresh Hong Kong data to the latest available trade date
 3. overlap-refresh crypto data to the latest available trade date
 4. build or reuse the latest 8 market-wide snapshots
+
+If you want to run the same flow manually outside systemd:
+
+```bash
+cd /opt/risk-atlas/app
+bash aws/scripts/run-daily-market-refresh.sh
+```
+
+That helper brings PostgreSQL up if needed, then runs `prisma/refresh-daily-market-state.ts` inside the API container with the production environment file.
 
 If you prefer to install the timer manually:
 
@@ -684,7 +704,27 @@ These are the settings you must treat differently from local development:
 - PostgreSQL must not be exposed publicly
 - invite codes and salt must not stay on the demo defaults
 
-## 12. Useful operating commands
+## 12. Routine maintenance and operating commands
+
+### Update the server to the latest checked-in version
+
+```bash
+cd /opt/risk-atlas/app
+git pull --ff-only origin main
+git submodule update --init --recursive
+bash aws/scripts/deploy-ec2.sh
+```
+
+Use this when deployment scripts, frontend assets, API behavior, or environment-handling logic has changed and you want the server to match the latest repository version.
+
+### Run one daily refresh manually
+
+```bash
+cd /opt/risk-atlas/app
+bash aws/scripts/run-daily-market-refresh.sh
+```
+
+This is useful when you do not want to wait for the next timer tick, or when the timer is temporarily disabled during maintenance.
 
 ### Check Docker services
 

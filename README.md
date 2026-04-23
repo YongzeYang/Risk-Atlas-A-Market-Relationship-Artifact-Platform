@@ -1,371 +1,256 @@
 # Risk Atlas
 
-Risk Atlas is a plain-English financial research product for reading how a basket of Hong Kong stocks is really behaving beneath the surface.
+Chinese versions: [Simplified Chinese](README.zh-CN.md) | [Traditional Chinese (Hong Kong)](README.zh-HK.md)
 
-Instead of starting from technical market-structure jargon, the product starts from five questions a human can actually ask:
+Risk Atlas is a market-structure research product for Hong Kong equities and crypto markets. It turns end-of-day price history into offline relationship artifacts, then exposes question-led workflows for snapshots, snapshot series, drift comparison, relationship checks, spillover reads, and hidden-group views.
 
-- Am I really diversified, or do these names still move like one trade?
-- Which relationships are strong enough, weak enough, or different enough to deserve a closer look?
-- If this stock drops, who tends to move with it?
-- What hidden groups already exist inside this basket?
-- What changed between one snapshot and another?
+The public UI branding still says "Risk Atlas HK", but the current product scope is HK plus crypto.
 
-The current release is HK-first. It builds point-in-time snapshots, rolling snapshot series, snapshot-to-snapshot comparison, relationship screening, spillover reads, and hidden-group views on top of offline relationship artifacts.
+## Live example
 
-## Research boundary
+You can view the deployed example at <https://risk-atlas.org>.
 
-Risk Atlas is for research support, not direct trading advice.
+- It is the actual hosted version of the product and the fastest way to see the current UI in action.
+- Use it as the reference deployment for the landing page, snapshot browsing flow, and snapshot detail experience.
+- The repository can move ahead of the hosted site, but this URL is still the clearest example of a running production-style environment.
 
-- it describes co-movement and structure; it does not explain causality
-- it can highlight concentration, drift, spillover, and hidden groups; it does not guarantee persistence
-- it helps narrow where to look next; it does not replace judgment, portfolio context, or execution discipline
+## Screenshots
 
-## What the product does today
+### Home page
 
-- creates single market snapshots for one basket, one date, and one lookback
-- runs repeated snapshot series across daily, weekly, or monthly cadence
-- compares ready snapshots across time, lookback, and basket choice
-- surfaces relationships worth a closer look through persisted screening runs
-- shows spillover from one anchor name through neighbor ladders and concentration summaries
-- reveals hidden groups through ordered heatmaps, clustering summaries, and group-drift comparison
-- keeps reads and comparison open while gating create and queue actions behind invite codes
+![Risk Atlas home page](imgs/home_page.png)
 
-## Under the hood
+### Snapshot detail page
 
-Under the hood, Risk Atlas imports end-of-day prices, resolves a basket for one date and lookback, computes a symmetric relationship matrix offline, stores the result as matrix.bsm plus metadata, and exposes read/query workflows through APIs and a web UI.
+![Risk Atlas snapshot detail page](imgs/snapshot_detail_page.png)
 
-## Strict status
+## Who this is for
 
-As of the latest real-HK verification on 2026-04-19, the system is complete against the user's full 1-7 target set.
+- Researchers who want point-in-time structure reads instead of only raw price charts.
+- Teams comparing diversification, crowding, drift, and hidden grouping across a basket.
+- Users who need a practical example of offline artifact builds, persisted matrix reads, and lightweight hosted delivery.
 
-- 1. Full HK / very large universe support: complete
-- 2. Build Series as a first-class model: complete
-- 3. Compare Builds across time/window/universe: complete
-- 4. Invite-code mode with open queries and gated writes: complete
-- 5. Pair Divergence Candidates: complete
-- 6. Co-movement Exposure View: complete
-- 7. Clustered Structure View: complete
+## What users can do today
 
-What closed item 1:
+- Browse saved snapshot builds for Hong Kong and crypto markets.
+- Open snapshot detail pages backed by `matrix.bsm`, `preview.json`, and `manifest.json`.
+- Compare builds across time, lookback windows, and universe choice.
+- Inspect relationship structure, pair drift, spillover, and grouped market structure reads.
+- Queue new builds and build series behind invite-code gates while keeping read paths open.
+- Run on either local filesystem artifacts or S3-backed artifacts with a local matrix cache.
 
-- the official filtered HKEX common-equity universe is 2670 names
-- the real dataset currently imports 2515 names and 1399094 EOD rows
-- build preparation now uses pairwise-overlap correlation instead of requiring one globally aligned date set across the entire universe
-- hk_all_common_equity now validates on 2026-04-17 with 2515 coverage-qualified symbols and 2470 matrix-ready symbols
-- a real one-shot full-market build has been verified end to end at 2470 symbols with a succeeded matrix.bsm artifact
-- compare-build drift no longer depends on dense preview scores and now reads drift directly from BSM artifacts
+## Latest validated state
 
-What closed items 6 and 7:
+Validated locally on 2026-04-23:
 
-- the neighbor, exposure, cluster ordering, cluster summary, and drift workflows all exist
-- real-HK security_master broad-sector coverage is now backfilled from cached Yahoo search taxonomy plus name heuristics
-- HK common-equity rows with populated sector now measure 2609 of 2701, which makes exposure and structure overlays usable across the real market build surface
-- exposure and structure queries have been verified on the succeeded 2470-symbol real full-market build
+- `pnpm bootstrap:local` completed end to end with exit code 0.
+- The bootstrap reused repository baselines in `data/real-hk` and `data/crypto`, overlap-refreshed both markets to 2026-04-23, and finished all 8 default full-market snapshots at `windowDays=252`.
+- HK snapshots succeeded for all 4 score methods with 2471 resolved symbols from the current real-HK surface.
+- Crypto snapshots succeeded for all 4 score methods with 654 resolved symbols from the market-map universe.
+- The HK catalog currently holds 1,408,608 EOD rows and the crypto catalog currently holds 248,371 EOD rows.
+- First-run build records now persist `sourceDatasetMaxTradeDate`, `symbolSetHash`, and `symbolStateHashesJson`.
+- A manual same-config rerun of the latest HK `pearson_corr` snapshot reused 2471 prefix rows from its parent and finished with `buildStrategy=incremental`.
 
-## Real HK data scale
+## Current default catalog surface
 
-Latest audited numbers from the real benchmark pipeline:
+- HK dataset: `hk_eod_yahoo_real_v1`.
+- HK default market-wide universe: `hk_all_common_equity`.
+- Crypto dataset: `crypto_market_map_yahoo_v2`.
+- Crypto default market-wide universe: `crypto_market_map_all`.
+- Additional crypto universes include market-cap baskets and liquidity-driven universes such as `crypto_top_50_liquid`, `crypto_top_100_liquid`, and `crypto_top_200_liquid`.
+- The default bootstrap output is the latest 8 market-wide snapshots: 4 score methods for HK and the same 4 score methods for crypto, all at `windowDays=252`.
 
-- official filtered HKEX equity universe: 2670
-- HK common-equity rows in security_master: 2701
-- HK common-equity rows with populated sector: 2609
-- imported real dataset symbols: 2515
-- imported real dataset rows: 1399094
-- dataset date range: 2024-01-02 to 2026-04-17
-- coverage-qualified symbols on 2026-04-17: 2515
-- matrix-ready symbols on 2026-04-17: 2470
-- filtered out near-flat symbols on 2026-04-17: 45
-- verified real full-market build artifact sizes: matrix 24760448 bytes, preview 667983 bytes, manifest 37904 bytes
+## Build surface and workflows
 
-The build and benchmark flows now prove that both medium-to-large and full-market real universes are buildable:
+### Supported build inputs
 
-- HK Real Yahoo 300: succeeded
-- HK Real Yahoo 500: succeeded
-- HK Real Yahoo 1000: succeeded
-- HK All Common Equity real build on 2026-04-17: succeeded at 2470 symbols
+- Markets: HK and crypto.
+- Score methods: `pearson_corr`, `ewma_corr`, `tail_dep_05`, `nmi_hist_10`.
+- Build windows: `60`, `120`, `252`.
+- Build series frequencies: `daily`, `weekly`, `monthly`.
+- Artifact backends: `local_fs`, `s3`.
+- Current hard cap: 4000 resolved symbols in one build.
 
-## What the product does today
+### Main product workflows
 
-- builds single HK correlation snapshots into matrix.bsm, preview.json, and manifest.json
-- validates requests using coverage-qualified and matrix-ready symbol counts rather than raw requested counts
-- computes large-universe matrices with pairwise-overlap correlation instead of whole-universe aligned-date gating
-- supports rolling Build Series scheduled on real dataset trading dates
-- compares succeeded builds across time, window, and universe changes
-- runs Pair Divergence, Co-movement Exposure, and Clustered Structure analysis workflows
-- keeps queued analysis runs reopenable through persisted run ids
-- resolves both static and rule-driven HK universes
-- backfills real-HK broad-sector taxonomy into security_master for overlay-heavy workflows
+- Snapshot list and detail pages for saved full-market or basket-specific reads.
+- Snapshot series scheduling with real trading-date alignment.
+- Compare Builds for time-vs-time, window-vs-window, and universe-vs-universe reads.
+- Relationship and pair-level inspection from saved artifacts.
+- Spillover analysis from one anchor symbol outward.
+- Hidden-group and clustered-structure reads for crowded or fragmented baskets.
 
-## One-click local startup
+### Access model
+
+- Creating build runs requires an invite code.
+- Creating build series requires an invite code.
+- Queueing new analysis runs requires an invite code.
+- Reading existing builds, analysis runs, compare results, and artifact-backed queries stays open.
+
+## How the system works
+
+1. Import end-of-day prices into PostgreSQL and refresh dataset metadata.
+2. Resolve the requested universe for one as-of date and lookback window.
+3. Prepare aligned return inputs and feed them into the C++ matrix builder.
+4. Persist the canonical artifact bundle: `matrix.bsm`, `preview.json`, and `manifest.json`.
+5. Serve web and API reads from metadata plus artifact-backed queries.
+
+## Artifact bundle
+
+- `matrix.bsm` is the numerical source of truth for matrix-style reads.
+- `preview.json` carries symbol order, top pairs, and lightweight summary data for fast UI reads.
+- `manifest.json` records bundle metadata, byte sizes, bounds, and preview format details.
+
+The C++ incremental builder supports both same-build resume and cross-build prefix seeding. When symbol order and per-symbol state hashes still match a previous succeeded build, a new build can seed reusable rows instead of recomputing the entire matrix from scratch.
+
+## One-command local startup
 
 ### Prerequisites
 
-- Node.js 20+
-- pnpm 10+
-- Docker with docker compose
-- CMake 3.20+
-- a C++20-capable compiler
+- Node.js 20+.
+- pnpm 10+.
+- Docker with Compose support.
+- CMake 3.20+.
+- A C++20-capable compiler.
 
-### Fastest path from fresh clone
+### Fastest path from a fresh clone
 
 ```bash
 git clone <your-repo-url>
 cd risk-atlas
 cp .env.example .env
-bash scripts/quickstart.sh
+pnpm quickstart
 ```
 
-What that does:
+`pnpm quickstart` will:
 
-- installs workspace dependencies
-- generates apps/api/.env and apps/web/.env from the root .env
-- starts PostgreSQL through docker compose
-- configures and builds the C++ BSM writer
-- runs Prisma generate, Prisma migrate deploy, and seed
-- seed prefers the local real-HK CSV at data/real-hk/hk_eod_yahoo_real_v1.csv when it exists and only falls back to regenerating the demo CSV when real-HK files are absent
-- starts the API and web dev servers together
+- install workspace dependencies.
+- sync the root `.env` into `apps/api/.env` and `apps/web/.env`.
+- start PostgreSQL through Docker Compose.
+- configure and build the C++ targets.
+- run Prisma generate and migrations.
+- run the market-state bootstrap.
+- start the API and web dev servers.
 
-Default local addresses after startup:
+Default local addresses:
 
-- web: http://localhost:5173
-- api: http://localhost:3000
-- swagger: http://localhost:3000/docs
+- Web: http://localhost:5173.
+- API: http://localhost:3000.
+- Swagger UI: http://localhost:3000/docs.
 
-In local dev, the web app now uses relative API paths by default, so browser requests stay same-origin with Vite and flow through the configured proxy. Set an explicit absolute VITE_API_BASE_URL only when you intentionally want the browser to call the API directly.
-
-Stop the stack by pressing Ctrl+C in the terminal that is running quickstart or dev:stack.
-
-### First-time bootstrap and daily start as separate commands
+If you prefer to separate bootstrap from daily development startup:
 
 ```bash
 pnpm bootstrap:local
 pnpm dev:stack
 ```
 
-`bootstrap:local` now defaults to the full market-state bootstrap path:
+## What bootstrap gives you
 
-- reuses the repository baselines already checked into `data/real-hk` and `data/crypto` when they are present
-- seeds the Hong Kong prerequisites only when they are still missing
-- overlap-refreshes both Hong Kong and crypto data to the latest available trade date instead of rebuilding the catalog from scratch
-- builds or reuses the latest 8 market-wide snapshots at `windowDays=252`: 4 score methods for Hong Kong and the same 4 score methods for crypto
+`pnpm bootstrap:local` now defaults to the market-state bootstrap path controlled by `RISK_ATLAS_BOOTSTRAP_MARKET_STATE=1`.
 
-The recurring daily refresh uses the same import path and snapshot plan. To run it manually:
+That flow:
+
+- reuses repository baselines already checked into `data/real-hk` and `data/crypto` when they exist.
+- seeds missing Hong Kong prerequisites only when necessary.
+- overlap-refreshes both Hong Kong and crypto data to the latest available trade date instead of rebuilding everything from scratch.
+- builds or reuses the latest 8 full-market snapshots at `windowDays=252` across 4 score methods and 2 markets.
+- leaves you with a usable local data catalog plus ready-to-query artifact bundles.
+
+The same market refresh logic also powers the recurring daily job:
 
 ```bash
 pnpm --dir apps/api db:refresh-daily-market-state
 ```
 
-In production, the provided AWS systemd timer runs that refresh flow every 24 hours.
+The AWS deployment guide includes a systemd timer that runs this refresh every 24 hours.
 
-### Regenerate app env files after changing root config
-
-```bash
-pnpm env:sync
-```
-
-## Configuration you can customize
-
-Edit the root .env before running bootstrap or quickstart.
-
-Important keys:
-
-- POSTGRES_DB: database name
-- POSTGRES_USER: database user
-- POSTGRES_PASSWORD: database password
-- POSTGRES_HOST: database host used by the API
-- POSTGRES_PORT: host port mapped by docker compose
-- API_PORT: Fastify port
-- ARTIFACT_STORAGE_BACKEND: local_fs or s3; local_fs is the default local behavior, s3 uploads build artifacts to S3 and uses a local matrix cache for queries
-- ARTIFACT_ROOT_DIR: local working directory for artifacts and analysis-run records
-- ARTIFACT_CACHE_DIR: local cache directory for matrix.bsm files when ARTIFACT_STORAGE_BACKEND=s3
-- AWS_REGION: AWS region used for S3 artifact operations when ARTIFACT_STORAGE_BACKEND=s3
-- S3_ARTIFACT_BUCKET: S3 bucket name used for build artifacts when ARTIFACT_STORAGE_BACKEND=s3
-- S3_ARTIFACT_PREFIX: optional S3 prefix root such as prod or staging
-- S3_SIGNED_URL_TTL_SECONDS: lifetime of S3 presigned matrix download URLs
-- WEB_PORT: Vite dev port
-- VITE_API_BASE_URL: optional absolute web-to-api base URL; leave blank for default local proxy behavior
-- CORS_ALLOWED_ORIGINS: optional comma-separated origins allowed when the browser calls the API directly
-- RISK_ATLAS_INVITE_CODES: comma-separated invite code list used by seed
-- RISK_ATLAS_INVITE_SALT: salt used to hash invite codes into the database
-- RISK_ATLAS_BOOTSTRAP_MARKET_STATE: default 1; bootstrap:local reuses repository market data, refreshes both markets to the latest overlap window, and builds or reuses the latest 8 full-market snapshots
-- RISK_ATLAS_BOOTSTRAP_REAL_HK: legacy fallback used only when RISK_ATLAS_BOOTSTRAP_MARKET_STATE=0 and you still want the older real-HK benchmark path after seed
-
-Example:
-
-```dotenv
-POSTGRES_DB=risk_atlas_prod
-POSTGRES_USER=atlas
-POSTGRES_PASSWORD=replace-this-password
-POSTGRES_PORT=5544
-API_PORT=3100
-ARTIFACT_STORAGE_BACKEND=local_fs
-WEB_PORT=5174
-VITE_API_BASE_URL=
-CORS_ALLOWED_ORIGINS=http://localhost:5174
-RISK_ATLAS_INVITE_CODES=team-alpha-2026,team-beta-2026
-```
-
-After editing the root .env, run:
+## Useful commands
 
 ```bash
 pnpm env:sync
-```
-
-## AWS production deployment
-
-The recommended first production deployment for this repository is:
-
-- one Ubuntu EC2 host
-- host-level Nginx for ports 80 and 443
-- Docker Compose for the API and PostgreSQL
-- one public domain with same-origin routing
-- Amazon S3 as the recommended low-cost build artifact source of truth
-- a small local EC2 cache for matrix.bsm query files when S3 storage is enabled
-
-The API now supports both local_fs and s3 artifact storage backends. In s3 mode, preview.json and manifest.json are read from S3, build downloads use presigned URLs, and matrix.bsm is cached locally on demand for the existing C++ query path.
-
-For the full step-by-step AWS guide, deployment scripts, Compose file, Nginx templates, environment template, and S3 sync timer, see:
-
-- [aws/README.md](aws/README.md)
-
-## Optional: refresh the larger real HK dataset from source
-
-If the repository already contains the local real-HK CSV under data/real-hk, seed will reuse it automatically. If you want to refresh that dataset from upstream sources and rewrite the coverage audit report, run:
-
-```bash
+pnpm bootstrap:local
+pnpm dev:stack
 pnpm real-hk:refresh
-```
-
-That command refreshes the real Yahoo HK dataset, imports it, upserts benchmark universes, and writes an audit report into artifacts/benchmark-reports.
-
-If you only want to refresh the real-HK security-master taxonomy overlay without reimporting prices, run:
-
-```bash
 pnpm real-hk:taxonomy
-```
-
-## Optional: import a real crypto POC dataset
-
-The repository now includes a static-universe crypto proof-of-concept importer that pulls public daily candles from Coinbase, writes a local CSV under data/crypto, imports the dataset, and runs one verification build:
-
-```bash
-pnpm crypto:coinbase:import
-```
-
-What it creates:
-
-- dataset: crypto_usd_coinbase_daily_v1
-- universe: crypto_usd_top_10
-- market: CRYPTO
-
-That Coinbase path is still the lightweight proof of concept.
-
-## Optional: import a crypto market-map dataset
-
-The repository also includes a larger crypto market-map importer. It uses CoinGecko market metadata for candidate ranking and taxonomy hints, then switches to Yahoo chart history for the actual daily time series so the import can scale to a much larger batch. It writes taxonomy files under data/crypto, imports the dataset, and runs one verification build on the imported market-map universe:
-
-```bash
 pnpm crypto:market-map:import
+pnpm crypto:coinbase:import
+pnpm --dir apps/api db:refresh-daily-market-state
 ```
 
-What it creates:
+What they do:
 
-- dataset: crypto_market_map_yahoo_v2
-- static universes: crypto_market_map_all, crypto_market_cap_50, crypto_market_cap_100, crypto_market_cap_200
-- dynamic universes: crypto_top_50_liquid, crypto_top_100_liquid, crypto_top_200_liquid, plus populated crypto sector baskets
-- market: CRYPTO
+- `pnpm env:sync`: copy root env values into the app-local env files.
+- `pnpm bootstrap:local`: prepare the local database, datasets, artifacts, and latest snapshot set.
+- `pnpm dev:stack`: run the API and web dev servers against the local stack.
+- `pnpm real-hk:refresh`: refresh the real HK dataset and coverage audit report.
+- `pnpm real-hk:taxonomy`: refresh only the HK sector taxonomy overlay.
+- `pnpm crypto:market-map:import`: import the larger best-effort crypto market-map dataset.
+- `pnpm crypto:coinbase:import`: import the smaller Coinbase proof-of-concept crypto dataset.
+- `pnpm --dir apps/api db:refresh-daily-market-state`: manually run the 24-hour market refresh job.
 
-Important scope notes:
+## Configuration highlights
 
-- the importer now uses Yahoo chart history with batched/concurrent fetching instead of the much slower CoinGecko public history endpoint
-- the importer intentionally excludes stablecoins, wrapped or bridged assets, leveraged tokens, and liquid-staking derivatives so the market map behaves more like a spot risk-asset universe
-- crypto dynamic universes are now market-aware for liquidity and sector-filter rules; the legacy all-common-equity rule remains HK-oriented
-- the default importer now runs in best-effort mode: it scans 5 CoinGecko candidate pages, tries to pull as many Yahoo history series as possible, and proceeds with whatever clears the build window as long as at least 50 assets survive; you can still override the upper bound and floor with `CRYPTO_MARKET_MAP_TARGET_COUNT`, `CRYPTO_MARKET_MAP_MIN_COUNT`, `CRYPTO_MARKET_MAP_CANDIDATE_PAGE_COUNT`, `CRYPTO_MARKET_MAP_REQUEST_DELAY_MS`, `CRYPTO_MARKET_MAP_HISTORY_BATCH_SIZE`, `CRYPTO_MARKET_MAP_HISTORY_CONCURRENCY`, `CRYPTO_MARKET_MAP_PROGRESS_EVERY`, and `CRYPTO_MARKET_MAP_ENRICH_DETAILS=1`
+Edit the root `.env` before bootstrap or deployment. The most important keys are:
 
-## HK universe support
+- `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST`, `POSTGRES_PORT`.
+- `API_PORT`, `WEB_PORT`.
+- `VITE_API_BASE_URL`, `CORS_ALLOWED_ORIGINS`.
+- `ARTIFACT_STORAGE_BACKEND`, `ARTIFACT_ROOT_DIR`, `ARTIFACT_CACHE_DIR`.
+- `AWS_REGION`, `S3_ARTIFACT_BUCKET`, `S3_ARTIFACT_PREFIX`, `S3_SIGNED_URL_TTL_SECONDS`.
+- `RISK_ATLAS_INVITE_CODES`, `RISK_ATLAS_INVITE_SALT`.
+- `RISK_ATLAS_BOOTSTRAP_MARKET_STATE`.
+- `RISK_ATLAS_BOOTSTRAP_REAL_HK`.
 
-The current catalog includes:
+Artifact backend behavior:
 
-- static demo universes such as hk_top_20 and hk_financials_10
-- liquidity universes: hk_top_50_liquid and hk_top_200_liquid
-- market-wide universe: hk_all_common_equity, displayed as HK All Tradable Common Equities
-- sector universes for financials, property, tech, energy, consumer, industrial, telecom, and utilities
+- `local_fs`: keep artifact bundles under the local artifact root.
+- `s3`: upload artifact bundles to S3 while keeping a local matrix cache for the current C++ query path.
 
-Catalog compatibility is dataset-aware:
+After editing the root env file, resync app env files:
 
-- static universes are only advertised for datasets that fully cover all required symbols with the minimum build history
-- liquidity, all-common-equity, and sector universes remain dataset-resolved at request time
+```bash
+pnpm env:sync
+```
 
-Important scope note:
+## Data pipelines
 
-The all-common-equity and sector universes resolve against the selected dataset, as-of date, and minimum-history requirement. They represent the dataset-covered tradable HK common-equity set that is actually buildable for that request, not a promise that every security-master row has usable data on every date.
+### Hong Kong real-market pipeline
 
-## Analysis workflows
+- Uses the repository baseline under `data/real-hk` when present.
+- Can refresh the dataset from source and regenerate the benchmark report with `pnpm real-hk:refresh`.
+- Maintains taxonomy overlays in `security_master` for sector-aware reads.
 
-### Build and series
+### Crypto market-map pipeline
 
-- single snapshot builds
-- rolling Build Series across daily, weekly, or monthly cadence
-- weekly and monthly series snap to the last real trading date in each bucket
-- every scheduled Build Series run is validated before the series is created
+- Ranks candidates from CoinGecko market metadata.
+- Pulls the actual daily candles from Yahoo chart history in batches.
+- Runs in best-effort mode by default and proceeds as long as the surviving asset count clears the minimum floor.
+- Writes CSV, symbols, and taxonomy outputs under `data/crypto`.
 
-### Compare
+The larger market-map importer creates:
 
-- time vs time: same universe and window, different dates
-- window vs window: same universe and date, different lookback windows
-- universe vs universe: same date and window, different resolved scopes
+- dataset: `crypto_market_map_yahoo_v2`.
+- static universes: `crypto_market_map_all`, `crypto_market_cap_50`, `crypto_market_cap_100`, `crypto_market_cap_200`.
+- dynamic universes such as `crypto_top_50_liquid`, `crypto_top_100_liquid`, `crypto_top_200_liquid`, plus sector baskets when populated.
 
-### Pair Divergence Candidates
+## AWS deployment
 
-- long-window correlation
-- recent correlation
-- correlation delta
-- recent relative-return gap
-- spread z-score
+The recommended production shape for this repository is:
 
-### Co-movement Exposure View
+- one Ubuntu EC2 host.
+- host-level Nginx on ports 80 and 443.
+- Docker Compose for API and PostgreSQL.
+- one public domain with same-origin routing.
+- optional S3 artifact storage plus a small local EC2 matrix cache.
+- a 24-hour refresh timer for market-state updates and snapshot rebuilds.
 
-- anchor symbol to top-neighbor view
-- similarity strength banding
-- sector overlay and sector weight share
-- concentration summary and effective-neighbor count
+For the full production guide, environment template, Compose file, Nginx config, and S3 refresh notes, see [aws/README.md](aws/README.md).
 
-### Clustered Structure View
+## Research boundary
 
-- ordered symbol layout for heatmap reading
-- cluster summaries and sector composition
-- cluster drift comparison across builds
+Risk Atlas is research support, not direct trading advice.
 
-## Access model
-
-- creating build runs requires an invite code
-- creating Build Series requires an invite code
-- queueing new analysis runs requires an invite code
-- browsing builds, reading build-scoped analysis queries, listing analysis runs, and compare queries are open read paths
-
-## Artifact model
-
-The canonical bundle remains:
-
-- matrix.bsm
-- preview.json
-- manifest.json
-
-The BSM artifact is the numerical source of truth for matrix-style reads. Preview metadata remains useful for symbol order, top pairs, and summary fields, while large-build compare queries now read drift directly from BSM instead of relying on dense preview score matrices.
-
-## Stack
-
-- C++20 for the BSM writer/query engine
-- TypeScript + Fastify for the API
-- PostgreSQL + Prisma for metadata and dataset state
-- React + Vite for the web app
-
-## Current boundaries
-
-- HK only
-- end-of-day data only
-- pearson_corr only
-- windows limited to 60, 120, and 252
-- current single-build guardrail is 4000 symbols
-- offline artifact builds, not real-time risk monitoring
-- research workflows, not portfolio construction or execution
+- It describes co-movement and structure rather than causality.
+- It can highlight concentration, drift, spillover, and clustering, but it does not guarantee persistence.
+- It is end-of-day and artifact-driven, not a real-time execution or risk engine.
