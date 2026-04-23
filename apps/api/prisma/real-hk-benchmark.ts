@@ -5,6 +5,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { createInterface } from 'node:readline';
+import { fileURLToPath } from 'node:url';
 
 import { Market, Prisma, SecurityType, Sector } from '@prisma/client';
 import * as XLSX from 'xlsx';
@@ -39,6 +40,13 @@ const MAX_FETCH_ATTEMPTS = 3;
 const NEAR_ZERO_VARIANCE_THRESHOLD = 1e-20;
 const WINDOW_DAYS = 252;
 const TAXONOMY_ONLY_MODE = process.argv.includes('--taxonomy-only');
+const SKIP_BENCHMARKS_MODE = process.argv.includes('--skip-benchmarks');
+const IMPORT_MODE =
+  (process.env.RISK_ATLAS_IMPORT_EOD_MODE ?? 'replace').trim() === 'merge' ? 'merge' : 'replace';
+const SOURCE_REFRESH_OVERLAP_DAYS = Number.parseInt(
+  process.env.RISK_ATLAS_HK_SOURCE_REFRESH_OVERLAP_DAYS ?? '45',
+  10
+);
 const OFFICIAL_EQUITY_SUBCATEGORIES = new Set([
   'Equity Securities (Main Board)',
   'Equity Securities (GEM)'
@@ -207,6 +215,8 @@ async function main() {
   console.log(
     TAXONOMY_ONLY_MODE
       ? 'Starting official HKEX + Yahoo real HK taxonomy refresh flow.'
+      : SKIP_BENCHMARKS_MODE
+        ? 'Starting official HKEX + Yahoo real HK refresh/import flow without benchmark builds.'
       : 'Starting official HKEX + Yahoo real HK refresh/import/audit flow.'
   );
 
@@ -254,7 +264,7 @@ async function main() {
     datasetId: DATASET_ID,
     datasetName: DATASET_NAME,
     csvPath: OUTPUT_CSV_PATH,
-    replaceExisting: true,
+    importMode: IMPORT_MODE,
     prismaClient: prisma,
     transactionTimeoutMs: 900_000
   });
@@ -291,27 +301,35 @@ async function main() {
     requiredRows: WINDOW_DAYS + 1
   });
 
-  const benchmarkEligibleSymbols = await selectBenchmarkEligibleSymbols(DATASET_ID, importSummary.maxTradeDate);
-  const acceptedBySymbol = new Map(
-    refreshOutcome.acceptedHistories.map((entry) => [entry.symbol, entry] as const)
-  );
-  const benchmarkHistories = benchmarkEligibleSymbols
-    .map((symbol) => acceptedBySymbol.get(symbol))
-    .filter((entry): entry is SymbolHistory => entry !== undefined);
+  let benchmarkEligibleSymbols: string[] = [];
+  let benchmarkPlans: ReadonlyArray<(typeof BENCHMARK_PLANS)[number]> = [];
+  let benchmarks: BenchmarkEntry[] = [];
 
-  const benchmarkPlans = BENCHMARK_PLANS.filter(
-    (plan) => benchmarkHistories.length >= plan.requestedSymbolCount
-  );
-
-  for (const plan of benchmarkPlans) {
-    await upsertStaticUniverse(
-      plan.universeId,
-      plan.universeName,
-      benchmarkHistories.slice(0, plan.requestedSymbolCount)
+  if (SKIP_BENCHMARKS_MODE) {
+    console.log('Skipping HK benchmark builds because --skip-benchmarks was provided.');
+  } else {
+    benchmarkEligibleSymbols = await selectBenchmarkEligibleSymbols(DATASET_ID, importSummary.maxTradeDate);
+    const acceptedBySymbol = new Map(
+      refreshOutcome.acceptedHistories.map((entry) => [entry.symbol, entry] as const)
     );
-  }
+    const benchmarkHistories = benchmarkEligibleSymbols
+      .map((symbol) => acceptedBySymbol.get(symbol))
+      .filter((entry): entry is SymbolHistory => entry !== undefined);
 
-  const benchmarks = await runBenchmarks(importSummary.maxTradeDate, benchmarkPlans);
+    benchmarkPlans = BENCHMARK_PLANS.filter(
+      (plan) => benchmarkHistories.length >= plan.requestedSymbolCount
+    );
+
+    for (const plan of benchmarkPlans) {
+      await upsertStaticUniverse(
+        plan.universeId,
+        plan.universeName,
+        benchmarkHistories.slice(0, plan.requestedSymbolCount)
+      );
+    }
+
+    benchmarks = await runBenchmarks(importSummary.maxTradeDate, benchmarkPlans);
+  }
   const report = buildCoverageReport({
     officialEquities,
     refreshOutcome,
@@ -886,31 +904,32 @@ async function refreshOfficialUniverseHistories(
     officialEquities,
     FETCH_CONCURRENCY,
     async (official) => {
-      const cached = cachedHistories.get(official.symbol);
-      if (
-        cached &&
-        cached.prices.length >= MIN_REQUIRED_PRICE_ROWS &&
-        cached.lastTradeDate >= activeMinLastTradeDate
-      ) {
+      const cached = cachedHistories.get(official.symbol) ?? null;
+
+      if (cached && cached.prices.length >= MIN_REQUIRED_PRICE_ROWS) {
         reusedSymbolCount += 1;
-        return {
-          history: {
-            symbol: official.symbol,
-            name: official.name,
-            prices: cached.prices,
-            lastTradeDate: cached.lastTradeDate
-          },
-          rejection: null as FetchRejection | null
-        };
+
+        if (cached.lastTradeDate >= FETCH_END_DATE) {
+          return {
+            history: {
+              symbol: official.symbol,
+              name: official.name,
+              prices: cached.prices,
+              lastTradeDate: cached.lastTradeDate
+            },
+            rejection: null as FetchRejection | null
+          };
+        }
       }
 
       fetchedSymbolCount += 1;
-      return fetchSymbolHistory(official, activeMinLastTradeDate);
+      return fetchSymbolHistory(official, activeMinLastTradeDate, cached);
     },
     (completed) => {
       if (completed % 100 === 0 || completed === officialEquities.length) {
         console.log(
-          `Processed ${completed}/${officialEquities.length} official HK symbols. Reused ${reusedSymbolCount}, fetched ${fetchedSymbolCount}.`
+          `Processed ${completed}/${officialEquities.length} official HK symbols. ` +
+            `Reused cached bases ${reusedSymbolCount}, fetched source windows ${fetchedSymbolCount}.`
         );
       }
     }
@@ -939,9 +958,11 @@ async function refreshOfficialUniverseHistories(
 
 async function fetchSymbolHistory(
   official: OfficialSecurity,
-  activeMinLastTradeDate: string
+  activeMinLastTradeDate: string,
+  cachedHistory: SymbolHistory | null
 ): Promise<{ history: SymbolHistory | null; rejection: FetchRejection | null }> {
-  const url = buildYahooChartUrl(official.symbol, FETCH_START_DATE, FETCH_END_DATE);
+  const fetchStartDate = deriveIncrementalFetchStartDate(cachedHistory?.lastTradeDate ?? null);
+  const url = buildYahooChartUrl(official.symbol, fetchStartDate, FETCH_END_DATE);
 
   for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt += 1) {
     try {
@@ -958,45 +979,24 @@ async function fetchSymbolHistory(
       }
 
       if (!response.ok) {
-        return {
-          history: null,
-          rejection: {
-            symbol: official.symbol,
-            name: official.name,
-            reason: 'request_failed'
-          }
-        };
+        return fallbackOrReject(official, cachedHistory, activeMinLastTradeDate, 'request_failed');
       }
 
       const payload = (await response.json()) as YahooChartResponse;
       const result = payload.chart?.result?.[0];
       if (!result?.meta) {
-        return {
-          history: null,
-          rejection: {
-            symbol: official.symbol,
-            name: official.name,
-            reason: 'missing_payload'
-          }
-        };
+        return fallbackOrReject(official, cachedHistory, activeMinLastTradeDate, 'missing_payload');
       }
 
       if (result.meta.exchangeName !== 'HKG' || result.meta.instrumentType !== 'EQUITY') {
-        return {
-          history: null,
-          rejection: {
-            symbol: official.symbol,
-            name: official.name,
-            reason: 'not_hkg_equity'
-          }
-        };
+        return fallbackOrReject(official, cachedHistory, activeMinLastTradeDate, 'not_hkg_equity');
       }
 
       const timestamps = result.timestamp ?? [];
       const adjCloses = result.indicators?.adjclose?.[0]?.adjclose ?? [];
       const volumes = result.indicators?.quote?.[0]?.volume ?? [];
 
-      const prices: PricePoint[] = [];
+      const fetchedPrices: PricePoint[] = [];
       for (let index = 0; index < timestamps.length; index += 1) {
         const timestamp = timestamps[index];
         const adjClose = adjCloses[index];
@@ -1006,7 +1006,7 @@ async function fetchSymbolHistory(
         }
 
         const volume = volumes[index];
-        prices.push({
+        fetchedPrices.push({
           tradeDate: new Date(timestamp * 1000).toISOString().slice(0, 10),
           adjClose: Number(adjClose),
           volume:
@@ -1014,27 +1014,15 @@ async function fetchSymbolHistory(
         });
       }
 
+      const prices = mergePricePoints(cachedHistory?.prices ?? [], fetchedPrices);
+
       if (prices.length < MIN_REQUIRED_PRICE_ROWS) {
-        return {
-          history: null,
-          rejection: {
-            symbol: official.symbol,
-            name: official.name,
-            reason: 'insufficient_history'
-          }
-        };
+        return fallbackOrReject(official, cachedHistory, activeMinLastTradeDate, 'insufficient_history');
       }
 
       const lastTradeDate = prices[prices.length - 1]?.tradeDate ?? '';
       if (!lastTradeDate || lastTradeDate < activeMinLastTradeDate) {
-        return {
-          history: null,
-          rejection: {
-            symbol: official.symbol,
-            name: official.name,
-            reason: 'inactive'
-          }
-        };
+        return fallbackOrReject(official, cachedHistory, activeMinLastTradeDate, 'inactive');
       }
 
       return {
@@ -1047,8 +1035,33 @@ async function fetchSymbolHistory(
         rejection: null
       };
     } catch {
+      if (attempt === MAX_FETCH_ATTEMPTS) {
+        return fallbackOrReject(official, cachedHistory, activeMinLastTradeDate, 'request_failed');
+      }
+
       await wait(200 * attempt);
     }
+  }
+
+  return fallbackOrReject(official, cachedHistory, activeMinLastTradeDate, 'request_failed');
+}
+
+function fallbackOrReject(
+  official: OfficialSecurity,
+  cachedHistory: SymbolHistory | null,
+  activeMinLastTradeDate: string,
+  reason: FetchRejectionReason
+): { history: SymbolHistory | null; rejection: FetchRejection | null } {
+  if (canReuseCachedHistory(cachedHistory, activeMinLastTradeDate)) {
+    return {
+      history: {
+        symbol: official.symbol,
+        name: official.name,
+        prices: cachedHistory.prices,
+        lastTradeDate: cachedHistory.lastTradeDate
+      },
+      rejection: null
+    };
   }
 
   return {
@@ -1056,9 +1069,48 @@ async function fetchSymbolHistory(
     rejection: {
       symbol: official.symbol,
       name: official.name,
-      reason: 'request_failed'
+      reason
     }
   };
+}
+
+function canReuseCachedHistory(
+  cachedHistory: SymbolHistory | null,
+  activeMinLastTradeDate: string
+): cachedHistory is SymbolHistory {
+  return Boolean(
+    cachedHistory &&
+      cachedHistory.prices.length >= MIN_REQUIRED_PRICE_ROWS &&
+      cachedHistory.lastTradeDate >= activeMinLastTradeDate
+  );
+}
+
+function mergePricePoints(existingPrices: PricePoint[], refreshedPrices: PricePoint[]): PricePoint[] {
+  const byTradeDate = new Map(existingPrices.map((price) => [price.tradeDate, price] as const));
+
+  for (const price of refreshedPrices) {
+    byTradeDate.set(price.tradeDate, price);
+  }
+
+  return [...byTradeDate.values()].sort((left, right) => left.tradeDate.localeCompare(right.tradeDate));
+}
+
+function deriveIncrementalFetchStartDate(lastTradeDate: string | null): string {
+  if (!lastTradeDate) {
+    return FETCH_START_DATE;
+  }
+
+  const overlapDays = Number.isFinite(SOURCE_REFRESH_OVERLAP_DAYS) && SOURCE_REFRESH_OVERLAP_DAYS > 0
+    ? SOURCE_REFRESH_OVERLAP_DAYS
+    : 45;
+  const candidate = shiftIsoDate(lastTradeDate, -overlapDays);
+  return candidate > FETCH_START_DATE ? candidate : FETCH_START_DATE;
+}
+
+function shiftIsoDate(isoDate: string, deltaDays: number): string {
+  const date = new Date(`${isoDate}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + deltaDays);
+  return date.toISOString().slice(0, 10);
 }
 
 async function upsertSecurityMaster(
@@ -1562,11 +1614,15 @@ type YahooSearchResponse = {
   quotes?: YahooSearchQuote[];
 };
 
-main()
-  .catch((error) => {
-    console.error('Real HK benchmark failed:', error);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
+
+if (isMain) {
+  main()
+    .catch((error) => {
+      console.error('Real HK benchmark failed:', error);
+      process.exitCode = 1;
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}

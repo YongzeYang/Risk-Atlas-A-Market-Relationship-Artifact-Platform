@@ -142,6 +142,21 @@ pnpm bootstrap:local
 pnpm dev:stack
 ```
 
+`bootstrap:local` now defaults to the full market-state bootstrap path:
+
+- reuses the repository baselines already checked into `data/real-hk` and `data/crypto` when they are present
+- seeds the Hong Kong prerequisites only when they are still missing
+- overlap-refreshes both Hong Kong and crypto data to the latest available trade date instead of rebuilding the catalog from scratch
+- builds or reuses the latest 8 market-wide snapshots at `windowDays=252`: 4 score methods for Hong Kong and the same 4 score methods for crypto
+
+The recurring daily refresh uses the same import path and snapshot plan. To run it manually:
+
+```bash
+pnpm --dir apps/api db:refresh-daily-market-state
+```
+
+In production, the provided AWS systemd timer runs that refresh flow every 24 hours.
+
 ### Regenerate app env files after changing root config
 
 ```bash
@@ -172,7 +187,8 @@ Important keys:
 - CORS_ALLOWED_ORIGINS: optional comma-separated origins allowed when the browser calls the API directly
 - RISK_ATLAS_INVITE_CODES: comma-separated invite code list used by seed
 - RISK_ATLAS_INVITE_SALT: salt used to hash invite codes into the database
-- RISK_ATLAS_BOOTSTRAP_REAL_HK: set to 1 if you want bootstrap:local to run the real-HK benchmark import immediately after seed
+- RISK_ATLAS_BOOTSTRAP_MARKET_STATE: default 1; bootstrap:local reuses repository market data, refreshes both markets to the latest overlap window, and builds or reuses the latest 8 full-market snapshots
+- RISK_ATLAS_BOOTSTRAP_REAL_HK: legacy fallback used only when RISK_ATLAS_BOOTSTRAP_MARKET_STATE=0 and you still want the older real-HK benchmark path after seed
 
 Example:
 

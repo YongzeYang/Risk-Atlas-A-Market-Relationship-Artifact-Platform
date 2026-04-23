@@ -62,6 +62,19 @@ type SnapshotBuildSummary = {
 async function main() {
   console.log('Starting initial market bootstrap for HK + crypto snapshot coverage.');
 
+  await ensureHongKongSeedPrerequisites();
+
+  console.log('Refreshing Hong Kong market data from repository baseline to the latest available overlap window.');
+  await runPrismaScript('prisma/real-hk-benchmark.ts', ['--skip-benchmarks'], {
+    RISK_ATLAS_IMPORT_EOD_MODE: 'merge'
+  });
+
+  console.log('Refreshing crypto market data from repository baseline to the latest available overlap window.');
+  await runPrismaScript('prisma/import-crypto-market-map.ts', [], {
+    CRYPTO_MARKET_MAP_SKIP_VERIFICATION_BUILD: '1',
+    RISK_ATLAS_IMPORT_EOD_MODE: 'merge'
+  });
+
   const hkDataset = await ensureHongKongDatasetReady();
   const cryptoDataset = await ensureCryptoDatasetReady();
 
@@ -147,8 +160,7 @@ async function ensureHongKongDatasetReady(): Promise<DatasetCatalogRow> {
     return current;
   }
 
-  console.log('Hong Kong dataset or universe is missing. Running prisma/seed.ts.');
-  await runPrismaScript('prisma/seed.ts');
+  await ensureHongKongSeedPrerequisites();
 
   const seeded = await findFirstUsableDataset([HK_REAL_DATASET_ID, HK_DEMO_DATASET_ID]);
   if (!seeded || !(await hasUniverse(HK_UNIVERSE_ID))) {
@@ -158,6 +170,18 @@ async function ensureHongKongDatasetReady(): Promise<DatasetCatalogRow> {
   }
 
   return seeded;
+}
+
+async function ensureHongKongSeedPrerequisites(): Promise<void> {
+  const current = await findFirstUsableDataset([HK_REAL_DATASET_ID, HK_DEMO_DATASET_ID]);
+  const universeReady = await hasUniverse(HK_UNIVERSE_ID);
+
+  if (current && universeReady) {
+    return;
+  }
+
+  console.log('Hong Kong seed prerequisites are missing. Running prisma/seed.ts.');
+  await runPrismaScript('prisma/seed.ts');
 }
 
 async function ensureCryptoDatasetReady(): Promise<DatasetCatalogRow> {
@@ -316,10 +340,11 @@ async function ensureSnapshotBuild(plan: SnapshotPlan): Promise<SnapshotBuildSum
 
 async function runPrismaScript(
   scriptPath: string,
+  scriptArgs: string[] = [],
   extraEnv: Record<string, string> = {}
 ): Promise<void> {
   await new Promise<void>((resolve, reject) => {
-    const child = spawn(process.execPath, ['--import', 'tsx', scriptPath], {
+    const child = spawn(process.execPath, ['--import', 'tsx', scriptPath, ...scriptArgs], {
       cwd: process.cwd(),
       env: {
         ...process.env,

@@ -5,6 +5,7 @@ import 'dotenv/config';
 import { buildApp } from './app.js';
 import { disconnectPrisma } from './lib/prisma.js';
 import { resumePendingAnalysisRuns } from './services/analysis-run-runner.js';
+import { resumePendingBuildRuns } from './services/build-run-runner.js';
 
 const PORT = Number(process.env.PORT ?? 3000);
 const HOST = process.env.HOST ?? '0.0.0.0';
@@ -52,6 +53,7 @@ async function main() {
   const app = await buildApp();
   installShutdownHandlers(app);
   await resumePendingAnalysisRuns();
+  await resumePendingBuildRuns();
 
   await app.listen({
     port: PORT,

@@ -12,6 +12,7 @@ import {
 } from '../contracts/build-runs.js';
 
 const repoRootDir = resolve(fileURLToPath(new URL('../../../../', import.meta.url)));
+const MATRIX_BUILD_PROGRESS_FILENAME = 'matrix.build-progress.txt';
 
 export type LocalArtifactBundlePaths = {
   rootDir: string;
@@ -20,6 +21,7 @@ export type LocalArtifactBundlePaths = {
   matrixPath: string;
   previewPath: string;
   manifestPath: string;
+  progressPath: string;
 };
 
 export function resolveArtifactRootDir(): string {
@@ -47,7 +49,8 @@ export function getLocalArtifactBundlePaths(buildRunId: string): LocalArtifactBu
     buildDir,
     matrixPath: resolve(buildDir, ARTIFACT_FILE_NAMES.matrix),
     previewPath: resolve(buildDir, ARTIFACT_FILE_NAMES.preview),
-    manifestPath: resolve(buildDir, ARTIFACT_FILE_NAMES.manifest)
+    manifestPath: resolve(buildDir, ARTIFACT_FILE_NAMES.manifest),
+    progressPath: resolve(buildDir, MATRIX_BUILD_PROGRESS_FILENAME)
   };
 }
 

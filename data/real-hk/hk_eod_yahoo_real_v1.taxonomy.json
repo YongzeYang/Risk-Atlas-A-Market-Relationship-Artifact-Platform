@@ -1633,11 +1633,11 @@
   },
   {
     "symbol": "0252.HK",
-    "shortName": null,
-    "rawSector": null,
-    "rawIndustry": null,
-    "broadSector": null,
-    "source": "unmapped"
+    "shortName": "SE ASIA PPT",
+    "rawSector": "Consumer Cyclical",
+    "rawIndustry": "Packaging & Containers",
+    "broadSector": "consumer",
+    "source": "cache"
   },
   {
     "symbol": "0253.HK",
@@ -13856,6 +13856,14 @@
     "source": "cache"
   },
   {
+    "symbol": "2476.HK",
+    "shortName": "VGT",
+    "rawSector": "Technology",
+    "rawIndustry": "Electronic Components",
+    "broadSector": "tech",
+    "source": "cache"
+  },
+  {
     "symbol": "2477.HK",
     "shortName": "WELLCELL HOLD",
     "rawSector": "Communication Services",
@@ -15424,16 +15432,8 @@
     "source": "cache"
   },
   {
-    "symbol": "2929.HK",
-    "shortName": null,
-    "rawSector": null,
-    "rawIndustry": null,
-    "broadSector": null,
-    "source": "unmapped"
-  },
-  {
     "symbol": "2934.HK",
-    "shortName": null,
+    "shortName": "SANDMARTIN-OLD",
     "rawSector": null,
     "rawIndustry": null,
     "broadSector": null,
@@ -15448,8 +15448,32 @@
     "source": "unmapped"
   },
   {
-    "symbol": "2939.HK",
+    "symbol": "2940.HK",
+    "shortName": "WELLCELL HOLD",
+    "rawSector": null,
+    "rawIndustry": null,
+    "broadSector": null,
+    "source": "unmapped"
+  },
+  {
+    "symbol": "2941.HK",
     "shortName": null,
+    "rawSector": null,
+    "rawIndustry": null,
+    "broadSector": null,
+    "source": "unmapped"
+  },
+  {
+    "symbol": "2942.HK",
+    "shortName": null,
+    "rawSector": null,
+    "rawIndustry": null,
+    "broadSector": null,
+    "source": "unmapped"
+  },
+  {
+    "symbol": "2943.HK",
+    "shortName": "ANCHORSTONE RTS",
     "rawSector": null,
     "rawIndustry": null,
     "broadSector": null,
@@ -15485,6 +15509,14 @@
     "rawSector": "Consumer Defensive",
     "rawIndustry": "Packaged Foods",
     "broadSector": "consumer",
+    "source": "cache"
+  },
+  {
+    "symbol": "3296.HK",
+    "shortName": null,
+    "rawSector": "Technology",
+    "rawIndustry": "Consumer Electronics",
+    "broadSector": "tech",
     "source": "cache"
   },
   {
@@ -20368,8 +20400,16 @@
     "source": "unmapped"
   },
   {
+    "symbol": "8552.HK",
+    "shortName": "SINOFORTUNE FIN",
+    "rawSector": null,
+    "rawIndustry": null,
+    "broadSector": null,
+    "source": "unmapped"
+  },
+  {
     "symbol": "8600.HK",
-    "shortName": null,
+    "shortName": "WLS HOLDINGS",
     "rawSector": null,
     "rawIndustry": null,
     "broadSector": null,

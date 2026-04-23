@@ -1,0 +1,10 @@
+[Unit]
+Description=Risk Atlas daily market refresh
+Wants=network-online.target docker.service
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/risk-atlas/app
+EnvironmentFile=/opt/risk-atlas/app/aws/.env.production
+ExecStart=/opt/risk-atlas/app/aws/scripts/run-daily-market-refresh.sh /opt/risk-atlas/app/aws/.env.production

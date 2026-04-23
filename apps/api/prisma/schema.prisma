@@ -20,6 +20,11 @@ enum BuildStatus {
   failed
 }
 
+enum BuildStrategy {
+  full
+  incremental
+}
+
 enum ArtifactStorageKind {
   local_fs
   s3
@@ -148,6 +153,7 @@ model EodPrice {
 
   @@index([datasetId, tradeDate])
   @@index([datasetId, symbol])
+  @@unique([datasetId, symbol, tradeDate], map: "eod_prices_datasetId_symbol_tradeDate_key")
   @@map("eod_prices")
 }
 
@@ -159,6 +165,11 @@ model BuildRun {
   asOfDate            String       @db.VarChar(10)
   windowDays          Int
   scoreMethod         ScoreMethod
+  buildStrategy       BuildStrategy @default(full)
+  previousBuildRunId  String?
+  sourceDatasetMaxTradeDate String? @db.VarChar(10)
+  symbolSetHash       String?      @db.VarChar(64)
+  symbolStateHashesJson Json?
   status              BuildStatus  @default(pending)
   resolvedSymbolsJson Json?
   createdAt           DateTime     @default(now())
@@ -169,12 +180,15 @@ model BuildRun {
   dataset             Dataset      @relation(fields: [datasetId], references: [id], onDelete: Restrict)
   universe            Universe     @relation(fields: [universeId], references: [id], onDelete: Restrict)
   series              BuildSeries? @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  previousBuildRun    BuildRun?    @relation("BuildRunIncrementalParent", fields: [previousBuildRunId], references: [id], onDelete: SetNull)
+  nextIncrementalBuilds BuildRun[] @relation("BuildRunIncrementalParent")
   artifact            Artifact?
 
   @@index([status, createdAt])
   @@index([datasetId, asOfDate])
   @@index([universeId, asOfDate])
   @@index([seriesId, asOfDate])
+  @@index([datasetId, universeId, scoreMethod, windowDays, asOfDate], map: "build_runs_dataset_universe_score_window_asof_idx")
   @@map("build_runs")
 }
 

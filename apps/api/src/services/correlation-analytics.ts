@@ -30,6 +30,10 @@ type PairwiseScoreBuildArgs = {
   minimumPairOverlapCount?: number;
 };
 
+export type PairwiseScoreRowBuilder = {
+  buildLowerRow(rowIndex: number): number[];
+};
+
 export function buildRowsBySymbol(
   rows: PriceRow[],
   symbolOrder: string[]
@@ -171,10 +175,25 @@ export function buildCorrelationMatrix(args: {
 }
 
 export function buildScoreMatrix(args: PairwiseScoreBuildArgs): number[][] {
-  const minimumPairOverlapCount =
-    args.minimumPairOverlapCount ?? getMinimumPairwiseOverlapCount(args.windowDays);
   const n = args.symbolOrder.length;
   const scores = Array.from({ length: n }, () => Array<number>(n).fill(0));
+  const rowBuilder = createPairwiseScoreRowBuilder(args);
+
+  for (let i = 0; i < n; i += 1) {
+    const lowerRow = rowBuilder.buildLowerRow(i);
+    for (let j = 0; j <= i; j += 1) {
+      const score = lowerRow[j]!;
+      scores[i]![j] = score;
+      scores[j]![i] = score;
+    }
+  }
+
+  return scores;
+}
+
+export function createPairwiseScoreRowBuilder(args: PairwiseScoreBuildArgs): PairwiseScoreRowBuilder {
+  const minimumPairOverlapCount =
+    args.minimumPairOverlapCount ?? getMinimumPairwiseOverlapCount(args.windowDays);
   const preparations = prepareScoreMethodInputs(
     args.scoreMethod,
     args.symbolOrder,
@@ -182,41 +201,43 @@ export function buildScoreMatrix(args: PairwiseScoreBuildArgs): number[][] {
     args.windowDays
   );
 
-  for (let i = 0; i < n; i += 1) {
-    scores[i]![i] = 1;
-  }
-
-  for (let i = 0; i < n; i += 1) {
-    const leftSymbol = args.symbolOrder[i]!;
-    const leftReturns = args.returnVectorsBySymbol.get(leftSymbol);
-
-    if (!leftReturns) {
-      throw new Error(`Missing return vector for symbol "${leftSymbol}".`);
-    }
-
-    for (let j = i + 1; j < n; j += 1) {
-      const rightSymbol = args.symbolOrder[j]!;
-      const rightReturns = args.returnVectorsBySymbol.get(rightSymbol);
-
-      if (!rightReturns) {
-        throw new Error(`Missing return vector for symbol "${rightSymbol}".`);
+  return {
+    buildLowerRow(rowIndex) {
+      if (!Number.isInteger(rowIndex) || rowIndex < 0 || rowIndex >= args.symbolOrder.length) {
+        throw new Error(`Row index ${rowIndex} is out of bounds for score generation.`);
       }
 
-      const score = computePairScoreForMethod({
-        scoreMethod: args.scoreMethod,
-        leftReturns,
-        rightReturns,
-        windowDays: args.windowDays,
-        minimumPairOverlapCount,
-        leftPreparation: preparations.get(leftSymbol),
-        rightPreparation: preparations.get(rightSymbol)
-      });
-      scores[i]![j] = score;
-      scores[j]![i] = score;
-    }
-  }
+      const leftSymbol = args.symbolOrder[rowIndex]!;
+      const leftReturns = args.returnVectorsBySymbol.get(leftSymbol);
+      if (!leftReturns) {
+        throw new Error(`Missing return vector for symbol "${leftSymbol}".`);
+      }
 
-  return scores;
+      const lowerRow = Array<number>(rowIndex + 1).fill(0);
+      lowerRow[rowIndex] = 1;
+
+      for (let columnIndex = 0; columnIndex < rowIndex; columnIndex += 1) {
+        const rightSymbol = args.symbolOrder[columnIndex]!;
+        const rightReturns = args.returnVectorsBySymbol.get(rightSymbol);
+
+        if (!rightReturns) {
+          throw new Error(`Missing return vector for symbol "${rightSymbol}".`);
+        }
+
+        lowerRow[columnIndex] = computePairScoreForMethod({
+          scoreMethod: args.scoreMethod,
+          leftReturns,
+          rightReturns,
+          windowDays: args.windowDays,
+          minimumPairOverlapCount,
+          leftPreparation: preparations.get(leftSymbol),
+          rightPreparation: preparations.get(rightSymbol)
+        });
+      }
+
+      return lowerRow;
+    }
+  };
 }
 
 export function getMinimumPairwiseOverlapCount(windowDays: number): number {

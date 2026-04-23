@@ -355,6 +355,19 @@ git pull --ff-only origin main
 git submodule update --init --recursive
 ```
 
+What this means:
+
+- `git pull --ff-only origin main` updates your checked-out `main` branch only if the server can move straight forward to the remote commit without creating a merge commit
+- this is the safest deploy behavior for a production host because it refuses to hide local divergence behind an automatic merge
+- if it succeeds, the files in `/opt/risk-atlas/app` now actually match the latest remote `main`
+
+What to do if it fails:
+
+- run `git status` first
+- if you only expected ignored secrets such as `aws/.env.production`, leave them alone; ignored files do not block a fast-forward pull
+- if you see tracked files modified on the server, decide whether those edits should be committed, copied elsewhere, or discarded before pulling again
+- if the server has local commits that are not on `origin/main`, inspect them with `git log --oneline --decorate --graph --max-count=10` before deciding whether to rebase, reset, or preserve them
+
 If git pull refuses because of local tracked-file changes, inspect them with git status first. The production secrets file aws/.env.production is already ignored and should not block a fast-forward pull.
 
 ## 7. Configure the production environment file
@@ -385,6 +398,9 @@ Most important fields:
 - S3_ARTIFACT_BUCKET and AWS_REGION: required for S3 artifact storage
 - S3_ARTIFACT_PREFIX: optional namespace such as prod
 - S3_SIGNED_URL_TTL_SECONDS: lifetime of presigned build download URLs
+- RUN_INITIAL_MARKET_BOOTSTRAP_ON_DEPLOY: set this to 1 if first deploy should reuse repository baselines, refresh both markets to the latest overlap window, and build the latest 8 market-wide snapshots automatically
+- INSTALL_DAILY_MARKET_REFRESH_TIMER: set this to 1 if the host should keep both markets refreshed every 24 hours after deploy
+- RISK_ATLAS_DAILY_REFRESH_RUN_HK and RISK_ATLAS_DAILY_REFRESH_RUN_CRYPTO: let you disable one market while keeping the 24-hour timer enabled
 
 For this deployment, keep VITE_API_BASE_URL blank.
 
@@ -416,7 +432,7 @@ What the deploy script does:
 7. starts PostgreSQL with Docker Compose
 8. runs Prisma migrate deploy inside the API image
 9. optionally runs one of the first-deploy data helpers:
-  - RUN_INITIAL_MARKET_BOOTSTRAP_ON_DEPLOY=1 imports or verifies the Hong Kong and crypto datasets, then runs 8 snapshot builds total: 4 score methods for HK and the same 4 score methods for crypto
+  - RUN_INITIAL_MARKET_BOOTSTRAP_ON_DEPLOY=1 reuses repository baselines under data/, refreshes both markets to the latest overlap window, then runs or reuses 8 snapshot builds total: 4 score methods for HK and the same 4 score methods for crypto
   - otherwise, RUN_SEED_ON_DEPLOY=1 runs the Hong Kong seed path only
 10. starts or updates the API container with either local_fs or s3 artifact mode depending on ARTIFACT_STORAGE_BACKEND
 11. renders the Nginx site config from the templates in aws/nginx
@@ -446,9 +462,10 @@ RUN_SEED_ON_DEPLOY=0
 
 That helper does this in order:
 
-1. ensures the Hong Kong dataset exists by running prisma/seed.ts only when the HK dataset is still missing or empty
-2. ensures the crypto dataset exists by running prisma/import-crypto-market-map.ts only when crypto_market_map_yahoo_v2 is still missing or empty
-3. runs 8 snapshot builds sequentially with windowDays=252:
+1. ensures the Hong Kong seed prerequisites exist by running prisma/seed.ts only when the HK dataset or hk_all_common_equity universe is still missing
+2. refreshes the Hong Kong dataset from the repository baseline plus the latest overlap window with prisma/real-hk-benchmark.ts --skip-benchmarks and merge semantics
+3. refreshes the crypto market-map dataset from the repository baseline plus the latest overlap window with prisma/import-crypto-market-map.ts and merge semantics
+4. runs or reuses 8 snapshot builds sequentially with windowDays=252:
    - Hong Kong market: pearson_corr, ewma_corr, tail_dep_05, nmi_hist_10
    - Crypto market: pearson_corr, ewma_corr, tail_dep_05, nmi_hist_10
 
@@ -463,6 +480,35 @@ If you prefer to run that helper manually instead of through the deploy script:
 cd /opt/risk-atlas/app
 docker compose -f aws/docker-compose.ec2.yml --env-file aws/.env.production run --rm --no-deps api \
   node --import tsx prisma/bootstrap-initial-market-state.ts
+```
+
+That is the same bootstrap flow that local `pnpm bootstrap:local` now uses by default.
+
+### Recurring 24-hour market refresh
+
+If you want the server to keep both markets current every 24 hours after the first deploy, set this in `aws/.env.production` before running the deploy script:
+
+```dotenv
+INSTALL_DAILY_MARKET_REFRESH_TIMER=1
+```
+
+The deploy script installs and enables `aws/systemd/risk-atlas-daily-market-refresh.service` and `aws/systemd/risk-atlas-daily-market-refresh.timer` when that flag is enabled.
+
+The timer runs the same market-state refresh flow every 24 hours:
+
+1. ensure the Hong Kong seed prerequisites still exist
+2. overlap-refresh Hong Kong data to the latest available trade date
+3. overlap-refresh crypto data to the latest available trade date
+4. build or reuse the latest 8 market-wide snapshots
+
+If you prefer to install the timer manually:
+
+```bash
+sudo cp aws/systemd/risk-atlas-daily-market-refresh.service /etc/systemd/system/
+sudo cp aws/systemd/risk-atlas-daily-market-refresh.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now risk-atlas-daily-market-refresh.timer
+sudo systemctl status risk-atlas-daily-market-refresh.timer
 ```
 
 If your seed uses the bundled real-HK CSV, the first import is intentionally heavy: the file is about 1.4 million rows and may take several minutes on EC2 before the next post-import log lines appear.

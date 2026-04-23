@@ -1,9 +1,12 @@
 import 'dotenv/config';
 
 import { createHash } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { createReadStream, existsSync } from 'node:fs';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { createInterface } from 'node:readline';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { fileURLToPath } from 'node:url';
 
 import { Market, Prisma, Sector, SecurityType } from '@prisma/client';
 
@@ -55,6 +58,12 @@ const MIN_REQUIRED_HISTORY_ROWS = BUILD_WINDOW_DAYS + 1;
 const BUILD_SCORE_METHOD = 'pearson_corr' as const;
 const SKIP_VERIFICATION_BUILD =
   (process.env.CRYPTO_MARKET_MAP_SKIP_VERIFICATION_BUILD ?? '0').trim() === '1';
+const IMPORT_MODE =
+  (process.env.RISK_ATLAS_IMPORT_EOD_MODE ?? 'replace').trim() === 'merge' ? 'merge' : 'replace';
+const SOURCE_REFRESH_OVERLAP_DAYS = parsePositiveInteger(
+  process.env.RISK_ATLAS_CRYPTO_SOURCE_REFRESH_OVERLAP_DAYS,
+  45
+);
 const MIN_SECTOR_UNIVERSE_SIZE = 5;
 const PROGRESS_LOG_EVERY = parsePositiveInteger(
   process.env.CRYPTO_MARKET_MAP_PROGRESS_EVERY,
@@ -201,6 +210,31 @@ type SelectedAsset = {
   rows: CsvRow[];
 };
 
+type CachedSelectedAsset = {
+  coinId: string;
+  historySymbol: string;
+  symbol: string;
+  rawSymbol: string;
+  name: string;
+  sector: Sector | null;
+  categories: string[];
+  rows: CsvRow[];
+  lastTradeDate: string;
+};
+
+type CachedSelectedAssetSnapshot = {
+  symbol: string;
+  rawSymbol: string;
+  coinId: string;
+  historySymbol: string;
+  name: string;
+  sector: Sector | null;
+  categories: string[];
+  rowCount?: number;
+  firstTradeDate?: string | null;
+  lastTradeDate?: string | null;
+};
+
 type HistoryFetchResult = {
   market: CoinGeckoMarketEntry;
   historySymbol: string | null;
@@ -214,6 +248,7 @@ async function main() {
   const startedAt = Date.now();
   const estimatedCoinGeckoRequests =
     CANDIDATE_PAGE_COUNT + (ENABLE_DETAIL_ENRICHMENT ? TARGET_ASSET_COUNT : 0);
+  const cachedSelectedAssets = await loadCachedSelectedAssets(OUTPUT_TAXONOMY_PATH, OUTPUT_CSV_PATH);
 
   console.log(
     `Starting crypto market-map import for target=${TARGET_ASSET_COUNT}, ` +
@@ -227,6 +262,9 @@ async function main() {
     `Network plan: CoinGecko requests~${estimatedCoinGeckoRequests} for market metadata, ` +
       `then Yahoo chart history in batches for up to ${TARGET_ASSET_COUNT} accepted assets ` +
       `(best-effort mode will build with any result >= ${MIN_ASSET_COUNT}).`
+  );
+  console.log(
+    `Loaded ${cachedSelectedAssets.size} cached crypto assets for incremental source refresh.`
   );
 
   await mkdir(OUTPUT_ROOT_DIR, { recursive: true });
@@ -242,7 +280,7 @@ async function main() {
 
   const selectedAssets: SelectedAsset[] = [];
   const skipCounts = new Map(prefilterSkips);
-  const usedSymbols = new Set<string>();
+  const usedSymbols = new Set([...cachedSelectedAssets.values()].map((asset) => asset.symbol));
   let processedCandidates = 0;
 
   let nextCandidateIndex = 0;
@@ -265,8 +303,18 @@ async function main() {
       historyBatchMarkets,
       HISTORY_FETCH_CONCURRENCY,
       async (market) => {
-        const historySymbol = buildYahooHistorySymbol(market.symbol);
+        const cachedAsset = cachedSelectedAssets.get(market.id) ?? null;
+        const historySymbol = cachedAsset?.historySymbol ?? buildYahooHistorySymbol(market.symbol);
         if (!historySymbol) {
+          if (canReuseCachedSelectedAsset(cachedAsset)) {
+            return {
+              market,
+              historySymbol: cachedAsset.historySymbol,
+              rows: cachedAsset.rows,
+              errorMessage: null
+            } satisfies HistoryFetchResult;
+          }
+
           return {
             market,
             historySymbol: null,
@@ -276,13 +324,32 @@ async function main() {
         }
 
         try {
+          const symbol = cachedAsset?.symbol ?? makeCanonicalSymbol(market.symbol, market.id, usedSymbols);
+          const fetchStartDate = deriveCryptoHistoryFetchStartDate(cachedAsset?.lastTradeDate ?? null);
+          const fetchedRows = await fetchYahooHistoryRows(historySymbol, fetchStartDate);
+
           return {
             market,
             historySymbol,
-            rows: await fetchYahooHistoryRows(historySymbol),
+            rows: mergeCsvRows(
+              cachedAsset?.rows ?? [],
+              fetchedRows.map((row) => ({
+                ...row,
+                symbol
+              }))
+            ),
             errorMessage: null
           } satisfies HistoryFetchResult;
         } catch (error) {
+          if (canReuseCachedSelectedAsset(cachedAsset)) {
+            return {
+              market,
+              historySymbol: cachedAsset.historySymbol,
+              rows: cachedAsset.rows,
+              errorMessage: null
+            } satisfies HistoryFetchResult;
+          }
+
           return {
             market,
             historySymbol,
@@ -336,12 +403,11 @@ async function main() {
         continue;
       }
 
-      const symbol = makeCanonicalSymbol(result.market.symbol, result.market.id, usedSymbols);
-      const sector = assignSector([], result.market.name, result.market.symbol, result.market.id);
-      const rows = result.rows.map((row) => ({
-        ...row,
-        symbol
-      }));
+      const cachedAsset = cachedSelectedAssets.get(result.market.id) ?? null;
+      const symbol = result.rows[0]?.symbol ?? cachedAsset?.symbol ?? makeCanonicalSymbol(result.market.symbol, result.market.id, usedSymbols);
+      const sector =
+        cachedAsset?.sector ?? assignSector([], result.market.name, result.market.symbol, result.market.id);
+      const rows = result.rows;
 
       selectedAssets.push({
         coinId: result.market.id,
@@ -353,7 +419,7 @@ async function main() {
         marketCapUsd: result.market.market_cap,
         currentVolumeUsd: result.market.total_volume,
         sector,
-        categories: [],
+        categories: cachedAsset?.categories ?? [],
         rows
       });
 
@@ -457,7 +523,7 @@ async function main() {
     datasetName: DATASET_NAME,
     csvPath: OUTPUT_CSV_PATH,
     market: Market.CRYPTO,
-    replaceExisting: true,
+    importMode: IMPORT_MODE,
     prismaClient: prisma,
     transactionTimeoutMs: 900_000
   });
@@ -701,17 +767,15 @@ function buildYahooHistorySymbol(rawSymbol: string): string | null {
   return `${normalized}-USD`;
 }
 
-function buildYahooChartUrl(symbol: string): string {
-  const period1 = Math.floor(
-    new Date(Date.now() - (HISTORY_DAYS + 14) * 24 * 60 * 60 * 1000).getTime() / 1000
-  );
-  const period2 = Math.floor(Date.now() / 1000);
+function buildYahooChartUrl(symbol: string, startDate: string, endDate: string): string {
+  const period1 = Math.floor(new Date(`${startDate}T00:00:00Z`).getTime() / 1000);
+  const period2 = Math.floor(new Date(`${endDate}T23:59:59Z`).getTime() / 1000);
 
   return `${YAHOO_CHART_BASE_URL}/${symbol}?period1=${period1}&period2=${period2}&interval=1d&includeAdjustedClose=true&events=div%2Csplits`;
 }
 
-async function fetchYahooHistoryRows(symbol: string): Promise<CsvRow[]> {
-  const response = await fetch(buildYahooChartUrl(symbol), {
+async function fetchYahooHistoryRows(symbol: string, startDate: string): Promise<CsvRow[]> {
+  const response = await fetch(buildYahooChartUrl(symbol, startDate, toIsoDate(Date.now())), {
     headers: {
       'user-agent': 'RiskAtlasCryptoMarketMap/1.0'
     }
@@ -1074,6 +1138,115 @@ function makeCanonicalSymbol(rawSymbol: string, coinId: string, usedSymbols: Set
   throw new Error(`Unable to generate a unique symbol for CoinGecko asset ${coinId}.`);
 }
 
+async function loadCachedSelectedAssets(
+  taxonomyPath: string,
+  csvPath: string
+): Promise<Map<string, CachedSelectedAsset>> {
+  const assets = new Map<string, CachedSelectedAsset>();
+
+  if (!existsSync(taxonomyPath) || !existsSync(csvPath)) {
+    return assets;
+  }
+
+  const rowsBySymbol = await loadCachedCryptoRowsBySymbol(csvPath);
+  const raw = await readFile(taxonomyPath, 'utf8');
+  const parsed = JSON.parse(raw) as CachedSelectedAssetSnapshot[];
+
+  for (const entry of parsed) {
+    if (!entry.coinId || !entry.symbol || !entry.historySymbol) {
+      continue;
+    }
+
+    const rows = rowsBySymbol.get(entry.symbol) ?? [];
+    const lastTradeDate = rows[rows.length - 1]?.tradeDate ?? entry.lastTradeDate ?? '';
+
+    assets.set(entry.coinId, {
+      coinId: entry.coinId,
+      historySymbol: entry.historySymbol,
+      symbol: entry.symbol,
+      rawSymbol: entry.rawSymbol,
+      name: entry.name,
+      sector: entry.sector,
+      categories: entry.categories ?? [],
+      rows,
+      lastTradeDate
+    });
+  }
+
+  return assets;
+}
+
+async function loadCachedCryptoRowsBySymbol(csvPath: string): Promise<Map<string, CsvRow[]>> {
+  const rowsBySymbol = new Map<string, CsvRow[]>();
+
+  const input = createReadStream(csvPath, { encoding: 'utf8' });
+  const readline = createInterface({
+    input,
+    crlfDelay: Infinity
+  });
+
+  let seenHeader = false;
+  let hasVolume = false;
+
+  for await (const rawLine of readline) {
+    const line = rawLine.trim();
+    if (!line) {
+      continue;
+    }
+
+    if (!seenHeader) {
+      seenHeader = true;
+      hasVolume = line === 'tradeDate,symbol,adjClose,volume';
+      continue;
+    }
+
+    const parts = line.split(',');
+    const tradeDate = parts[0] ?? '';
+    const symbol = (parts[1] ?? '').toUpperCase();
+    const adjClose = Number(parts[2] ?? '');
+    const volumeText = hasVolume ? parts[3] ?? '' : '';
+
+    const rows = rowsBySymbol.get(symbol) ?? [];
+    rows.push({
+      tradeDate,
+      symbol,
+      adjClose,
+      volume: volumeText ? BigInt(volumeText) : null
+    });
+    rowsBySymbol.set(symbol, rows);
+  }
+
+  return rowsBySymbol;
+}
+
+function canReuseCachedSelectedAsset(asset: CachedSelectedAsset | null): asset is CachedSelectedAsset {
+  return Boolean(asset && asset.rows.length >= MIN_REQUIRED_HISTORY_ROWS && asset.lastTradeDate);
+}
+
+function mergeCsvRows(existingRows: CsvRow[], refreshedRows: CsvRow[]): CsvRow[] {
+  const byTradeDate = new Map(existingRows.map((row) => [row.tradeDate, row] as const));
+
+  for (const row of refreshedRows) {
+    byTradeDate.set(row.tradeDate, row);
+  }
+
+  return [...byTradeDate.values()].sort((left, right) => left.tradeDate.localeCompare(right.tradeDate));
+}
+
+function deriveCryptoHistoryFetchStartDate(lastTradeDate: string | null): string {
+  if (!lastTradeDate) {
+    return toIsoDate(Date.now() - (HISTORY_DAYS + 14) * 24 * 60 * 60 * 1000);
+  }
+
+  return shiftIsoDate(lastTradeDate, -SOURCE_REFRESH_OVERLAP_DAYS);
+}
+
+function shiftIsoDate(isoDate: string, deltaDays: number): string {
+  const date = new Date(`${isoDate}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + deltaDays);
+  return date.toISOString().slice(0, 10);
+}
+
 async function upsertStaticUniverses(selectedAssets: SelectedAsset[]) {
   const orderedSymbols = selectedAssets.map((asset) => asset.symbol);
 
@@ -1255,11 +1428,15 @@ async function writeNormalizedCsv(rows: CsvRow[], outputPath: string): Promise<v
   await writeFile(outputPath, `${lines.join('\n')}\n`, 'utf8');
 }
 
-main()
-  .catch((error) => {
-    console.error('Crypto market-map import failed:', error);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
+
+if (isMain) {
+  main()
+    .catch((error) => {
+      console.error('Crypto market-map import failed:', error);
+      process.exit(1);
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}

@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 
-import { Market } from '@prisma/client';
+import { Market, Prisma } from '@prisma/client';
 
 import { prisma } from '../src/lib/prisma.js';
 
@@ -53,11 +53,15 @@ type ImportProcessedSummary = Pick<
   'rowCount' | 'symbolCount' | 'minTradeDate' | 'maxTradeDate' | 'firstValidAsOfByWindowDays'
 >;
 
+export const IMPORT_EOD_CSV_MODES = ['replace', 'merge'] as const;
+export type ImportEodCsvMode = (typeof IMPORT_EOD_CSV_MODES)[number];
+
 export type ImportEodCsvOptions = {
   datasetId: string;
   datasetName: string;
   csvPath: string;
   market?: ImportMarket;
+  importMode?: ImportEodCsvMode;
   replaceExisting?: boolean;
   prismaClient?: typeof prisma;
   transactionTimeoutMs?: number;
@@ -322,16 +326,67 @@ async function loadPersistedDatasetSummary(tx: any, datasetId: string): Promise<
   };
 }
 
+function resolveImportMode(options: ImportEodCsvOptions): ImportEodCsvMode {
+  if (options.importMode) {
+    return options.importMode;
+  }
+
+  if (options.replaceExisting === undefined) {
+    return 'replace';
+  }
+
+  return options.replaceExisting ? 'replace' : 'merge';
+}
+
+function dedupeImportBatch(batch: ImportRow[]): ImportRow[] {
+  const rowsByNaturalKey = new Map<string, ImportRow>();
+
+  for (const row of batch) {
+    rowsByNaturalKey.set(`${row.datasetId}\u0000${row.symbol}\u0000${row.tradeDate}`, row);
+  }
+
+  return [...rowsByNaturalKey.values()];
+}
+
+async function upsertImportBatch(tx: any, batch: ImportRow[]): Promise<void> {
+  const dedupedBatch = dedupeImportBatch(batch);
+
+  if (dedupedBatch.length === 0) {
+    return;
+  }
+
+  const values = Prisma.join(
+    dedupedBatch.map((row) =>
+      Prisma.sql`(${row.datasetId}, ${row.tradeDate}, ${row.symbol}, ${row.adjClose}, ${row.volume ?? null})`
+    )
+  );
+
+  await tx.$executeRaw(Prisma.sql`
+    INSERT INTO "eod_prices" (
+      "datasetId",
+      "tradeDate",
+      "symbol",
+      "adjClose",
+      "volume"
+    )
+    VALUES ${values}
+    ON CONFLICT ("datasetId", "symbol", "tradeDate")
+    DO UPDATE SET
+      "adjClose" = EXCLUDED."adjClose",
+      "volume" = EXCLUDED."volume"
+  `);
+}
+
 export async function importEodCsv(options: ImportEodCsvOptions): Promise<ImportEodCsvSummary> {
   const client = options.prismaClient ?? prisma;
   const market = options.market ?? Market.HK;
-  const replaceExisting = options.replaceExisting ?? true;
+  const importMode = resolveImportMode(options);
   const transactionTimeoutMs =
     options.transactionTimeoutMs ?? DEFAULT_IMPORT_TRANSACTION_TIMEOUT_MS;
 
   console.log(
     `Starting CSV import for dataset ${options.datasetId} from ${options.csvPath} ` +
-      `(batch size ${BATCH_SIZE.toLocaleString('en-US')}).`
+      `(mode=${importMode}, batch size ${BATCH_SIZE.toLocaleString('en-US')}).`
   );
 
   const finalSummary = await client.$transaction(
@@ -353,7 +408,7 @@ export async function importEodCsv(options: ImportEodCsvOptions): Promise<Import
         }
       });
 
-      if (replaceExisting) {
+      if (importMode === 'replace') {
         await tx.eodPrice.deleteMany({
           where: {
             datasetId: options.datasetId
@@ -366,15 +421,18 @@ export async function importEodCsv(options: ImportEodCsvOptions): Promise<Import
         options.datasetId,
         market,
         async (batch) => {
-          await tx.eodPrice.createMany({
-            data: batch
-          });
+          await upsertImportBatch(tx, batch);
         }
       );
 
-      const persistedSummary = replaceExisting
-        ? importedSummary
-        : await loadPersistedDatasetSummary(tx, options.datasetId);
+      const persistedSummary = await loadPersistedDatasetSummary(tx, options.datasetId);
+
+      if (importMode === 'merge') {
+        console.log(
+          `Merged ${importedSummary.rowCount.toLocaleString('en-US')} CSV rows into dataset ${options.datasetId}; ` +
+            `persisted dataset now has ${persistedSummary.rowCount.toLocaleString('en-US')} rows.`
+        );
+      }
 
       await tx.dataset.update({
         where: {
@@ -412,7 +470,7 @@ async function main() {
     datasetName: DEMO_DATASET_NAME,
     csvPath,
     market: Market.HK,
-    replaceExisting: true,
+    importMode: 'replace',
     prismaClient: prisma
   });
 

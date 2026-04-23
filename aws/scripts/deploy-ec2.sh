@@ -78,6 +78,13 @@ render_nginx_config() {
   sudo systemctl reload nginx
 }
 
+install_daily_market_refresh_timer() {
+  sudo cp "${AWS_DIR}/systemd/risk-atlas-daily-market-refresh.service" /etc/systemd/system/
+  sudo cp "${AWS_DIR}/systemd/risk-atlas-daily-market-refresh.timer" /etc/systemd/system/
+  sudo systemctl daemon-reload
+  sudo systemctl enable --now risk-atlas-daily-market-refresh.timer
+}
+
 main() {
   require_command docker
   require_command git
@@ -145,6 +152,10 @@ main() {
   docker_compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" up -d api
 
   render_nginx_config
+
+  if [[ "${INSTALL_DAILY_MARKET_REFRESH_TIMER:-0}" == "1" ]]; then
+    install_daily_market_refresh_timer
+  fi
 
   if [[ "${SYNC_ARTIFACTS_ON_DEPLOY:-0}" == "1" ]]; then
     "${AWS_DIR}/scripts/sync-artifacts-to-s3.sh" "${ENV_FILE}"

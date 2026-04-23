@@ -53,10 +53,15 @@ pnpm cpp:build
 
 pnpm --dir apps/api prisma:generate
 pnpm --dir apps/api db:migrate:deploy
-pnpm --dir apps/api db:seed
 
-if [[ "${RISK_ATLAS_BOOTSTRAP_REAL_HK:-0}" == "1" ]]; then
-  pnpm --dir apps/api db:benchmark-real-hk
+if [[ "${RISK_ATLAS_BOOTSTRAP_MARKET_STATE:-1}" == "1" ]]; then
+  pnpm --dir apps/api db:bootstrap-initial-market-state
+else
+  pnpm --dir apps/api db:seed
+
+  if [[ "${RISK_ATLAS_BOOTSTRAP_REAL_HK:-0}" == "1" ]]; then
+    pnpm --dir apps/api db:benchmark-real-hk
+  fi
 fi
 
 echo "Bootstrap completed. Start the stack with: pnpm dev:stack"
