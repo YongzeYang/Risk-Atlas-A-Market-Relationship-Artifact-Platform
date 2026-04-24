@@ -48,12 +48,14 @@ COPY --from=build /opt/risk-atlas/apps/api ./apps/api
 COPY --from=build /opt/risk-atlas/data ./data
 RUN mkdir -p /opt/risk-atlas/bin
 COPY --from=build /opt/risk-atlas/cpp/build/bin/risk_atlas_bsm_writer /opt/risk-atlas/bin/risk_atlas_bsm_writer
+COPY --from=build /opt/risk-atlas/cpp/build/bin/risk_atlas_bsm_incremental_builder /opt/risk-atlas/bin/risk_atlas_bsm_incremental_builder
 COPY --from=build /opt/risk-atlas/cpp/build/bin/risk_atlas_bsm_query /opt/risk-atlas/bin/risk_atlas_bsm_query
 
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=3000
 ENV BSM_WRITER_BIN=/opt/risk-atlas/bin/risk_atlas_bsm_writer
+ENV BSM_INCREMENTAL_BUILDER_BIN=/opt/risk-atlas/bin/risk_atlas_bsm_incremental_builder
 ENV BSM_QUERY_BIN=/opt/risk-atlas/bin/risk_atlas_bsm_query
 
 WORKDIR /opt/risk-atlas/apps/api

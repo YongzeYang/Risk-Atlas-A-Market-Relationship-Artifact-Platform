@@ -43,6 +43,7 @@ services:
       ARTIFACT_ROOT_DIR: /var/lib/risk-atlas/artifacts
       ARTIFACT_CACHE_DIR: ${ARTIFACT_CACHE_DIR:-/var/lib/risk-atlas/artifacts/cache}
       BSM_WRITER_BIN: ${BSM_WRITER_BIN:-/opt/risk-atlas/bin/risk_atlas_bsm_writer}
+      BSM_INCREMENTAL_BUILDER_BIN: ${BSM_INCREMENTAL_BUILDER_BIN:-/opt/risk-atlas/bin/risk_atlas_bsm_incremental_builder}
       BSM_QUERY_BIN: ${BSM_QUERY_BIN:-/opt/risk-atlas/bin/risk_atlas_bsm_query}
       AWS_REGION: ${AWS_REGION:-}
       S3_ARTIFACT_BUCKET: ${S3_ARTIFACT_BUCKET:-}
