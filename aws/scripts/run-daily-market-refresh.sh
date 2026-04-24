@@ -71,7 +71,7 @@ main() {
   wait_for_postgres
 
   docker_compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" run --rm --no-deps api \
-    node --import tsx prisma/refresh-daily-market-state.ts
+    sh -lc 'exec nice -n 10 node --import tsx prisma/refresh-daily-market-state.ts'
 }
 
 main "$@"

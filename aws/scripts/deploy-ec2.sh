@@ -145,7 +145,7 @@ main() {
     echo "RUN_INITIAL_MARKET_BOOTSTRAP_ON_DEPLOY=1, so this deploy will refresh HK and crypto market data and then build or reuse the latest 8 market snapshots." >&2
     echo "Set RUN_INITIAL_MARKET_BOOTSTRAP_ON_DEPLOY back to 0 after the first successful deploy if you want routine code redeploys to skip this heavy bootstrap path." >&2
     docker_compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" run --rm --no-deps api \
-      node --import tsx prisma/bootstrap-initial-market-state.ts
+      sh -lc 'exec nice -n 10 node --import tsx prisma/bootstrap-initial-market-state.ts'
   elif [[ "${RUN_SEED_ON_DEPLOY:-0}" == "1" ]]; then
     docker_compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" run --rm --no-deps api \
       node --import tsx prisma/seed.ts

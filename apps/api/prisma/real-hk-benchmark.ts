@@ -43,6 +43,7 @@ const TAXONOMY_ONLY_MODE = process.argv.includes('--taxonomy-only');
 const SKIP_BENCHMARKS_MODE = process.argv.includes('--skip-benchmarks');
 const IMPORT_MODE =
   (process.env.RISK_ATLAS_IMPORT_EOD_MODE ?? 'replace').trim() === 'merge' ? 'merge' : 'replace';
+const SKIP_ALIGNMENT_AUDIT = (process.env.RISK_ATLAS_SKIP_ALIGNMENT_AUDIT ?? '0').trim() === '1';
 const SOURCE_REFRESH_OVERLAP_DAYS = Number.parseInt(
   process.env.RISK_ATLAS_HK_SOURCE_REFRESH_OVERLAP_DAYS ?? '45',
   10
@@ -195,6 +196,7 @@ type RealCoverageReport = {
     latestWindowFullSymbolCount: number;
     latestWindowFullRate: number;
     sharedAlignedTradeDateCountAcrossCoverageQualified: number;
+    alignmentAuditSkipped: boolean;
     currentValidation: {
       valid: boolean;
       reasonCode: string;
@@ -342,21 +344,43 @@ async function main() {
       `reason=${validation.reasonCode}.`
   );
 
-  console.log(
-    'Running HK alignment audit over the latest trading window. ' +
-      'This is the last heavy post-import database step before the crypto refresh begins.'
-  );
-  const alignmentAudit = await measureAlignmentAudit({
-    datasetId: DATASET_ID,
-    asOfDate: importSummary.maxTradeDate,
-    requiredRows: WINDOW_DAYS + 1
-  });
+  const alignmentAudit = SKIP_ALIGNMENT_AUDIT
+    ? {
+        latestWindowTradeDateCount: 0,
+        latestWindowFullSymbolCount: 0,
+        sharedAlignedTradeDateCountAcrossCoverageQualified: 0,
+        skipped: true
+      }
+    : await (async () => {
+        console.log(
+          'Running HK alignment audit over the latest trading window. ' +
+            'This is the last heavy post-import database step before the crypto refresh begins.'
+        );
 
-  console.log(
-    `HK alignment audit complete: ${alignmentAudit.latestWindowTradeDateCount} trade dates in scope, ` +
-      `${alignmentAudit.latestWindowFullSymbolCount} full-window symbols, ` +
-      `${alignmentAudit.sharedAlignedTradeDateCountAcrossCoverageQualified} shared aligned dates.`
-  );
+        const result = await measureAlignmentAudit({
+          datasetId: DATASET_ID,
+          asOfDate: importSummary.maxTradeDate,
+          requiredRows: WINDOW_DAYS + 1
+        });
+
+        console.log(
+          `HK alignment audit complete: ${result.latestWindowTradeDateCount} trade dates in scope, ` +
+            `${result.latestWindowFullSymbolCount} full-window symbols, ` +
+            `${result.sharedAlignedTradeDateCountAcrossCoverageQualified} shared aligned dates.`
+        );
+
+        return {
+          ...result,
+          skipped: false
+        };
+      })();
+
+  if (alignmentAudit.skipped) {
+    console.log(
+      'Skipping HK alignment audit because RISK_ATLAS_SKIP_ALIGNMENT_AUDIT=1. ' +
+        'This avoids the heaviest post-import query on small EC2 instances.'
+    );
+  }
 
   let benchmarkEligibleSymbols: string[] = [];
   let benchmarkPlans: ReadonlyArray<(typeof BENCHMARK_PLANS)[number]> = [];
@@ -398,7 +422,8 @@ async function main() {
     alignmentAudit,
     benchmarkEligibleSymbols,
     benchmarkPlans,
-    benchmarks
+    benchmarks,
+    alignmentAuditSkipped: alignmentAudit.skipped
   });
 
   await mkdir(resolve(process.cwd(), '../../artifacts/benchmark-reports'), { recursive: true });
@@ -1494,6 +1519,7 @@ function buildCoverageReport(args: {
   benchmarkEligibleSymbols: string[];
   benchmarkPlans: ReadonlyArray<(typeof BENCHMARK_PLANS)[number]>;
   benchmarks: BenchmarkEntry[];
+  alignmentAuditSkipped: boolean;
 }): RealCoverageReport {
   const rejectionBreakdown = args.refreshOutcome.rejections.reduce<Record<string, number>>(
     (acc, entry) => {
@@ -1592,6 +1618,7 @@ function buildCoverageReport(args: {
       ),
       sharedAlignedTradeDateCountAcrossCoverageQualified:
         args.alignmentAudit.sharedAlignedTradeDateCountAcrossCoverageQualified,
+      alignmentAuditSkipped: args.alignmentAuditSkipped,
       currentValidation: {
         valid: args.validation.valid,
         reasonCode: args.validation.reasonCode,

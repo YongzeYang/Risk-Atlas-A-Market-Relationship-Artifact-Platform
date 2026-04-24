@@ -81,7 +81,8 @@ async function main() {
       await ensureHongKongSeedPrerequisites();
       refreshSteps.push('hk_refresh');
       await runPrismaScript('prisma/real-hk-benchmark.ts', ['--skip-benchmarks'], {
-        RISK_ATLAS_IMPORT_EOD_MODE: 'merge'
+        RISK_ATLAS_IMPORT_EOD_MODE: 'merge',
+        RISK_ATLAS_SKIP_ALIGNMENT_AUDIT: '1'
       });
     } else {
       console.log('Skipping HK refresh because RISK_ATLAS_DAILY_REFRESH_RUN_HK=0.');

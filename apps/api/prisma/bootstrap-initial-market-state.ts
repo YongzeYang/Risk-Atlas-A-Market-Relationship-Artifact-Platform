@@ -66,7 +66,8 @@ async function main() {
 
   console.log('Refreshing Hong Kong market data from repository baseline to the latest available overlap window.');
   await runPrismaScript('prisma/real-hk-benchmark.ts', ['--skip-benchmarks'], {
-    RISK_ATLAS_IMPORT_EOD_MODE: 'merge'
+    RISK_ATLAS_IMPORT_EOD_MODE: 'merge',
+    RISK_ATLAS_SKIP_ALIGNMENT_AUDIT: '1'
   });
 
   console.log('Refreshing crypto market data from repository baseline to the latest available overlap window.');
