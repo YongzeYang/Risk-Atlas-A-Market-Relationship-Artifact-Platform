@@ -13,11 +13,11 @@ import * as XLSX from 'xlsx';
 import { prisma } from '../src/lib/prisma.js';
 import {
   assessBuildRequestCoverage,
-  getBuildRequestValidation
+  getBuildRequestValidationForResolvedUniverse
 } from '../src/services/build-request-validation-service.js';
 import { computeLogReturns } from '../src/services/correlation-analytics.js';
 import { runBuild } from '../src/services/build-run-runner.js';
-import { importEodCsv } from './import-eod.js';
+import { importEodCsv, type ImportEodCsvSummary } from './import-eod.js';
 import { MIN_REQUIRED_PRICE_ROWS } from './mvp-config.js';
 
 const DATASET_ID = 'hk_eod_yahoo_real_v1';
@@ -127,6 +127,12 @@ type RefreshOutcome = {
   officialEquities: OfficialSecurity[];
   reusedSymbolCount: number;
   fetchedSymbolCount: number;
+};
+
+type IncrementalImportPlan = {
+  mergeStartDateBySymbol: Map<string, string>;
+  symbolCount: number;
+  rowCount: number;
 };
 
 type RealCoverageReport = {
@@ -256,15 +262,33 @@ async function main() {
   );
   const refreshOutcome = await refreshOfficialUniverseHistories(officialEquities, currentCache);
   const activeMinLastTradeDate = computeActiveMinLastTradeDate(FETCH_END_DATE);
+  const datasetSummaryOverride = buildHistoryDatasetSummary(refreshOutcome.acceptedHistories);
+  const incrementalImportPlan =
+    IMPORT_MODE === 'merge'
+      ? buildIncrementalImportPlan(refreshOutcome.acceptedHistories, currentCache)
+      : null;
 
-  await writeNormalizedCsv(refreshOutcome.acceptedHistories, OUTPUT_CSV_PATH);
+  if (IMPORT_MODE === 'merge' && incrementalImportPlan && incrementalImportPlan.rowCount === 0 && existsSync(OUTPUT_CSV_PATH)) {
+    console.log('HK price cache is unchanged after refresh. Skipping full CSV rewrite.');
+  } else {
+    await writeNormalizedCsv(refreshOutcome.acceptedHistories, OUTPUT_CSV_PATH);
+  }
   await writeAcceptedSymbolsJson(refreshOutcome.acceptedHistories, OUTPUT_SYMBOLS_PATH);
+
+  if (IMPORT_MODE === 'merge' && incrementalImportPlan) {
+    console.log(
+      `Prepared incremental HK import plan for ${incrementalImportPlan.symbolCount.toLocaleString('en-US')} symbols ` +
+        `covering ${incrementalImportPlan.rowCount.toLocaleString('en-US')} changed rows.`
+    );
+  }
 
   const importSummary = await importEodCsv({
     datasetId: DATASET_ID,
     datasetName: DATASET_NAME,
     csvPath: OUTPUT_CSV_PATH,
     importMode: IMPORT_MODE,
+    mergeStartDateBySymbol: incrementalImportPlan?.mergeStartDateBySymbol,
+    datasetSummaryOverride,
     prismaClient: prisma,
     transactionTimeoutMs: 900_000
   });
@@ -283,23 +307,56 @@ async function main() {
     throw new Error('Universe "hk_all_common_equity" was not found.');
   }
 
+  console.log(
+    'HK CSV import finished. Computing post-import coverage assessment for hk_all_common_equity. ' +
+      'This can take time on smaller EC2 instances.'
+  );
   const coverageAssessment = await assessBuildRequestCoverage({
     datasetId: DATASET_ID,
     universe: universeRow,
     asOfDate: importSummary.maxTradeDate,
     windowDays: WINDOW_DAYS
   });
-  const validation = await getBuildRequestValidation({
-    datasetId: DATASET_ID,
-    universeId: 'hk_all_common_equity',
+
+  console.log(
+    `HK coverage assessment complete: ` +
+      `${coverageAssessment.coverageQualifiedSymbols.length} coverage-qualified symbols, ` +
+      `${coverageAssessment.matrixReadySymbols.length} matrix-ready symbols, ` +
+      `${coverageAssessment.filteredOutSymbols.length} filtered-out symbols.`
+  );
+
+  console.log('Building HK validation summary from the completed coverage assessment.');
+  const validation = await getBuildRequestValidationForResolvedUniverse({
+    dataset: {
+      id: DATASET_ID,
+      market: Market.HK
+    },
+    universe: universeRow,
     asOfDate: importSummary.maxTradeDate,
-    windowDays: WINDOW_DAYS
+    windowDays: WINDOW_DAYS,
+    assessment: coverageAssessment
   });
+
+  console.log(
+    `HK validation summary complete: valid=${validation.valid ? 'yes' : 'no'}, ` +
+      `reason=${validation.reasonCode}.`
+  );
+
+  console.log(
+    'Running HK alignment audit over the latest trading window. ' +
+      'This is the last heavy post-import database step before the crypto refresh begins.'
+  );
   const alignmentAudit = await measureAlignmentAudit({
     datasetId: DATASET_ID,
     asOfDate: importSummary.maxTradeDate,
     requiredRows: WINDOW_DAYS + 1
   });
+
+  console.log(
+    `HK alignment audit complete: ${alignmentAudit.latestWindowTradeDateCount} trade dates in scope, ` +
+      `${alignmentAudit.latestWindowFullSymbolCount} full-window symbols, ` +
+      `${alignmentAudit.sharedAlignedTradeDateCountAcrossCoverageQualified} shared aligned dates.`
+  );
 
   let benchmarkEligibleSymbols: string[] = [];
   let benchmarkPlans: ReadonlyArray<(typeof BENCHMARK_PLANS)[number]> = [];
@@ -1188,6 +1245,106 @@ async function writeAcceptedSymbolsJson(histories: SymbolHistory[], outputPath: 
   );
 }
 
+function buildHistoryDatasetSummary(
+  histories: SymbolHistory[]
+): Pick<
+  ImportEodCsvSummary,
+  'rowCount' | 'symbolCount' | 'minTradeDate' | 'maxTradeDate' | 'firstValidAsOfByWindowDays'
+> {
+  let rowCount = 0;
+  let minTradeDate: string | null = null;
+  let maxTradeDate: string | null = null;
+  const tradeDates = new Set<string>();
+
+  for (const history of histories) {
+    for (const price of history.prices) {
+      rowCount += 1;
+      tradeDates.add(price.tradeDate);
+
+      if (minTradeDate === null || price.tradeDate < minTradeDate) {
+        minTradeDate = price.tradeDate;
+      }
+
+      if (maxTradeDate === null || price.tradeDate > maxTradeDate) {
+        maxTradeDate = price.tradeDate;
+      }
+    }
+  }
+
+  if (rowCount === 0 || minTradeDate === null || maxTradeDate === null) {
+    throw new Error('HK refresh produced no accepted price rows to summarize.');
+  }
+
+  const sortedTradeDates = [...tradeDates].sort((left, right) => left.localeCompare(right));
+
+  return {
+    rowCount,
+    symbolCount: histories.length,
+    minTradeDate,
+    maxTradeDate,
+    firstValidAsOfByWindowDays: {
+      '60': sortedTradeDates[60] ?? null,
+      '120': sortedTradeDates[120] ?? null,
+      '252': sortedTradeDates[252] ?? null
+    }
+  };
+}
+
+function buildIncrementalImportPlan(
+  histories: SymbolHistory[],
+  cachedHistories: Map<string, SymbolHistory>
+): IncrementalImportPlan {
+  const mergeStartDateBySymbol = new Map<string, string>();
+  let rowCount = 0;
+
+  for (const history of histories) {
+    const earliestChangedTradeDate = findEarliestChangedTradeDate(
+      history,
+      cachedHistories.get(history.symbol) ?? null
+    );
+
+    if (!earliestChangedTradeDate) {
+      continue;
+    }
+
+    mergeStartDateBySymbol.set(history.symbol, earliestChangedTradeDate);
+    rowCount += history.prices.filter((price) => price.tradeDate >= earliestChangedTradeDate).length;
+  }
+
+  return {
+    mergeStartDateBySymbol,
+    symbolCount: mergeStartDateBySymbol.size,
+    rowCount
+  };
+}
+
+function findEarliestChangedTradeDate(
+  history: SymbolHistory,
+  cachedHistory: SymbolHistory | null
+): string | null {
+  if (!cachedHistory) {
+    return history.prices[0]?.tradeDate ?? null;
+  }
+
+  const cachedPricesByTradeDate = new Map(
+    cachedHistory.prices.map((price) => [price.tradeDate, price] as const)
+  );
+
+  for (const price of history.prices) {
+    const cachedPrice = cachedPricesByTradeDate.get(price.tradeDate);
+
+    if (!cachedPrice || !samePricePoint(cachedPrice, price)) {
+      return price.tradeDate;
+    }
+  }
+
+  return null;
+}
+
+function samePricePoint(left: PricePoint, right: PricePoint): boolean {
+  return left.adjClose === right.adjClose && (left.volume ?? null) === (right.volume ?? null);
+}
+
 async function upsertStaticUniverse(
   universeId: string,
   universeName: string,
@@ -1332,7 +1489,7 @@ function buildCoverageReport(args: {
   activeMinLastTradeDate: string;
   importSummary: Awaited<ReturnType<typeof importEodCsv>>;
   coverageAssessment: Awaited<ReturnType<typeof assessBuildRequestCoverage>>;
-  validation: Awaited<ReturnType<typeof getBuildRequestValidation>>;
+  validation: Awaited<ReturnType<typeof getBuildRequestValidationForResolvedUniverse>>;
   alignmentAudit: Awaited<ReturnType<typeof measureAlignmentAudit>>;
   benchmarkEligibleSymbols: string[];
   benchmarkPlans: ReadonlyArray<(typeof BENCHMARK_PLANS)[number]>;

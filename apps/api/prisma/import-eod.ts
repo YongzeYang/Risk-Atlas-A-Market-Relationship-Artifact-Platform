@@ -64,6 +64,11 @@ export type ImportEodCsvOptions = {
   market?: ImportMarket;
   importMode?: ImportEodCsvMode;
   replaceExisting?: boolean;
+  mergeStartDateBySymbol?: ReadonlyMap<string, string>;
+  datasetSummaryOverride?: Pick<
+    ImportEodCsvSummary,
+    'rowCount' | 'symbolCount' | 'minTradeDate' | 'maxTradeDate' | 'firstValidAsOfByWindowDays'
+  >;
   prismaClient?: typeof prisma;
   transactionTimeoutMs?: number;
 };
@@ -138,6 +143,7 @@ async function streamImportRows(
   csvPath: string,
   datasetId: string,
   market: ImportMarket,
+  mergeStartDateBySymbol: ReadonlyMap<string, string> | undefined,
   onBatch: (batch: ImportRow[]) => Promise<void>
 ): Promise<ImportProcessedSummary> {
   if (!existsSync(csvPath)) {
@@ -156,6 +162,7 @@ async function streamImportRows(
   let hasVolume = false;
 
   let rowCount = 0;
+  let sourceRowCount = 0;
   let batch: ImportRow[] = [];
   let flushedRowCount = 0;
   let nextProgressLogAt = PROGRESS_LOG_EVERY_ROWS;
@@ -215,6 +222,14 @@ async function streamImportRows(
     const tradeDate = parts[0]!;
     const symbol = parts[1]!.toUpperCase();
     const adjClose = Number(parts[2]!);
+    sourceRowCount += 1;
+
+    if (mergeStartDateBySymbol) {
+      const mergeStartDate = mergeStartDateBySymbol.get(symbol);
+      if (!mergeStartDate || tradeDate < mergeStartDate) {
+        continue;
+      }
+    }
 
     validateImportRow({ tradeDate, symbol, adjClose }, lineNumber, market);
 
@@ -257,8 +272,26 @@ async function streamImportRows(
     throw new Error('CSV is empty or missing a header row.');
   }
 
-  if (rowCount === 0 || minTradeDate === null || maxTradeDate === null) {
+  if (sourceRowCount === 0) {
     throw new Error('CSV contains no data rows.');
+  }
+
+  if (rowCount === 0) {
+    return {
+      rowCount: 0,
+      symbolCount: 0,
+      minTradeDate: '',
+      maxTradeDate: '',
+      firstValidAsOfByWindowDays: {
+        '60': null,
+        '120': null,
+        '252': null
+      }
+    };
+  }
+
+  if (minTradeDate === null || maxTradeDate === null) {
+    throw new Error('CSV contains no imported data rows after filtering.');
   }
 
   return {
@@ -385,6 +418,7 @@ export async function importEodCsv(options: ImportEodCsvOptions): Promise<Import
   const importMode = resolveImportMode(options);
   const transactionTimeoutMs =
     options.transactionTimeoutMs ?? DEFAULT_IMPORT_TRANSACTION_TIMEOUT_MS;
+  const mergeStartDateBySymbol = importMode === 'merge' ? options.mergeStartDateBySymbol : undefined;
 
   console.log(
     `Starting CSV import for dataset ${options.datasetId} from ${options.csvPath} ` +
@@ -418,22 +452,43 @@ export async function importEodCsv(options: ImportEodCsvOptions): Promise<Import
         });
       }
 
-      const importedSummary = await streamImportRows(
-        options.csvPath,
-        options.datasetId,
-        market,
-        async (batch) => {
-          await upsertImportBatch(tx, batch);
-        }
-      );
+      const importedSummary =
+        importMode === 'merge' && mergeStartDateBySymbol && mergeStartDateBySymbol.size === 0
+          ? {
+              rowCount: 0,
+              symbolCount: 0,
+              minTradeDate: '',
+              maxTradeDate: '',
+              firstValidAsOfByWindowDays: {
+                '60': null,
+                '120': null,
+                '252': null
+              }
+            }
+          : await streamImportRows(
+              options.csvPath,
+              options.datasetId,
+              market,
+              mergeStartDateBySymbol,
+              async (batch) => {
+                await upsertImportBatch(tx, batch);
+              }
+            );
 
-      const persistedSummary = await loadPersistedDatasetSummary(tx, options.datasetId);
+      const persistedSummary = options.datasetSummaryOverride ?? await loadPersistedDatasetSummary(tx, options.datasetId);
 
       if (importMode === 'merge') {
-        console.log(
-          `Merged ${importedSummary.rowCount.toLocaleString('en-US')} CSV rows into dataset ${options.datasetId}; ` +
-            `persisted dataset now has ${persistedSummary.rowCount.toLocaleString('en-US')} rows.`
-        );
+        if (importedSummary.rowCount === 0) {
+          console.log(
+            `No changed CSV rows needed importing for dataset ${options.datasetId}; ` +
+              `persisted dataset remains at ${persistedSummary.rowCount.toLocaleString('en-US')} rows.`
+          );
+        } else {
+          console.log(
+            `Merged ${importedSummary.rowCount.toLocaleString('en-US')} CSV rows into dataset ${options.datasetId}; ` +
+              `persisted dataset now has ${persistedSummary.rowCount.toLocaleString('en-US')} rows.`
+          );
+        }
       }
 
       await tx.dataset.update({

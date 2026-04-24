@@ -100,13 +100,16 @@ export async function getBuildRequestValidationForResolvedUniverse(args: {
   universe: UniverseValidationRow;
   asOfDate: string;
   windowDays: BuildRunWindowDays;
+  assessment?: BuildRequestCoverageAssessment;
 }): Promise<BuildRequestValidationResponse> {
-  const assessment = await assessBuildRequestCoverage({
-    datasetId: args.dataset.id,
-    universe: args.universe,
-    asOfDate: args.asOfDate,
-    windowDays: args.windowDays
-  });
+  const assessment =
+    args.assessment ??
+    (await assessBuildRequestCoverage({
+      datasetId: args.dataset.id,
+      universe: args.universe,
+      asOfDate: args.asOfDate,
+      windowDays: args.windowDays
+    }));
 
   if (assessment.insufficientSymbols.length > 0) {
     const preview = assessment.insufficientSymbols
