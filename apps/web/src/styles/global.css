@@ -3421,6 +3421,16 @@ select {
   .start-here-strip__actions {
     justify-content: flex-start;
   }
+
+  .page--compare .workspace-hero__intro,
+  .page--divergence .workspace-hero__intro,
+  .page--exposure .workspace-hero__intro,
+  .page--structure .workspace-hero__intro,
+  .page--builds .workspace-hero__intro,
+  .page--series .workspace-hero__intro {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-4);
+  }
 }
 
 @media (max-width: 780px) {
