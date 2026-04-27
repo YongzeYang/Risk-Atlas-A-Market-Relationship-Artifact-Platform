@@ -501,7 +501,10 @@ If you want the server to keep both markets current every 24 hours after the fir
 
 ```dotenv
 INSTALL_DAILY_MARKET_REFRESH_TIMER=1
+RISK_ATLAS_DAILY_REFRESH_BUILD_SNAPSHOTS=0
 ```
+
+Keep `RISK_ATLAS_DAILY_REFRESH_BUILD_SNAPSHOTS=0` on very small instances such as `t3.small` unless you explicitly want the daily job to also rebuild market snapshots.
 
 The deploy script installs and enables `aws/systemd/risk-atlas-daily-market-refresh.service` and `aws/systemd/risk-atlas-daily-market-refresh.timer` when that flag is enabled.
 
@@ -510,7 +513,10 @@ The timer runs the same market-state refresh flow every 24 hours:
 1. ensure the Hong Kong seed prerequisites still exist
 2. overlap-refresh Hong Kong data to the latest available trade date
 3. overlap-refresh crypto data to the latest available trade date
-4. build or reuse the latest 8 market-wide snapshots
+
+When `RISK_ATLAS_DAILY_REFRESH_BUILD_SNAPSHOTS=1`, the same job then builds or reuses the latest 8 market-wide snapshots.
+
+On `t3.small`, rebuilding 8 snapshots inline is usually the step that causes CPU and memory saturation, so the production default is now dataset refresh only.
 
 If you want to run the same flow manually outside systemd:
 

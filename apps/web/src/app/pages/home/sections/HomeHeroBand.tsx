@@ -75,7 +75,7 @@ export default function HomeHeroBand({
           </p>
 
           <p className="workspace-hero__subline hero-band__subline">
-            Useful when a basket or market looks diversified on paper but still behaves like one crowded idea. Repository baselines refresh every 24 hours, and the latest Hong Kong and crypto snapshots are rebuilt automatically.
+            Useful when a basket or market looks diversified on paper but still behaves like one crowded idea. Source data refreshes every 24 hours by pulling the latest Hong Kong market coverage from HKEX and Yahoo Finance, plus crypto market coverage from CoinGecko and Yahoo Finance.
           </p>
 
           <div className="workspace-hero__actions hero-band__actions">

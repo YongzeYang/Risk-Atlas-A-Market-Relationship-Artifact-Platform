@@ -501,7 +501,10 @@ docker compose -f aws/docker-compose.ec2.yml --env-file aws/.env.production run 
 
 ```dotenv
 INSTALL_DAILY_MARKET_REFRESH_TIMER=1
+RISK_ATLAS_DAILY_REFRESH_BUILD_SNAPSHOTS=0
 ```
+
+對於 `t3.small` 這類很小的實例，建議保持 `RISK_ATLAS_DAILY_REFRESH_BUILD_SNAPSHOTS=0`，除非你明確希望 daily job 同時重建市場快照。
 
 啟用後，deploy 腳本會安裝並啟用 `aws/systemd/risk-atlas-daily-market-refresh.service` 及 `aws/systemd/risk-atlas-daily-market-refresh.timer`。
 
@@ -510,7 +513,10 @@ INSTALL_DAILY_MARKET_REFRESH_TIMER=1
 1. 確保港股 seed prerequisite 仍然存在
 2. 把港股資料 overlap-refresh 到最新可用交易日
 3. 把加密資料 overlap-refresh 到最新可用交易日
-4. 構建或重用最新 8 個全市場快照
+
+當 `RISK_ATLAS_DAILY_REFRESH_BUILD_SNAPSHOTS=1` 時，這個任務才會繼續構建或重用最新的 8 個全市場快照。
+
+在 `t3.small` 上，把這 8 個快照和資料刷新放在同一個定時任務裡，通常就是導致 CPU 與記憶體被打滿、站點逾時的主要原因，所以生產預設值現在改為「只刷新資料」。
 
 如果你希望在不依賴 systemd 的情況下手動執行同一流程：
 

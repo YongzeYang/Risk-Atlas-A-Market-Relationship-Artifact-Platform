@@ -28,6 +28,8 @@ const SNAPSHOT_WINDOW_DAYS: BuildRunWindowDays = 252;
 
 const RUN_HK_REFRESH = (process.env.RISK_ATLAS_DAILY_REFRESH_RUN_HK ?? '1').trim() !== '0';
 const RUN_CRYPTO_REFRESH = (process.env.RISK_ATLAS_DAILY_REFRESH_RUN_CRYPTO ?? '1').trim() !== '0';
+const BUILD_DAILY_SNAPSHOTS =
+  (process.env.RISK_ATLAS_DAILY_REFRESH_BUILD_SNAPSHOTS ?? '0').trim() !== '0';
 
 type DatasetCatalogRow = {
   id: string;
@@ -96,6 +98,28 @@ async function main() {
       });
     } else {
       console.log('Skipping crypto refresh because RISK_ATLAS_DAILY_REFRESH_RUN_CRYPTO=0.');
+    }
+
+    if (!BUILD_DAILY_SNAPSHOTS) {
+      console.log(
+        'Skipping daily snapshot builds because RISK_ATLAS_DAILY_REFRESH_BUILD_SNAPSHOTS=0. ' +
+          'Daily refresh will update datasets only.'
+      );
+
+      console.log(
+        JSON.stringify(
+          {
+            refreshSteps,
+            buildSnapshots: false,
+            snapshotCount: 0,
+            summaries: []
+          },
+          null,
+          2
+        )
+      );
+
+      return;
     }
 
     const hkDataset = await ensureHongKongDatasetReady();
