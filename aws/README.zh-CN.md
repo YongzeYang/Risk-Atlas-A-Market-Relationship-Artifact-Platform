@@ -410,8 +410,11 @@ cp aws/.env.production.example aws/.env.production
 - `S3_ARTIFACT_PREFIX`：可选前缀，例如 `prod`
 - `S3_SIGNED_URL_TTL_SECONDS`：构建下载 presigned URL 的有效期
 - `RUN_INITIAL_MARKET_BOOTSTRAP_ON_DEPLOY`：如果你希望首次部署时复用仓库基线、把两个市场刷新到最新 overlap window，并自动构建最新 8 个全市场快照，就设为 `1`
-- `INSTALL_DAILY_MARKET_REFRESH_TIMER`：如果你希望部署后主机每 24 小时自动刷新一次两个市场，就设为 `1`
+- `INSTALL_DAILY_MARKET_REFRESH_TIMER`：如果你希望部署后主机安装拆分后的港股 / crypto 24 小时定时器，就设为 `1`
 - `RISK_ATLAS_DAILY_REFRESH_RUN_HK` 与 `RISK_ATLAS_DAILY_REFRESH_RUN_CRYPTO`：允许你在保持 24 小时 timer 开启的同时，单独关闭某一侧市场
+- `RISK_ATLAS_DAILY_REFRESH_CONTINUE_ON_MARKET_FAILURE`：设为 `1` 时，如果单个市场刷新失败，会自动降级成 warning，让另一侧市场继续完成
+- `DAILY_REFRESH_API_CPUS`、`DAILY_REFRESH_API_MEMORY`、`DAILY_REFRESH_API_MEMORY_SWAP` 与 `DAILY_REFRESH_API_PIDS_LIMIT`：daily refresh 开始前施加到运行中 API container 的护栏，避免很小的主机把 CPU、内存和 PID 全吃满
+- `RISK_ATLAS_DAILY_REFRESH_CRYPTO_*`：daily-only 的 crypto 刷新调优参数，用来单独控制目标资产数、候选页数、Yahoo 批大小、并发和请求间隔
 
 在这个部署模型里，`VITE_API_BASE_URL` 保持为空。
 
@@ -501,22 +504,50 @@ docker compose -f aws/docker-compose.ec2.yml --env-file aws/.env.production run 
 
 ```dotenv
 INSTALL_DAILY_MARKET_REFRESH_TIMER=1
+DAILY_REFRESH_API_CPUS=1.0
+DAILY_REFRESH_API_MEMORY=1200m
+DAILY_REFRESH_API_MEMORY_SWAP=1200m
+DAILY_REFRESH_API_PIDS_LIMIT=256
+RISK_ATLAS_DAILY_REFRESH_CONTINUE_ON_MARKET_FAILURE=1
 RISK_ATLAS_DAILY_REFRESH_BUILD_SNAPSHOTS=0
 ```
 
 对于 `t3.small` 这类很小的实例，建议保持 `RISK_ATLAS_DAILY_REFRESH_BUILD_SNAPSHOTS=0`，除非你明确希望 daily job 同时重建市场快照。
 
-启用后，deploy 脚本会安装并启用 `aws/systemd/risk-atlas-daily-market-refresh.service` 和 `aws/systemd/risk-atlas-daily-market-refresh.timer`。
+现在安装的 systemd service 会在刷新失败后 30 分钟重试一次；如果 6 小时内已经连续失败 2 次，就先停止抖动，等下一次正常 timer 周期再继续。
 
-这个 timer 每 24 小时执行同一套 market-state refresh 流程：
+此外，刷新脚本会在任务开始前把上面的 API container 护栏应用上去，避免 refresh 在很小的实例上独占整台机器。
 
-1. 确保港股 seed prerequisite 仍然存在
-2. 把港股数据 overlap-refresh 到最新可用交易日
-3. 把加密数据 overlap-refresh 到最新可用交易日
+deploy 脚本现在安装的是两个错峰 timer，而不是一个 combined timer：
 
-当 `RISK_ATLAS_DAILY_REFRESH_BUILD_SNAPSHOTS=1` 时，这个任务才会继续构建或复用最新的 8 个全市场快照。
+1. `aws/systemd/risk-atlas-hk-daily-market-refresh.timer` 先跑港股刷新
+2. `aws/systemd/risk-atlas-crypto-daily-market-refresh.timer` 在数小时后再跑 crypto 刷新
 
-在 `t3.small` 上，把这 8 个快照和数据刷新放在同一个定时任务里，通常就是导致 CPU 和内存被打满、站点超时的主要原因，所以生产默认值现在改为“只刷新数据”。
+这样可以把港股和 crypto 从同一个资源窗口里拆开，避免在很小的主机上互相抢资源。
+
+对于很小的实例，建议先保持一组更保守的 daily crypto 刷新参数，确认仍有余量后再上调：
+
+```dotenv
+RISK_ATLAS_DAILY_REFRESH_CRYPTO_TARGET_COUNT=300
+RISK_ATLAS_DAILY_REFRESH_CRYPTO_MIN_COUNT=80
+RISK_ATLAS_DAILY_REFRESH_CRYPTO_CANDIDATE_PAGE_COUNT=3
+RISK_ATLAS_DAILY_REFRESH_CRYPTO_HISTORY_BATCH_SIZE=80
+RISK_ATLAS_DAILY_REFRESH_CRYPTO_HISTORY_CONCURRENCY=4
+RISK_ATLAS_DAILY_REFRESH_CRYPTO_REQUEST_DELAY_MS=500
+```
+
+启用后，deploy 脚本会安装并启用 `aws/systemd/risk-atlas-hk-daily-market-refresh.service` / `aws/systemd/risk-atlas-hk-daily-market-refresh.timer` 以及 `aws/systemd/risk-atlas-crypto-daily-market-refresh.service` / `aws/systemd/risk-atlas-crypto-daily-market-refresh.timer`。
+
+这两个 timer 会执行同一套 market-state refresh 编排，但放在不同时间窗口：
+
+1. 港股 timer 会先确保港股 seed prerequisite 仍然存在，然后把港股数据 overlap-refresh 到最新可用交易日
+2. crypto timer 会在后面的窗口里，把加密数据 overlap-refresh 到最新可用交易日，并使用上面那组 daily-only crypto 调优参数
+
+当 `RISK_ATLAS_DAILY_REFRESH_BUILD_SNAPSHOTS=1` 时，每个 timer 只会为自己刚刚刷新的市场构建或复用 snapshot，不再把两个市场塞进同一个任务里重建。
+
+当 `RISK_ATLAS_DAILY_REFRESH_CONTINUE_ON_MARKET_FAILURE=1` 时，如果某一侧市场刷新失败，系统会记录 degraded outcome，但不会把另一侧市场的刷新一起拖垮。只有当这次运行中所有被请求的市场都失败时，service 才会真正失败。
+
+在 `t3.small` 上，把两个市场塞进同一个刷新窗口本身就会制造争抢，所以生产路径现在改成“拆分 timer + 默认只刷新数据”。
 
 如果你希望在不依赖 systemd 的情况下手动执行同一流程：
 
@@ -527,15 +558,29 @@ bash aws/scripts/run-daily-market-refresh.sh
 
 这个 helper 会在需要时先拉起 PostgreSQL，然后用生产环境文件在 API container 内运行 `prisma/refresh-daily-market-state.ts`。
 
+如果你只想手动刷新其中一个市场：
+
+```bash
+cd /opt/risk-atlas/app
+bash aws/scripts/run-daily-market-refresh.sh aws/.env.production hk
+bash aws/scripts/run-daily-market-refresh.sh aws/.env.production crypto
+```
+
 如果你更希望手动安装 timer：
 
 ```bash
-sudo cp aws/systemd/risk-atlas-daily-market-refresh.service /etc/systemd/system/
-sudo cp aws/systemd/risk-atlas-daily-market-refresh.timer /etc/systemd/system/
+sudo cp aws/systemd/risk-atlas-hk-daily-market-refresh.service /etc/systemd/system/
+sudo cp aws/systemd/risk-atlas-hk-daily-market-refresh.timer /etc/systemd/system/
+sudo cp aws/systemd/risk-atlas-crypto-daily-market-refresh.service /etc/systemd/system/
+sudo cp aws/systemd/risk-atlas-crypto-daily-market-refresh.timer /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now risk-atlas-daily-market-refresh.timer
-sudo systemctl status risk-atlas-daily-market-refresh.timer
+sudo systemctl enable --now risk-atlas-hk-daily-market-refresh.timer
+sudo systemctl enable --now risk-atlas-crypto-daily-market-refresh.timer
+sudo systemctl status risk-atlas-hk-daily-market-refresh.timer
+sudo systemctl status risk-atlas-crypto-daily-market-refresh.timer
 ```
+
+如果你在首次安装后更新了 unit 文件，记得重新执行 `sudo systemctl daemon-reload`，再重启 timer 或 service，让新的失败退避策略生效。
 
 如果你的 seed 使用了仓库内自带的 real-HK CSV，那么第一次导入会比较重：文件大约有 140 万行，在 EC2 上可能要几分钟后才会看到下一条导入日志。
 

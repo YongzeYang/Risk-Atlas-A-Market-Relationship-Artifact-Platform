@@ -1,0 +1,18 @@
+[Unit]
+Description=Risk Atlas crypto daily market refresh
+Wants=network-online.target docker.service
+After=network-online.target docker.service
+StartLimitIntervalSec=6h
+StartLimitBurst=2
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/risk-atlas/app
+EnvironmentFile=/opt/risk-atlas/app/aws/.env.production
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+Restart=on-failure
+RestartSec=30m
+TimeoutStartSec=8h
+ExecStart=/opt/risk-atlas/app/aws/scripts/run-daily-market-refresh.sh /opt/risk-atlas/app/aws/.env.production crypto

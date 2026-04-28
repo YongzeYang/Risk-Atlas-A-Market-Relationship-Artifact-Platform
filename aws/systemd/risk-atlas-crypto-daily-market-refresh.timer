@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Risk Atlas crypto daily market refresh every 24 hours
+
+[Timer]
+OnBootSec=6h
+OnUnitActiveSec=24h
+Persistent=true
+Unit=risk-atlas-crypto-daily-market-refresh.service
+
+[Install]
+WantedBy=timers.target

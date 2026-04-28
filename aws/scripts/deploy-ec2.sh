@@ -78,11 +78,19 @@ render_nginx_config() {
   sudo systemctl reload nginx
 }
 
-install_daily_market_refresh_timer() {
-  sudo cp "${AWS_DIR}/systemd/risk-atlas-daily-market-refresh.service" /etc/systemd/system/
-  sudo cp "${AWS_DIR}/systemd/risk-atlas-daily-market-refresh.timer" /etc/systemd/system/
+install_daily_market_refresh_timers() {
+  sudo cp "${AWS_DIR}/systemd/risk-atlas-hk-daily-market-refresh.service" /etc/systemd/system/
+  sudo cp "${AWS_DIR}/systemd/risk-atlas-hk-daily-market-refresh.timer" /etc/systemd/system/
+  sudo cp "${AWS_DIR}/systemd/risk-atlas-crypto-daily-market-refresh.service" /etc/systemd/system/
+  sudo cp "${AWS_DIR}/systemd/risk-atlas-crypto-daily-market-refresh.timer" /etc/systemd/system/
+  sudo systemctl disable --now risk-atlas-daily-market-refresh.timer >/dev/null 2>&1 || true
+  sudo systemctl stop risk-atlas-daily-market-refresh.service >/dev/null 2>&1 || true
+  sudo rm -f \
+    /etc/systemd/system/risk-atlas-daily-market-refresh.service \
+    /etc/systemd/system/risk-atlas-daily-market-refresh.timer
   sudo systemctl daemon-reload
-  sudo systemctl enable --now risk-atlas-daily-market-refresh.timer
+  sudo systemctl enable --now risk-atlas-hk-daily-market-refresh.timer
+  sudo systemctl enable --now risk-atlas-crypto-daily-market-refresh.timer
 }
 
 main() {
@@ -156,7 +164,7 @@ main() {
   render_nginx_config
 
   if [[ "${INSTALL_DAILY_MARKET_REFRESH_TIMER:-0}" == "1" ]]; then
-    install_daily_market_refresh_timer
+    install_daily_market_refresh_timers
   fi
 
   if [[ "${SYNC_ARTIFACTS_ON_DEPLOY:-0}" == "1" ]]; then

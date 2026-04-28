@@ -30,6 +30,36 @@ const RUN_HK_REFRESH = (process.env.RISK_ATLAS_DAILY_REFRESH_RUN_HK ?? '1').trim
 const RUN_CRYPTO_REFRESH = (process.env.RISK_ATLAS_DAILY_REFRESH_RUN_CRYPTO ?? '1').trim() !== '0';
 const BUILD_DAILY_SNAPSHOTS =
   (process.env.RISK_ATLAS_DAILY_REFRESH_BUILD_SNAPSHOTS ?? '0').trim() !== '0';
+const CONTINUE_ON_MARKET_FAILURE =
+  (process.env.RISK_ATLAS_DAILY_REFRESH_CONTINUE_ON_MARKET_FAILURE ?? '1').trim() !== '0';
+const REFRESH_MODE = readRefreshEnv(
+  'RISK_ATLAS_DAILY_REFRESH_MODE',
+  RUN_HK_REFRESH && RUN_CRYPTO_REFRESH ? 'all' : RUN_HK_REFRESH ? 'hk' : RUN_CRYPTO_REFRESH ? 'crypto' : 'none'
+);
+const DAILY_CRYPTO_TARGET_COUNT = readRefreshEnv(
+  'RISK_ATLAS_DAILY_REFRESH_CRYPTO_TARGET_COUNT',
+  '300'
+);
+const DAILY_CRYPTO_MIN_COUNT = readRefreshEnv(
+  'RISK_ATLAS_DAILY_REFRESH_CRYPTO_MIN_COUNT',
+  '80'
+);
+const DAILY_CRYPTO_CANDIDATE_PAGE_COUNT = readRefreshEnv(
+  'RISK_ATLAS_DAILY_REFRESH_CRYPTO_CANDIDATE_PAGE_COUNT',
+  '3'
+);
+const DAILY_CRYPTO_HISTORY_BATCH_SIZE = readRefreshEnv(
+  'RISK_ATLAS_DAILY_REFRESH_CRYPTO_HISTORY_BATCH_SIZE',
+  '80'
+);
+const DAILY_CRYPTO_HISTORY_CONCURRENCY = readRefreshEnv(
+  'RISK_ATLAS_DAILY_REFRESH_CRYPTO_HISTORY_CONCURRENCY',
+  '4'
+);
+const DAILY_CRYPTO_REQUEST_DELAY_MS = readRefreshEnv(
+  'RISK_ATLAS_DAILY_REFRESH_CRYPTO_REQUEST_DELAY_MS',
+  '500'
+);
 
 type DatasetCatalogRow = {
   id: string;
@@ -67,6 +97,16 @@ type SnapshotBuildSummary = {
   reusedExistingBuild: boolean;
 };
 
+type MarketLabel = 'hk' | 'crypto';
+
+type MarketRefreshOutcome = {
+  marketLabel: MarketLabel;
+  requested: boolean;
+  status: 'succeeded' | 'skipped' | 'failed';
+  step: string;
+  errorMessage: string | null;
+};
+
 async function main() {
   const lockAcquired = await tryAcquireDailyRefreshLock();
   if (!lockAcquired) {
@@ -75,29 +115,79 @@ async function main() {
   }
 
   try {
-    console.log('Starting daily market refresh for HK + crypto snapshot coverage.');
+    console.log(
+      `Starting daily market refresh mode=${REFRESH_MODE} ` +
+        `(hk=${RUN_HK_REFRESH ? 'on' : 'off'}, crypto=${RUN_CRYPTO_REFRESH ? 'on' : 'off'}, ` +
+        `continueOnMarketFailure=${CONTINUE_ON_MARKET_FAILURE ? 'on' : 'off'}).`
+    );
 
     const refreshSteps: string[] = [];
+    const marketOutcomes: MarketRefreshOutcome[] = [];
 
     if (RUN_HK_REFRESH) {
-      await ensureHongKongSeedPrerequisites();
-      refreshSteps.push('hk_refresh');
-      await runPrismaScript('prisma/real-hk-benchmark.ts', ['--skip-benchmarks'], {
-        RISK_ATLAS_IMPORT_EOD_MODE: 'merge',
-        RISK_ATLAS_SKIP_ALIGNMENT_AUDIT: '1'
-      });
+      marketOutcomes.push(
+        await executeMarketRefresh('hk', 'hk_refresh', async () => {
+          await ensureHongKongSeedPrerequisites();
+          await runPrismaScript('prisma/real-hk-benchmark.ts', ['--skip-benchmarks'], {
+            RISK_ATLAS_IMPORT_EOD_MODE: 'merge',
+            RISK_ATLAS_SKIP_ALIGNMENT_AUDIT: '1'
+          });
+        })
+      );
     } else {
       console.log('Skipping HK refresh because RISK_ATLAS_DAILY_REFRESH_RUN_HK=0.');
+      marketOutcomes.push({
+        marketLabel: 'hk',
+        requested: false,
+        status: 'skipped',
+        step: 'hk_refresh',
+        errorMessage: null
+      });
     }
 
     if (RUN_CRYPTO_REFRESH) {
-      refreshSteps.push('crypto_refresh');
-      await runPrismaScript('prisma/import-crypto-market-map.ts', [], {
-        CRYPTO_MARKET_MAP_SKIP_VERIFICATION_BUILD: '1',
-        RISK_ATLAS_IMPORT_EOD_MODE: 'merge'
-      });
+      marketOutcomes.push(
+        await executeMarketRefresh('crypto', 'crypto_refresh', async () => {
+          console.log(
+            'Daily crypto refresh tuning: ' +
+              `target=${DAILY_CRYPTO_TARGET_COUNT}, min=${DAILY_CRYPTO_MIN_COUNT}, ` +
+              `candidatePages=${DAILY_CRYPTO_CANDIDATE_PAGE_COUNT}, ` +
+              `historyBatchSize=${DAILY_CRYPTO_HISTORY_BATCH_SIZE}, ` +
+              `historyConcurrency=${DAILY_CRYPTO_HISTORY_CONCURRENCY}, ` +
+              `requestDelayMs=${DAILY_CRYPTO_REQUEST_DELAY_MS}.`
+          );
+          await runPrismaScript('prisma/import-crypto-market-map.ts', [], {
+            CRYPTO_MARKET_MAP_SKIP_VERIFICATION_BUILD: '1',
+            RISK_ATLAS_IMPORT_EOD_MODE: 'merge',
+            CRYPTO_MARKET_MAP_TARGET_COUNT: DAILY_CRYPTO_TARGET_COUNT,
+            CRYPTO_MARKET_MAP_MIN_COUNT: DAILY_CRYPTO_MIN_COUNT,
+            CRYPTO_MARKET_MAP_CANDIDATE_PAGE_COUNT: DAILY_CRYPTO_CANDIDATE_PAGE_COUNT,
+            CRYPTO_MARKET_MAP_HISTORY_BATCH_SIZE: DAILY_CRYPTO_HISTORY_BATCH_SIZE,
+            CRYPTO_MARKET_MAP_HISTORY_CONCURRENCY: DAILY_CRYPTO_HISTORY_CONCURRENCY,
+            CRYPTO_MARKET_MAP_REQUEST_DELAY_MS: DAILY_CRYPTO_REQUEST_DELAY_MS
+          });
+        })
+      );
     } else {
       console.log('Skipping crypto refresh because RISK_ATLAS_DAILY_REFRESH_RUN_CRYPTO=0.');
+      marketOutcomes.push({
+        marketLabel: 'crypto',
+        requested: false,
+        status: 'skipped',
+        step: 'crypto_refresh',
+        errorMessage: null
+      });
+    }
+
+    for (const outcome of marketOutcomes) {
+      if (outcome.status === 'succeeded') {
+        refreshSteps.push(outcome.step);
+      }
+    }
+
+    const requestedOutcomes = marketOutcomes.filter((outcome) => outcome.requested);
+    if (requestedOutcomes.length > 0 && requestedOutcomes.every((outcome) => outcome.status === 'failed')) {
+      throw new Error(buildAllMarketsFailedMessage(requestedOutcomes));
     }
 
     if (!BUILD_DAILY_SNAPSHOTS) {
@@ -109,7 +199,10 @@ async function main() {
       console.log(
         JSON.stringify(
           {
+            refreshMode: REFRESH_MODE,
+            continueOnMarketFailure: CONTINUE_ON_MARKET_FAILURE,
             refreshSteps,
+            marketOutcomes,
             buildSnapshots: false,
             snapshotCount: 0,
             summaries: []
@@ -122,31 +215,60 @@ async function main() {
       return;
     }
 
-    const hkDataset = await ensureHongKongDatasetReady();
-    const cryptoDataset = await ensureCryptoDatasetReady();
+    const snapshotPlans: SnapshotPlan[] = [];
+    const snapshotMarkets = determineSnapshotMarkets(marketOutcomes);
 
-    const snapshotPlans: SnapshotPlan[] = [
-      ...BUILD_RUN_SCORE_METHODS.map((scoreMethod) => ({
-        marketLabel: 'hk' as const,
-        datasetId: hkDataset.id,
-        universeId: HK_UNIVERSE_ID,
-        asOfDate: requireCatalogMaxTradeDate(hkDataset, 'Hong Kong dataset'),
-        windowDays: SNAPSHOT_WINDOW_DAYS,
-        scoreMethod
-      })),
-      ...BUILD_RUN_SCORE_METHODS.map((scoreMethod) => ({
-        marketLabel: 'crypto' as const,
-        datasetId: cryptoDataset.id,
-        universeId: CRYPTO_UNIVERSE_ID,
-        asOfDate: requireCatalogMaxTradeDate(cryptoDataset, 'Crypto dataset'),
-        windowDays: SNAPSHOT_WINDOW_DAYS,
-        scoreMethod
-      }))
-    ];
+    if (snapshotMarkets.includes('hk')) {
+      const hkDataset = await ensureHongKongDatasetReady();
+      snapshotPlans.push(
+        ...BUILD_RUN_SCORE_METHODS.map((scoreMethod) => ({
+          marketLabel: 'hk' as const,
+          datasetId: hkDataset.id,
+          universeId: HK_UNIVERSE_ID,
+          asOfDate: requireCatalogMaxTradeDate(hkDataset, 'Hong Kong dataset'),
+          windowDays: SNAPSHOT_WINDOW_DAYS,
+          scoreMethod
+        }))
+      );
+    }
+
+    if (snapshotMarkets.includes('crypto')) {
+      const cryptoDataset = await ensureCryptoDatasetReady();
+      snapshotPlans.push(
+        ...BUILD_RUN_SCORE_METHODS.map((scoreMethod) => ({
+          marketLabel: 'crypto' as const,
+          datasetId: cryptoDataset.id,
+          universeId: CRYPTO_UNIVERSE_ID,
+          asOfDate: requireCatalogMaxTradeDate(cryptoDataset, 'Crypto dataset'),
+          windowDays: SNAPSHOT_WINDOW_DAYS,
+          scoreMethod
+        }))
+      );
+    }
+
+    if (snapshotPlans.length === 0) {
+      console.log('Skipping daily snapshot builds because no refreshed market remained eligible.');
+      console.log(
+        JSON.stringify(
+          {
+            refreshMode: REFRESH_MODE,
+            continueOnMarketFailure: CONTINUE_ON_MARKET_FAILURE,
+            refreshSteps,
+            marketOutcomes,
+            buildSnapshots: true,
+            snapshotCount: 0,
+            summaries: []
+          },
+          null,
+          2
+        )
+      );
+      return;
+    }
 
     console.log(
       `Prepared ${snapshotPlans.length} daily snapshot plans ` +
-        `(markets=2, scoreMethods=${BUILD_RUN_SCORE_METHODS.length}, windowDays=${SNAPSHOT_WINDOW_DAYS}).`
+        `(markets=${snapshotMarkets.length}, scoreMethods=${BUILD_RUN_SCORE_METHODS.length}, windowDays=${SNAPSHOT_WINDOW_DAYS}).`
     );
 
     const summaries: SnapshotBuildSummary[] = [];
@@ -166,9 +288,10 @@ async function main() {
     console.log(
       JSON.stringify(
         {
+          refreshMode: REFRESH_MODE,
+          continueOnMarketFailure: CONTINUE_ON_MARKET_FAILURE,
           refreshSteps,
-          hkDataset: summarizeDataset(hkDataset),
-          cryptoDataset: summarizeDataset(cryptoDataset),
+          marketOutcomes,
           snapshotCount: summaries.length,
           summaries
         },
@@ -179,6 +302,75 @@ async function main() {
   } finally {
     await releaseDailyRefreshLock();
   }
+}
+
+async function executeMarketRefresh(
+  marketLabel: MarketLabel,
+  step: string,
+  runStep: () => Promise<void>
+): Promise<MarketRefreshOutcome> {
+  try {
+    await runStep();
+    return {
+      marketLabel,
+      requested: true,
+      status: 'succeeded',
+      step,
+      errorMessage: null
+    };
+  } catch (error) {
+    const errorMessage = getErrorMessage(error);
+    if (!CONTINUE_ON_MARKET_FAILURE) {
+      throw error;
+    }
+
+    console.error(
+      `Daily refresh degraded after ${marketLabel} failure: ${errorMessage}. ` +
+        'Continuing with remaining markets.'
+    );
+
+    return {
+      marketLabel,
+      requested: true,
+      status: 'failed',
+      step,
+      errorMessage
+    };
+  }
+}
+
+function determineSnapshotMarkets(marketOutcomes: MarketRefreshOutcome[]): MarketLabel[] {
+  const requestedMarkets = marketOutcomes.filter((outcome) => outcome.requested);
+  const selectedMarkets: MarketLabel[] = [];
+
+  if (requestedMarkets.length === 0) {
+    return ['hk', 'crypto'];
+  }
+
+  for (const outcome of requestedMarkets) {
+    if (outcome.status !== 'failed') {
+      selectedMarkets.push(outcome.marketLabel);
+    }
+  }
+
+  return selectedMarkets;
+}
+
+function buildAllMarketsFailedMessage(outcomes: MarketRefreshOutcome[]): string {
+  return outcomes
+    .map(
+      (outcome) =>
+        `${outcome.marketLabel}: ${outcome.errorMessage ?? 'unknown refresh failure'}`
+    )
+    .join(' | ');
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return String(error);
 }
 
 function summarizeDataset(dataset: DatasetCatalogRow) {
@@ -435,6 +627,11 @@ async function runPrismaScript(
       );
     });
   });
+}
+
+function readRefreshEnv(name: string, fallback: string): string {
+  const value = process.env[name]?.trim();
+  return value && value.length > 0 ? value : fallback;
 }
 
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];

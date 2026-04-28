@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Risk Atlas Hong Kong daily market refresh every 24 hours
+
+[Timer]
+OnBootSec=15m
+OnUnitActiveSec=24h
+Persistent=true
+Unit=risk-atlas-hk-daily-market-refresh.service
+
+[Install]
+WantedBy=timers.target

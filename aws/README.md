@@ -410,8 +410,11 @@ Most important fields:
 - S3_ARTIFACT_PREFIX: optional namespace such as prod
 - S3_SIGNED_URL_TTL_SECONDS: lifetime of presigned build download URLs
 - RUN_INITIAL_MARKET_BOOTSTRAP_ON_DEPLOY: set this to 1 if first deploy should reuse repository baselines, refresh both markets to the latest overlap window, and build the latest 8 market-wide snapshots automatically
-- INSTALL_DAILY_MARKET_REFRESH_TIMER: set this to 1 if the host should keep both markets refreshed every 24 hours after deploy
+- INSTALL_DAILY_MARKET_REFRESH_TIMER: set this to 1 if the host should install the split Hong Kong and crypto 24-hour timers after deploy
 - RISK_ATLAS_DAILY_REFRESH_RUN_HK and RISK_ATLAS_DAILY_REFRESH_RUN_CRYPTO: let you disable one market while keeping the 24-hour timer enabled
+- RISK_ATLAS_DAILY_REFRESH_CONTINUE_ON_MARKET_FAILURE: when set to 1, one market refresh failure degrades to a warning so the other market can still finish
+- DAILY_REFRESH_API_CPUS, DAILY_REFRESH_API_MEMORY, DAILY_REFRESH_API_MEMORY_SWAP, and DAILY_REFRESH_API_PIDS_LIMIT: guardrails applied to the running API container before the daily refresh begins so a very small host keeps headroom for PostgreSQL, Nginx, and the kernel
+- RISK_ATLAS_DAILY_REFRESH_CRYPTO_*: daily-only crypto refresh tuning knobs for target asset count, candidate page count, Yahoo batch size, concurrency, and request delay
 
 For this deployment, keep VITE_API_BASE_URL blank.
 
@@ -501,22 +504,50 @@ If you want the server to keep both markets current every 24 hours after the fir
 
 ```dotenv
 INSTALL_DAILY_MARKET_REFRESH_TIMER=1
+DAILY_REFRESH_API_CPUS=1.0
+DAILY_REFRESH_API_MEMORY=1200m
+DAILY_REFRESH_API_MEMORY_SWAP=1200m
+DAILY_REFRESH_API_PIDS_LIMIT=256
+RISK_ATLAS_DAILY_REFRESH_CONTINUE_ON_MARKET_FAILURE=1
 RISK_ATLAS_DAILY_REFRESH_BUILD_SNAPSHOTS=0
 ```
 
 Keep `RISK_ATLAS_DAILY_REFRESH_BUILD_SNAPSHOTS=0` on very small instances such as `t3.small` unless you explicitly want the daily job to also rebuild market snapshots.
 
-The deploy script installs and enables `aws/systemd/risk-atlas-daily-market-refresh.service` and `aws/systemd/risk-atlas-daily-market-refresh.timer` when that flag is enabled.
+The installed systemd services now retry a failed refresh once after 30 minutes and stop flapping after 2 failed starts within 6 hours.
 
-The timer runs the same market-state refresh flow every 24 hours:
+The refresh script also applies the API-container guardrails above before the job starts, so the refresh cannot claim the entire host on a very small instance.
 
-1. ensure the Hong Kong seed prerequisites still exist
-2. overlap-refresh Hong Kong data to the latest available trade date
-3. overlap-refresh crypto data to the latest available trade date
+The deploy script now installs two staggered timers instead of one combined timer:
 
-When `RISK_ATLAS_DAILY_REFRESH_BUILD_SNAPSHOTS=1`, the same job then builds or reuses the latest 8 market-wide snapshots.
+1. `aws/systemd/risk-atlas-hk-daily-market-refresh.timer` starts the Hong Kong refresh first
+2. `aws/systemd/risk-atlas-crypto-daily-market-refresh.timer` starts the crypto refresh several hours later
 
-On `t3.small`, rebuilding 8 snapshots inline is usually the step that causes CPU and memory saturation, so the production default is now dataset refresh only.
+That split keeps HK and crypto out of the same resource window on a very small host.
+
+For very small instances, keep the daily crypto refresh conservative unless you have already verified enough headroom:
+
+```dotenv
+RISK_ATLAS_DAILY_REFRESH_CRYPTO_TARGET_COUNT=300
+RISK_ATLAS_DAILY_REFRESH_CRYPTO_MIN_COUNT=80
+RISK_ATLAS_DAILY_REFRESH_CRYPTO_CANDIDATE_PAGE_COUNT=3
+RISK_ATLAS_DAILY_REFRESH_CRYPTO_HISTORY_BATCH_SIZE=80
+RISK_ATLAS_DAILY_REFRESH_CRYPTO_HISTORY_CONCURRENCY=4
+RISK_ATLAS_DAILY_REFRESH_CRYPTO_REQUEST_DELAY_MS=500
+```
+
+When `INSTALL_DAILY_MARKET_REFRESH_TIMER=1`, the deploy script installs and enables both `aws/systemd/risk-atlas-hk-daily-market-refresh.service` / `aws/systemd/risk-atlas-hk-daily-market-refresh.timer` and `aws/systemd/risk-atlas-crypto-daily-market-refresh.service` / `aws/systemd/risk-atlas-crypto-daily-market-refresh.timer`.
+
+The split timers run the same market-state refresh flow, but in separate windows:
+
+1. the Hong Kong timer ensures the Hong Kong seed prerequisites still exist and then overlap-refreshes Hong Kong data to the latest available trade date
+2. the crypto timer overlap-refreshes crypto data to the latest available trade date using the daily-only crypto tuning window above
+
+When `RISK_ATLAS_DAILY_REFRESH_BUILD_SNAPSHOTS=1`, each timer builds or reuses snapshots only for the market it refreshed instead of rebuilding both markets in one combined job.
+
+When `RISK_ATLAS_DAILY_REFRESH_CONTINUE_ON_MARKET_FAILURE=1`, a failure on one market is logged as a degraded outcome and does not collapse the other market's refresh. The service only fails when every requested market in that run fails.
+
+On `t3.small`, combining both markets in one refresh window is itself a source of contention, so the production path is now split timers plus dataset refresh only by default.
 
 If you want to run the same flow manually outside systemd:
 
@@ -527,15 +558,29 @@ bash aws/scripts/run-daily-market-refresh.sh
 
 That helper brings PostgreSQL up if needed, then runs `prisma/refresh-daily-market-state.ts` inside the API container with the production environment file.
 
+You can also run one market only:
+
+```bash
+cd /opt/risk-atlas/app
+bash aws/scripts/run-daily-market-refresh.sh aws/.env.production hk
+bash aws/scripts/run-daily-market-refresh.sh aws/.env.production crypto
+```
+
 If you prefer to install the timer manually:
 
 ```bash
-sudo cp aws/systemd/risk-atlas-daily-market-refresh.service /etc/systemd/system/
-sudo cp aws/systemd/risk-atlas-daily-market-refresh.timer /etc/systemd/system/
+sudo cp aws/systemd/risk-atlas-hk-daily-market-refresh.service /etc/systemd/system/
+sudo cp aws/systemd/risk-atlas-hk-daily-market-refresh.timer /etc/systemd/system/
+sudo cp aws/systemd/risk-atlas-crypto-daily-market-refresh.service /etc/systemd/system/
+sudo cp aws/systemd/risk-atlas-crypto-daily-market-refresh.timer /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now risk-atlas-daily-market-refresh.timer
-sudo systemctl status risk-atlas-daily-market-refresh.timer
+sudo systemctl enable --now risk-atlas-hk-daily-market-refresh.timer
+sudo systemctl enable --now risk-atlas-crypto-daily-market-refresh.timer
+sudo systemctl status risk-atlas-hk-daily-market-refresh.timer
+sudo systemctl status risk-atlas-crypto-daily-market-refresh.timer
 ```
+
+If you update the unit after the first install, run `sudo systemctl daemon-reload` and restart the timer or service so the retry policy takes effect.
 
 If your seed uses the bundled real-HK CSV, the first import is intentionally heavy: the file is about 1.4 million rows and may take several minutes on EC2 before the next post-import log lines appear.
 
